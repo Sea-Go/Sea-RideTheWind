@@ -19,7 +19,7 @@ _基于 Go / go-zero 构建的现代化微服务业务后端框架._
 
 项目资料与访问入口汇总
 
-- 📄 [项目文档](https://my.feishu.cn/wiki/FWSkwcTKwiuCcGkzqwPcfx0Inuc?fromScene=spaceOverview)
+- 📄 [项目文档](https://my.feishu.cn/wiki/FWSkwcTKwiuCcGkzqwPcfx0Inuc?from=from_copylink )   密码：174w667#
 - 👥QQ 交流群：750807478
 - 🧩 [前端仓库](https://github.com/Sea-Go/Sea-RideTheWind-Fronted) / [推荐算法仓库](https://github.com/Sea-Go/Sea-BreakTheWaves)
 - 🚀 [在线体验](sea-ridethewindbreakthewaves.xyz)
