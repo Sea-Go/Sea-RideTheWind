@@ -1,0 +1,195 @@
+syntax = "proto3";
+
+package message;
+
+option go_package = "./pb";
+
+enum NotificationKind {
+  NOTIFICATION_KIND_UNSPECIFIED = 0;
+  ADMIN_BROADCAST = 1;
+  ADMIN_NOTICE = 2;
+  ARTICLE_COMMENT = 3;
+  COMMENT_REPLY = 4;
+  ARTICLE_PUBLISHED = 5;
+  ARTICLE_LIKED = 6;
+}
+
+enum SenderRole {
+  SENDER_ROLE_UNSPECIFIED = 0;
+  USER = 1;
+  ADMIN = 2;
+  SYSTEM = 3;
+}
+
+enum ConversationStatus {
+  CONVERSATION_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  OPEN = 2;
+}
+
+message BaseResp {
+  int32 code = 1;
+  string msg = 2;
+}
+
+message NotificationItem {
+  int64 id = 1;
+  int64 recipient_id = 2;
+  int64 sender_id = 3;
+  SenderRole sender_role = 4;
+  NotificationKind kind = 5;
+  string title = 6;
+  string content = 7;
+  bool is_read = 8;
+  int64 created_at = 9;
+  map<string, string> extra = 10;
+}
+
+message NotificationListReq {
+  int64 user_id = 1;
+  int32 offset = 2;
+  int32 limit = 3;
+  bool unread_only = 4;
+}
+
+message NotificationListResp {
+  int32 code = 1;
+  string msg = 2;
+  repeated NotificationItem items = 3;
+  int64 total = 4;
+  int64 unread_count = 5;
+}
+
+message MarkNotificationReq {
+  int64 user_id = 1;
+  int64 notification_id = 2;
+}
+
+message MarkAllNotificationsReq {
+  int64 user_id = 1;
+}
+
+message UnreadSummaryReq {
+  int64 user_id = 1;
+}
+
+message UnreadSummaryResp {
+  int32 code = 1;
+  string msg = 2;
+  int64 notification_unread = 3;
+  int64 conversation_unread = 4;
+  int64 total_unread = 5;
+}
+
+message SendNotificationReq {
+  repeated int64 recipient_ids = 1;
+  bool broadcast = 2;
+  int64 sender_id = 3;
+  SenderRole sender_role = 4;
+  NotificationKind kind = 5;
+  string title = 6;
+  string content = 7;
+  map<string, string> extra = 8;
+}
+
+message SendNotificationResp {
+  int32 code = 1;
+  string msg = 2;
+  int64 affected = 3;
+}
+
+message ConversationItem {
+  int64 conversation_id = 1;
+  int64 peer_id = 2;
+  SenderRole peer_role = 3;
+  string peer_name = 4;
+  string peer_email = 5;
+  ConversationStatus status = 6;
+  int64 unread_count = 7;
+  string latest_message = 8;
+  int64 latest_message_at = 9;
+  int64 updated_at = 10;
+  bool can_send = 11;
+}
+
+message ConversationListReq {
+  int64 operator_id = 1;
+  SenderRole operator_role = 2;
+  int32 offset = 3;
+  int32 limit = 4;
+}
+
+message ConversationListResp {
+  int32 code = 1;
+  string msg = 2;
+  repeated ConversationItem items = 3;
+  int64 total = 4;
+  int64 unread_count = 5;
+}
+
+message ChatMessageItem {
+  int64 id = 1;
+  int64 conversation_id = 2;
+  int64 sender_id = 3;
+  SenderRole sender_role = 4;
+  int64 recipient_id = 5;
+  SenderRole recipient_role = 6;
+  string content = 7;
+  bool is_read = 8;
+  int64 created_at = 9;
+}
+
+message ConversationMessageListReq {
+  int64 operator_id = 1;
+  SenderRole operator_role = 2;
+  int64 conversation_id = 3;
+  int32 offset = 4;
+  int32 limit = 5;
+}
+
+message ConversationMessageListResp {
+  int32 code = 1;
+  string msg = 2;
+  repeated ChatMessageItem items = 3;
+  ConversationStatus status = 4;
+  bool can_send = 5;
+  int64 pending_sender_id = 6;
+  SenderRole pending_sender_role = 7;
+}
+
+message SendChatMessageReq {
+  int64 sender_id = 1;
+  SenderRole sender_role = 2;
+  int64 recipient_id = 3;
+  SenderRole recipient_role = 4;
+  int64 conversation_id = 5;
+  string content = 6;
+}
+
+message SendChatMessageResp {
+  int32 code = 1;
+  string msg = 2;
+  int64 conversation_id = 3;
+  ChatMessageItem message = 4;
+  ConversationStatus status = 5;
+  bool can_send = 6;
+}
+
+message MarkConversationReadReq {
+  int64 operator_id = 1;
+  SenderRole operator_role = 2;
+  int64 conversation_id = 3;
+}
+
+service MessageService {
+  rpc SendNotification(SendNotificationReq) returns (SendNotificationResp);
+  rpc ListNotifications(NotificationListReq) returns (NotificationListResp);
+  rpc MarkNotificationRead(MarkNotificationReq) returns (BaseResp);
+  rpc MarkAllNotificationsRead(MarkAllNotificationsReq) returns (BaseResp);
+  rpc GetUnreadSummary(UnreadSummaryReq) returns (UnreadSummaryResp);
+
+  rpc ListConversations(ConversationListReq) returns (ConversationListResp);
+  rpc GetConversationMessages(ConversationMessageListReq) returns (ConversationMessageListResp);
+  rpc SendChatMessage(SendChatMessageReq) returns (SendChatMessageResp);
+  rpc MarkConversationRead(MarkConversationReadReq) returns (BaseResp);
+}

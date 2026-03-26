@@ -1,0 +1,180 @@
+syntax = "v1"
+
+info (
+	title:   "Message Center API"
+	desc:    "Message center HTTP gateway for notifications and private chats"
+	version: "1.0.0"
+)
+
+type EmptyReq {}
+
+type PageReq {
+	Offset     int32 `json:"offset,optional"`
+	Limit      int32 `json:"limit,optional"`
+	UnreadOnly bool  `json:"unread_only,optional"`
+}
+
+type NotificationItem {
+	Id          int64             `json:"id,string"`
+	RecipientId int64             `json:"recipient_id,string"`
+	SenderId    int64             `json:"sender_id,string"`
+	SenderRole  int32             `json:"sender_role"`
+	Kind        int32             `json:"kind"`
+	Title       string            `json:"title"`
+	Content     string            `json:"content"`
+	IsRead      bool              `json:"is_read"`
+	CreatedAt   int64             `json:"created_at"`
+	Extra       map[string]string `json:"extra"`
+}
+
+type NotificationListResp {
+	Items       []NotificationItem `json:"items"`
+	Total       int64              `json:"total"`
+	UnreadCount int64              `json:"unread_count"`
+}
+
+type MarkNotificationReq {
+	NotificationId int64 `json:"notification_id,string"`
+}
+
+type UnreadSummaryResp {
+	NotificationUnread int64 `json:"notification_unread"`
+	ConversationUnread int64 `json:"conversation_unread"`
+	TotalUnread        int64 `json:"total_unread"`
+}
+
+type ConversationItem {
+	ConversationId  int64  `json:"conversation_id,string"`
+	PeerId          int64  `json:"peer_id,string"`
+	PeerRole        int32  `json:"peer_role"`
+	PeerName        string `json:"peer_name"`
+	PeerEmail       string `json:"peer_email"`
+	Status          int32  `json:"status"`
+	UnreadCount     int64  `json:"unread_count"`
+	LatestMessage   string `json:"latest_message"`
+	LatestMessageAt int64  `json:"latest_message_at"`
+	UpdatedAt       int64  `json:"updated_at"`
+	CanSend         bool   `json:"can_send"`
+}
+
+type ConversationListResp {
+	Items       []ConversationItem `json:"items"`
+	Total       int64              `json:"total"`
+	UnreadCount int64              `json:"unread_count"`
+}
+
+type ConversationMessagesReq {
+	ConversationId int64 `json:"conversation_id,string"`
+	Offset         int32 `json:"offset,optional"`
+	Limit          int32 `json:"limit,optional"`
+}
+
+type ChatMessageItem {
+	Id             int64  `json:"id,string"`
+	ConversationId int64  `json:"conversation_id,string"`
+	SenderId       int64  `json:"sender_id,string"`
+	SenderRole     int32  `json:"sender_role"`
+	RecipientId    int64  `json:"recipient_id,string"`
+	RecipientRole  int32  `json:"recipient_role"`
+	Content        string `json:"content"`
+	IsRead         bool   `json:"is_read"`
+	CreatedAt      int64  `json:"created_at"`
+}
+
+type ConversationMessagesResp {
+	Items             []ChatMessageItem `json:"items"`
+	Status            int32             `json:"status"`
+	CanSend           bool              `json:"can_send"`
+	PendingSenderId   int64             `json:"pending_sender_id,string"`
+	PendingSenderRole int32             `json:"pending_sender_role"`
+}
+
+type UserSendChatReq {
+	RecipientId    int64  `json:"recipient_id,string,optional"`
+	ConversationId int64  `json:"conversation_id,string,optional"`
+	Content        string `json:"content"`
+}
+
+type AdminSendChatReq {
+	RecipientId    int64  `json:"recipient_id,string"`
+	ConversationId int64  `json:"conversation_id,string,optional"`
+	Content        string `json:"content"`
+}
+
+type SendChatResp {
+	ConversationId int64           `json:"conversation_id,string"`
+	Message        ChatMessageItem `json:"message"`
+	Status         int32           `json:"status"`
+	CanSend        bool            `json:"can_send"`
+}
+
+type MarkConversationReadReq {
+	ConversationId int64 `json:"conversation_id,string"`
+}
+
+type AdminSendNotificationReq {
+	Broadcast bool              `json:"broadcast,optional"`
+	TargetId  int64             `json:"target_id,string,optional"`
+	Kind      int32             `json:"kind,optional"`
+	Title     string            `json:"title"`
+	Content   string            `json:"content"`
+	Extra     map[string]string `json:"extra,optional"`
+}
+
+type AdminSendNotificationResp {
+	Affected int64 `json:"affected"`
+}
+
+@server (
+	prefix: "/message/v1"
+	group:  "message"
+	jwt:    UserAuth
+)
+service messagecenter {
+	@handler GetUnreadSummary
+	get /unread (EmptyReq) returns (UnreadSummaryResp)
+
+	@handler ListNotifications
+	post /notifications/list (PageReq) returns (NotificationListResp)
+
+	@handler MarkNotificationRead
+	post /notifications/read (MarkNotificationReq) returns (EmptyReq)
+
+	@handler MarkAllNotificationsRead
+	post /notifications/readall (EmptyReq) returns (EmptyReq)
+
+	@handler ListConversations
+	post /conversations/list (PageReq) returns (ConversationListResp)
+
+	@handler GetConversationMessages
+	post /conversations/messages (ConversationMessagesReq) returns (ConversationMessagesResp)
+
+	@handler SendUserChatMessage
+	post /conversations/send (UserSendChatReq) returns (SendChatResp)
+
+	@handler MarkConversationRead
+	post /conversations/read (MarkConversationReadReq) returns (EmptyReq)
+}
+
+@server (
+	prefix: "/message/v1/admin"
+	group:  "messageadmin"
+	jwt:    AdminAuth
+)
+service messagecenter {
+	@handler SendAdminNotification
+	post /notifications/send (AdminSendNotificationReq) returns (AdminSendNotificationResp)
+
+	@handler ListAdminConversations
+	post /conversations/list (PageReq) returns (ConversationListResp)
+
+	@handler GetAdminConversationMessages
+	post /conversations/messages (ConversationMessagesReq) returns (ConversationMessagesResp)
+
+	@handler SendAdminChatMessage
+	post /conversations/send (AdminSendChatReq) returns (SendChatResp)
+
+	@handler MarkAdminConversationRead
+	post /conversations/read (MarkConversationReadReq) returns (EmptyReq)
+}
+

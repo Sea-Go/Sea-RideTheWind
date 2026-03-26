@@ -1,0 +1,37 @@
+Name: messagecenter
+Host: 0.0.0.0
+Port: 8892
+
+Log:
+  ServiceName: messagecenter
+  Mode: file
+  Path: ../../../../log/message-api
+
+UserAuth:
+  AccessSecret: ae0536f9-6450-4606-8e13-5a19ed505da0
+  AccessExpire: 31536000
+
+AdminAuth:
+  AccessSecret: "yU-hCm)2*?NQmWG"
+  AccessExpire: 2592000
+
+Telemetry:
+  Name: message-api
+  Endpoint: localhost:34317
+  Sampler: 1.0
+  Batcher: otlpgrpc
+
+DevServer:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 16066
+  MetricsPath: /metrics
+  HealthPath: /healthz
+  EnableMetrics: true
+  EnablePprof: true
+
+MessageRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: message.rpc

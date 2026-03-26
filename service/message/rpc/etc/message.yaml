@@ -1,0 +1,53 @@
+Name: message.rpc
+ListenOn: 0.0.0.0:8082
+Etcd:
+  Hosts:
+  - 127.0.0.1:32379
+  Key: message.rpc
+
+Log:
+  ServiceName: message-rpc
+  Mode: file
+  Path: ../../../../log/message-rpc
+
+Telemetry:
+  Name: message-rpc
+  Endpoint: localhost:34317
+  Sampler: 1.0
+  Batcher: otlpgrpc
+
+DevServer:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 16067
+  MetricsPath: /metrics
+  HealthPath: /healthz
+  EnableMetrics: true
+  EnablePprof: true
+
+Postgres:
+  Host: "127.0.0.1"
+  Port: "35432"
+  User: "admin"
+  Password: "Sea-TryGo"
+  DBName: "first_db"
+  Mode: "disable"
+
+UserRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: user.rpc
+
+AdminRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: admin.rpc
+
+List:
+  DefaultLimit: 20
+  MaxLimit: 100
+
+Broadcast:
+  PageSize: 200
