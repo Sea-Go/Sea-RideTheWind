@@ -12,7 +12,7 @@ import (
 
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/security/rpc/internal/svc"
-	"sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
+	pb "sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
 )
 
 type DetectImageAdLogic struct {
@@ -27,12 +27,11 @@ func NewDetectImageAdLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Det
 	}
 }
 
-// DashScopeResponse 阿里云 DashScope 响应格式
-type DashScopeResponse struct {
+type dashScopeResponse struct {
 	Output struct {
 		Choices []struct {
 			Message struct {
-				Content interface{} `json:"content"` // 可能是 string 或 array
+				Content interface{} `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
 	} `json:"output"`
@@ -42,8 +41,7 @@ type DashScopeResponse struct {
 	RequestID string `json:"request_id"`
 }
 
-// AdDetectionResult 广告检测结果
-type AdDetectionResult struct {
+type adDetectionResult struct {
 	IsAd          bool    `json:"is_ad"`
 	AdConfidence  float64 `json:"ad_confidence"`
 	ExtractedText string  `json:"extracted_text"`
@@ -51,20 +49,21 @@ type AdDetectionResult struct {
 	ErrorMessage  string  `json:"error_message"`
 }
 
-// callAIModel 调用阿里云 DashScope 多模态 API 进行广告检测
-func (l *DetectImageAdLogic) callAIModel(imageInput string, confidenceThreshold float64, enableTextExtraction bool) (*AdDetectionResult, error) {
+func (l *DetectImageAdLogic) callAIModel(imageInput string, confidenceThreshold float64, enableTextExtraction bool) (*adDetectionResult, error) {
 	config := l.svcCtx.Config.AIModel
+	if strings.TrimSpace(config.ModelEndpoint) == "" {
+		return nil, fmt.Errorf("image moderation model endpoint is not configured")
+	}
+	if strings.TrimSpace(config.APIKey) == "" {
+		return nil, fmt.Errorf("image moderation api key is not configured")
+	}
 
-	// 构建提示词
-	prompt := `请分析这张图片：
-1. 判断是否为广告图片（包含商品推广、营销信息、联系方式等）
-2. 提取图片中的文字内容（如果有）
-3. 返回 JSON 格式：{"is_ad": true/false, "ad_confidence": 0.0-1.0, "extracted_text": "提取的文字"}
+	timeoutSeconds := config.Timeout
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 300
+	}
 
-请严格只返回 JSON，不要其他内容。`
-
-	// 构建 DashScope 请求（支持 URL 或 Base64 Data URI）
-	dashScopeReq := map[string]interface{}{
+	requestPayload := map[string]interface{}{
 		"model": "qwen-vl-max",
 		"input": map[string]interface{}{
 			"messages": []map[string]interface{}{
@@ -72,7 +71,7 @@ func (l *DetectImageAdLogic) callAIModel(imageInput string, confidenceThreshold 
 					"role": "user",
 					"content": []map[string]interface{}{
 						{"image": imageInput},
-						{"text": prompt},
+						{"text": buildImagePrompt(confidenceThreshold, enableTextExtraction)},
 					},
 				},
 			},
@@ -83,154 +82,230 @@ func (l *DetectImageAdLogic) callAIModel(imageInput string, confidenceThreshold 
 		},
 	}
 
-	requestBody, err := json.Marshal(dashScopeReq)
+	requestBody, err := json.Marshal(requestPayload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal dashscope request: %w", err)
+		return nil, fmt.Errorf("marshal image moderation request: %w", err)
 	}
 
-	logger.LogInfo(l.ctx, "Calling DashScope API", logger.WithUserID(fmt.Sprintf("endpoint: %s", config.ModelEndpoint)))
-
-	// 创建独立的超时上下文，避免被上层 gRPC 上下文过早取消
-	apiCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
+	apiCtx, cancel := context.WithTimeout(l.ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
-	client := &http.Client{
-		Timeout: time.Duration(config.Timeout) * time.Second,
-	}
-
-	httpReq, err := http.NewRequestWithContext(apiCtx, "POST", config.ModelEndpoint, bytes.NewBuffer(requestBody))
+	httpReq, err := http.NewRequestWithContext(apiCtx, http.MethodPost, config.ModelEndpoint, bytes.NewBuffer(requestBody))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+		return nil, fmt.Errorf("create image moderation request: %w", err)
 	}
-
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+config.APIKey)
 
+	client := &http.Client{Timeout: time.Duration(timeoutSeconds) * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call DashScope API: %w", err)
+		return nil, fmt.Errorf("call image moderation endpoint: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, fmt.Errorf("read image moderation response: %w", err)
 	}
-
-	logger.LogInfo(l.ctx, "DashScope API response", logger.WithUserID(fmt.Sprintf("status: %d, body: %s", resp.StatusCode, string(body))))
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("DashScope API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("image moderation endpoint returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var dashScopeResp DashScopeResponse
-	if err := json.Unmarshal(body, &dashScopeResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal DashScope response: %w", err)
+	var parsed dashScopeResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, fmt.Errorf("unmarshal image moderation response: %w", err)
+	}
+	if len(parsed.Output.Choices) == 0 {
+		return nil, fmt.Errorf("image moderation response did not contain any choices")
 	}
 
-	if len(dashScopeResp.Output.Choices) == 0 {
-		return nil, fmt.Errorf("no choices in DashScope response")
-	}
+	contentText := dashScopeContentToString(parsed.Output.Choices[0].Message.Content)
+	jsonText := extractJSON(contentText)
 
-	content := dashScopeResp.Output.Choices[0].Message.Content
-	logger.LogInfo(l.ctx, "AI response content", logger.WithUserID(fmt.Sprintf("content: %v", content)))
-
-	// 提取 JSON（content 可能是 string 或 array）
-	var contentStr string
-	switch v := content.(type) {
-	case string:
-		contentStr = v
-	case []interface{}:
-		// 多模态响应格式：content 是数组
-		if len(v) > 0 {
-			if text, ok := v[0].(map[string]interface{}); ok {
-				contentStr = fmt.Sprintf("%v", text["text"])
-			}
-		}
-	default:
-		contentStr = fmt.Sprintf("%v", v)
-	}
-
-	// 提取 JSON（可能包含在 markdown 代码块中）
-	jsonStr := extractJSON(contentStr)
-
-	var result AdDetectionResult
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		logger.LogInfo(l.ctx, "JSON parse failed, using fallback", logger.WithUserID(fmt.Sprintf("error: %v, content: %s", err, contentStr)))
-		result = parseAdResultFallback(contentStr)
+	var result adDetectionResult
+	if err := json.Unmarshal([]byte(jsonText), &result); err != nil {
+		logger.LogInfo(l.ctx, "image moderation returned non-json payload, using fallback parser",
+			logger.WithUserID(fmt.Sprintf("content=%s", contentText)))
+		result = parseAdResultFallback(contentText)
 	}
 
 	result.Success = true
 	return &result, nil
 }
 
-// extractJSON 从文本中提取 JSON 字符串
-func extractJSON(text string) string {
-	start := strings.Index(text, "```")
-	if start != -1 {
-		end := strings.Index(text[start+3:], "```")
-		if end != -1 {
-			content := text[start+3 : start+3+end]
-			content = strings.TrimPrefix(content, "json")
-			return strings.TrimSpace(content)
+func dashScopeContentToString(content interface{}) string {
+	switch value := content.(type) {
+	case string:
+		return value
+	case []interface{}:
+		parts := make([]string, 0, len(value))
+		for _, item := range value {
+			if textItem, ok := item.(map[string]interface{}); ok {
+				if text, ok := textItem["text"].(string); ok {
+					parts = append(parts, text)
+					continue
+				}
+			}
+			parts = append(parts, fmt.Sprintf("%v", item))
 		}
+		return strings.TrimSpace(strings.Join(parts, "\n"))
+	default:
+		return fmt.Sprintf("%v", value)
 	}
-	return strings.TrimSpace(text)
 }
 
-// parseAdResultFallback 回退解析函数
-func parseAdResultFallback(content string) AdDetectionResult {
-	result := AdDetectionResult{
-		IsAd:          strings.Contains(strings.ToLower(content), "是广告") || strings.Contains(strings.ToLower(content), `"is_ad": true`),
+func extractJSON(text string) string {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return trimmed
+	}
+
+	if strings.HasPrefix(trimmed, "```") {
+		trimmed = strings.TrimPrefix(trimmed, "```json")
+		trimmed = strings.TrimPrefix(trimmed, "```JSON")
+		trimmed = strings.TrimPrefix(trimmed, "```")
+		trimmed = strings.TrimSuffix(trimmed, "```")
+		trimmed = strings.TrimSpace(trimmed)
+	}
+
+	start := strings.Index(trimmed, "{")
+	end := strings.LastIndex(trimmed, "}")
+	if start >= 0 && end > start {
+		return strings.TrimSpace(trimmed[start : end+1])
+	}
+
+	return trimmed
+}
+
+func parseAdResultFallback(content string) adDetectionResult {
+	normalized := strings.ToLower(content)
+	result := adDetectionResult{
+		IsAd:          containsAny(normalized, []string{`"is_ad": true`, `"is_ad":true`, "advertisement", "promotion", "promo", "marketing", "buy now", "discount", "coupon", "telegram", "whatsapp", "wechat", "vx"}),
 		AdConfidence:  0.5,
 		ExtractedText: content,
 	}
-	if strings.Contains(strings.ToLower(content), "高") || strings.Contains(strings.ToLower(content), "high") {
+
+	if containsAny(normalized, []string{"high confidence", `"ad_confidence": 0.9`, `"ad_confidence":0.9`, `"ad_confidence": 1`, `"ad_confidence":1`}) {
 		result.AdConfidence = 0.9
-	} else if strings.Contains(strings.ToLower(content), "低") || strings.Contains(strings.ToLower(content), "low") {
+	} else if containsAny(normalized, []string{"low confidence", `"ad_confidence": 0.2`, `"ad_confidence":0.2`, `"ad_confidence": 0.3`, `"ad_confidence":0.3`}) {
 		result.AdConfidence = 0.3
 	}
+
 	return result
 }
 
-// DetectImageAd 广告检测接口
+func buildImagePrompt(confidenceThreshold float64, enableTextExtraction bool) string {
+	prompt := fmt.Sprintf(
+		"Review the image and decide whether it is an advertisement. Use %.2f as the confidence threshold. Return JSON only: {\"is_ad\": true/false, \"ad_confidence\": 0.0-1.0, \"extracted_text\": \"...\"}.",
+		confidenceThreshold,
+	)
+	if enableTextExtraction {
+		prompt += " Extract visible text when it helps the decision."
+	} else {
+		prompt += " Keep extracted_text brief if text is not important."
+	}
+	return prompt
+}
+
+func containsAny(text string, keywords []string) bool {
+	for _, keyword := range keywords {
+		if strings.Contains(text, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+func shouldDowngradeOfficialMediaPoster(text string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(text))
+	if normalized == "" {
+		return false
+	}
+
+	officialSignals := []string{
+		"official poster",
+		"official teaser",
+		"official trailer",
+		"anime",
+		"movie",
+		"tv series",
+		"copyright",
+		"all rights reserved",
+	}
+	adSignals := []string{
+		"buy",
+		"sale",
+		"discount",
+		"coupon",
+		"shop",
+		"wechat",
+		"telegram",
+		"whatsapp",
+		"price",
+		"order now",
+	}
+
+	return containsAny(normalized, officialSignals) && !containsAny(normalized, adSignals)
+}
+
 func (l *DetectImageAdLogic) DetectImageAd(in *pb.DetectImageAdRequest) (*pb.DetectImageAdResponse, error) {
-	// 验证输入参数
-	if in.ImageUrl == "" && in.ImageBase64 == "" {
+	if in == nil {
+		return &pb.DetectImageAdResponse{
+			Success:      false,
+			ErrorMessage: "request is nil",
+		}, nil
+	}
+
+	if strings.TrimSpace(in.GetImageUrl()) == "" && strings.TrimSpace(in.GetImageBase64()) == "" {
 		return &pb.DetectImageAdResponse{
 			Success:      false,
 			ErrorMessage: "image_url or image_base64 is required",
 		}, nil
 	}
 
-	// 设置默认选项
-	confidenceThreshold := float64(0.7)
+	confidenceThreshold := l.svcCtx.Config.AIModel.ConfidenceThreshold
+	if confidenceThreshold <= 0 {
+		confidenceThreshold = 0.7
+	}
 	enableTextExtraction := true
 
-	if in.Options != nil {
-		if in.Options.ConfidenceThreshold > 0 {
-			confidenceThreshold = float64(in.Options.ConfidenceThreshold)
+	if in.GetOptions() != nil {
+		if in.GetOptions().GetConfidenceThreshold() > 0 {
+			confidenceThreshold = float64(in.GetOptions().GetConfidenceThreshold())
 		}
-		enableTextExtraction = in.Options.EnableTextExtraction
+		enableTextExtraction = in.GetOptions().GetEnableTextExtraction()
 	}
 
-	// 优先使用 Base64 数据，否则使用 URL
-	imageInput := in.ImageUrl
-	if in.ImageBase64 != "" {
-		imageInput = in.ImageBase64
+	imageInput := in.GetImageUrl()
+	if strings.TrimSpace(in.GetImageBase64()) != "" {
+		imageInput = in.GetImageBase64()
 	}
 
-	// 调用 AI 模型服务
+	if strings.TrimSpace(l.svcCtx.Config.AIModel.ModelEndpoint) == "" || strings.TrimSpace(l.svcCtx.Config.AIModel.APIKey) == "" {
+		return &pb.DetectImageAdResponse{
+			Success:      true,
+			ErrorMessage: "image moderation skipped because the image model is not fully configured",
+		}, nil
+	}
+
 	modelResp, err := l.callAIModel(imageInput, confidenceThreshold, enableTextExtraction)
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, 500, err)
 		return &pb.DetectImageAdResponse{
 			Success:      false,
-			ErrorMessage: fmt.Sprintf("AI model service error: %v", err),
+			ErrorMessage: fmt.Sprintf("image moderation service error: %v", err),
 		}, nil
 	}
 
-	// 构建响应
+	if modelResp.IsAd && shouldDowngradeOfficialMediaPoster(modelResp.ExtractedText) {
+		logger.LogInfo(l.ctx, "downgrading likely official media poster false positive",
+			logger.WithUserID(fmt.Sprintf("extracted_text=%s", modelResp.ExtractedText)))
+		modelResp.IsAd = false
+		modelResp.AdConfidence = 0.15
+	}
+
 	response := &pb.DetectImageAdResponse{
 		IsAd:          modelResp.IsAd,
 		AdConfidence:  float32(modelResp.AdConfidence),
@@ -238,8 +313,8 @@ func (l *DetectImageAdLogic) DetectImageAd(in *pb.DetectImageAdRequest) (*pb.Det
 		Success:       true,
 	}
 
-	logger.LogInfo(l.ctx, "Image ad detection completed",
-		logger.WithUserID(fmt.Sprintf("IsAd:%v, Confidence:%.2f", response.IsAd, response.AdConfidence)))
+	logger.LogInfo(l.ctx, "image ad detection completed",
+		logger.WithUserID(fmt.Sprintf("is_ad=%t confidence=%.2f", response.IsAd, response.AdConfidence)))
 
 	return response, nil
 }

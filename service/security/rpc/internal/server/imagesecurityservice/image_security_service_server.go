@@ -27,3 +27,8 @@ func (s *ImageSecurityServiceServer) DetectImageAd(ctx context.Context, in *pb.D
 	l := imagesecurityservicelogic.NewDetectImageAdLogic(ctx, s.svcCtx)
 	return l.DetectImageAd(in)
 }
+
+func (s *ImageSecurityServiceServer) DetectImageAdBatch(ctx context.Context, in *pb.DetectImageAdBatchRequest) (*pb.DetectImageAdBatchResponse, error) {
+	l := imagesecurityservicelogic.NewDetectImageAdBatchLogic(ctx, s.svcCtx)
+	return l.DetectImageAdBatch(in)
+}

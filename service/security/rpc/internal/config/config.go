@@ -25,6 +25,7 @@ type Config struct {
 		ApiKey      string  `json:"apiKey"`
 		Threshold   float64 `json:"threshold"`
 		Timeout     int     `json:"timeout"`
+		Model       string  `json:"model"`
 	}
 	HtmlSanitization struct {
 		AllowedTags []string `json:"allowedTags"`

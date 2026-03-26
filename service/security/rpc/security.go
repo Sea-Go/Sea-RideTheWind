@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
 
 	"sea-try-go/service/security/rpc/internal/config"
 	contentsecurityserviceServer "sea-try-go/service/security/rpc/internal/server/contentsecurityservice"
@@ -40,6 +40,6 @@ func main() {
 	})
 	defer s.Stop()
 
-	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
+	logger.LogInfo(context.Background(), "Starting rpc server at "+c.ListenOn)
 	s.Start()
 }

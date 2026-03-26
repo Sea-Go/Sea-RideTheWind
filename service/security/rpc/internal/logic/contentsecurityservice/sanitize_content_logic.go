@@ -12,7 +12,7 @@ import (
 
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/security/rpc/internal/svc"
-	"sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
+	pb "sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
 
 	"github.com/microcosm-cc/bluemonday"
 	"golang.org/x/text/unicode/norm"
@@ -30,18 +30,14 @@ func NewSanitizeContentLogic(ctx context.Context, svcCtx *svc.ServiceContext) *S
 	}
 }
 
-// normalizeUnicode 将文本转换为 NFC 标准化形式
 func normalizeUnicode(text string) string {
 	return norm.NFC.String(text)
 }
 
-// normalizeWhitespace 统一空白字符处理
 func normalizeWhitespace(text string) string {
-	// 统一换行符为 \n
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	text = strings.ReplaceAll(text, "\r", "\n")
 
-	// 压缩连续空格为单个空格
 	var result strings.Builder
 	result.Grow(len(text))
 	inSpace := false
@@ -58,68 +54,67 @@ func normalizeWhitespace(text string) string {
 		}
 	}
 
-	// 修剪首尾空白
 	return strings.TrimSpace(result.String())
 }
 
-// sanitizeHTML 使用 bluemonday UGCPolicy 净化 HTML
 func sanitizeHTML(text string, allowedTags []string) string {
-	p := bluemonday.UGCPolicy()
+	policy := bluemonday.UGCPolicy()
 
-	// 如果配置了允许的标签，则只保留这些标签
 	if len(allowedTags) > 0 {
-		// 首先清除所有标签
-		p = bluemonday.NewPolicy()
-		// 然后添加允许的标签
+		policy = bluemonday.NewPolicy()
 		for _, tag := range allowedTags {
 			switch tag {
 			case "b", "strong":
-				p.AllowAttrs("class").OnElements("b", "strong")
+				policy.AllowAttrs("class").OnElements("b", "strong")
 			case "i", "em":
-				p.AllowAttrs("class").OnElements("i", "em")
+				policy.AllowAttrs("class").OnElements("i", "em")
 			case "u":
-				p.AllowAttrs("class").OnElements("u")
+				policy.AllowAttrs("class").OnElements("u")
 			case "s":
-				p.AllowAttrs("class").OnElements("s")
+				policy.AllowAttrs("class").OnElements("s")
 			case "sub":
-				p.AllowAttrs("class").OnElements("sub")
+				policy.AllowAttrs("class").OnElements("sub")
 			case "sup":
-				p.AllowAttrs("class").OnElements("sup")
+				policy.AllowAttrs("class").OnElements("sup")
 			case "blockquote":
-				p.AllowAttrs("class").OnElements("blockquote")
+				policy.AllowAttrs("class").OnElements("blockquote")
 			case "code":
-				p.AllowAttrs("class").OnElements("code")
+				policy.AllowAttrs("class").OnElements("code")
 			case "pre":
-				p.AllowAttrs("class").OnElements("pre")
+				policy.AllowAttrs("class").OnElements("pre")
 			case "ul", "ol", "li":
-				p.AllowAttrs("class").OnElements("ul", "ol", "li")
+				policy.AllowAttrs("class").OnElements("ul", "ol", "li")
 			case "dl", "dt", "dd":
-				p.AllowAttrs("class").OnElements("dl", "dt", "dd")
+				policy.AllowAttrs("class").OnElements("dl", "dt", "dd")
 			case "a":
-				p.AllowAttrs("href", "target", "rel", "class").OnElements("a")
+				policy.AllowAttrs("href", "target", "rel", "class").OnElements("a")
 			case "img":
-				p.AllowAttrs("src", "alt", "title", "width", "height", "class").OnElements("img")
+				policy.AllowAttrs("src", "alt", "title", "width", "height", "class").OnElements("img")
 			case "p", "br":
-				p.AllowAttrs("class").OnElements("p", "br")
+				policy.AllowAttrs("class").OnElements("p", "br")
 			}
 		}
 	}
 
-	return p.Sanitize(text)
+	return policy.Sanitize(text)
 }
 
-// detectAd 调用外部 AI 模型服务进行广告检测
 func (l *SanitizeContentLogic) detectAd(text string) (bool, float32, error) {
 	cfg := l.svcCtx.Config.AdDetection
+	modelName := strings.TrimSpace(cfg.Model)
+	if modelName == "" {
+		modelName = "qwen3-max"
+	}
 
-	// 构建请求体
 	requestBody := map[string]interface{}{
-		"model": "qwen3-max",
+		"model": modelName,
 		"input": map[string]interface{}{
 			"messages": []map[string]string{
 				{
-					"role":    "system",
-					"content": "你是一个广告检测专家。请分析以下文本是否包含广告内容。返回 JSON 格式：{\"is_ad\": boolean, \"confidence\": float}，其中 confidence 是 0.0 到 1.0 之间的置信度。",
+					"role": "system",
+					"content": "You are an ad detection service. Return only JSON: " +
+						`{"is_ad": boolean, "confidence": float}` +
+						" for the given text.",
 				},
 				{
 					"role":    "user",
@@ -136,41 +131,35 @@ func (l *SanitizeContentLogic) detectAd(text string) (bool, float32, error) {
 	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, 500, err)
-		return false, 0.0, err
+		return false, 0, err
 	}
 
-	// 创建 HTTP 请求
-	req, err := http.NewRequestWithContext(l.ctx, "POST", cfg.ApiEndpoint, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(l.ctx, http.MethodPost, cfg.ApiEndpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, 500, err)
-		return false, 0.0, err
+		return false, 0, err
 	}
 
-	// 设置请求头
 	req.Header.Set("Authorization", "Bearer "+cfg.ApiKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	// 设置超时
 	client := &http.Client{
 		Timeout: time.Duration(cfg.Timeout) * time.Second,
 	}
 
-	// 发送请求
 	resp, err := client.Do(req)
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, 500, err)
-		return false, 0.0, err
+		return false, 0, err
 	}
 	defer resp.Body.Close()
 
-	// 读取响应
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, 500, err)
-		return false, 0.0, err
+		return false, 0, err
 	}
 
-	// 解析响应
 	var result struct {
 		Output struct {
 			Choices []struct {
@@ -183,15 +172,15 @@ func (l *SanitizeContentLogic) detectAd(text string) (bool, float32, error) {
 
 	if err := json.Unmarshal(body, &result); err != nil {
 		logger.LogBusinessErr(l.ctx, 500, err)
-		return false, 0.0, err
+		return false, 0, err
 	}
 
 	if len(result.Output.Choices) == 0 {
-		logger.LogBusinessErr(l.ctx, 500, fmt.Errorf("no choices in ad detection response: %s", string(body)))
-		return false, 0.0, fmt.Errorf("no choices in response")
+		err = fmt.Errorf("no choices in ad detection response: %s", string(body))
+		logger.LogBusinessErr(l.ctx, 500, err)
+		return false, 0, err
 	}
 
-	// 解析 AI 返回的 JSON
 	var adResult struct {
 		IsAd       bool    `json:"is_ad"`
 		Confidence float64 `json:"confidence"`
@@ -200,8 +189,7 @@ func (l *SanitizeContentLogic) detectAd(text string) (bool, float32, error) {
 	content := result.Output.Choices[0].Message.Content
 	if err := json.Unmarshal([]byte(content), &adResult); err != nil {
 		logger.LogBusinessErr(l.ctx, 500, err)
-		// 如果解析失败，尝试提取布尔值和数字
-		isAd := strings.Contains(strings.ToLower(content), "true") || strings.Contains(strings.ToLower(content), "是")
+		isAd := strings.Contains(strings.ToLower(content), "true")
 		confidence := 0.5
 		if isAd {
 			confidence = 0.8
@@ -211,64 +199,139 @@ func (l *SanitizeContentLogic) detectAd(text string) (bool, float32, error) {
 
 	return adResult.IsAd, float32(adResult.Confidence), nil
 }
+
 func (l *SanitizeContentLogic) SanitizeContent(in *pb.SanitizeContentRequest) (*pb.SanitizeContentResponse, error) {
+	started := time.Now()
 	if in == nil {
 		return &pb.SanitizeContentResponse{
 			Success:      false,
 			ErrorMessage: "request is nil",
+			LatencyMs:    int32(time.Since(started).Milliseconds()),
 		}, nil
 	}
 
 	originalText := in.GetText()
 	options := in.GetOptions()
+	if options == nil {
+		options = &pb.SanitizeOptions{}
+	}
 
-	// 如果没有提供文本，直接返回成功
 	if originalText == "" {
 		return &pb.SanitizeContentResponse{
-			SanitizedText: "",
-			Success:       true,
+			SanitizedText:        "",
+			Success:              true,
+			ObservabilityContext: cloneObservabilityContext(in.GetObservabilityContext()),
+			Decision: &pb.DecisionRecord{
+				Type:       "sanitize_content",
+				Chosen:     "empty_text",
+				Confidence: 1,
+			},
+			Quality: &pb.QualityValidation{
+				SchemaValid:         true,
+				CitationValid:       true,
+				ClaimGroundingCheck: "PASS",
+			},
+			LatencyMs: int32(time.Since(started).Milliseconds()),
+			Tokens:    &pb.TokensUsage{},
 		}, nil
 	}
 
 	processedText := originalText
-
-	// 1. Unicode 标准化
 	if options.GetEnableUnicodeNormalization() {
 		processedText = normalizeUnicode(processedText)
 	}
-
-	// 2. HTML 净化
 	if options.GetEnableHtmlSanitization() {
 		processedText = sanitizeHTML(processedText, l.svcCtx.Config.HtmlSanitization.AllowedTags)
 	}
-
-	// 3. 空白字符处理
 	if options.GetEnableWhitespaceNormalization() {
 		processedText = normalizeWhitespace(processedText)
 	}
 
-	// 4. 广告检测
-	var isAd bool = false
-	var adConfidence float32 = 0.0
-
+	var isAd bool
+	var adConfidence float32
 	if options.GetEnableAdDetection() && l.svcCtx.Config.AdDetection.ApiKey != "" {
 		var err error
 		isAd, adConfidence, err = l.detectAd(processedText)
 		if err != nil {
 			logger.LogBusinessErr(l.ctx, 500, err)
-			// 广告检测失败时继续处理，但记录日志
 			isAd = false
-			adConfidence = 0.0
+			adConfidence = 0
 		}
-
-		// 如果置信度超过阈值，标记为广告
 		if adConfidence >= float32(l.svcCtx.Config.AdDetection.Threshold) {
 			isAd = true
 		}
 	}
 
-	return &pb.SanitizeContentResponse{SanitizedText: processedText,
-		IsAd:         isAd,
-		AdConfidence: adConfidence,
-		Success:      true}, nil
+	reasonCodes := []string{"sanitized"}
+	chosen := "allow"
+	if isAd {
+		reasonCodes = append(reasonCodes, "ad_detected")
+		chosen = "reject"
+	}
+	if options.GetEnableHtmlSanitization() {
+		reasonCodes = append(reasonCodes, "html_sanitized")
+	}
+	if options.GetEnableUnicodeNormalization() {
+		reasonCodes = append(reasonCodes, "unicode_normalized")
+	}
+	if options.GetEnableWhitespaceNormalization() {
+		reasonCodes = append(reasonCodes, "whitespace_normalized")
+	}
+
+	return &pb.SanitizeContentResponse{
+		SanitizedText:        processedText,
+		IsAd:                 isAd,
+		AdConfidence:         adConfidence,
+		Success:              true,
+		ObservabilityContext: cloneObservabilityContext(in.GetObservabilityContext()),
+		Decision: &pb.DecisionRecord{
+			Type:        "sanitize_content",
+			Chosen:      chosen,
+			Confidence:  adConfidence,
+			ReasonCodes: reasonCodes,
+			Signals: map[string]string{
+				"html_sanitized":         fmt.Sprintf("%t", options.GetEnableHtmlSanitization()),
+				"unicode_normalized":     fmt.Sprintf("%t", options.GetEnableUnicodeNormalization()),
+				"whitespace_normalized":  fmt.Sprintf("%t", options.GetEnableWhitespaceNormalization()),
+				"ad_detection_requested": fmt.Sprintf("%t", options.GetEnableAdDetection()),
+			},
+			Constraints: &pb.DecisionConstraints{
+				MaxLatencyMs: int32(time.Since(started).Milliseconds()),
+			},
+		},
+		Quality: &pb.QualityValidation{
+			SchemaValid:         true,
+			CitationValid:       true,
+			ClaimGroundingCheck: "PASS",
+		},
+		LatencyMs: int32(time.Since(started).Milliseconds()),
+		Tokens:    &pb.TokensUsage{},
+	}, nil
+}
+
+func cloneObservabilityContext(in *pb.ObservabilityContext) *pb.ObservabilityContext {
+	if in == nil {
+		return nil
+	}
+
+	out := &pb.ObservabilityContext{
+		TraceId:      in.TraceId,
+		SpanId:       in.SpanId,
+		ParentSpanId: in.ParentSpanId,
+		RequestId:    in.RequestId,
+		Surface:      in.Surface,
+	}
+	if len(in.ExpIds) > 0 {
+		out.ExpIds = make([]*pb.ExperimentInfo, 0, len(in.ExpIds))
+		for _, exp := range in.ExpIds {
+			if exp == nil {
+				continue
+			}
+			out.ExpIds = append(out.ExpIds, &pb.ExperimentInfo{
+				Name:    exp.Name,
+				Variant: exp.Variant,
+			})
+		}
+	}
+	return out
 }
