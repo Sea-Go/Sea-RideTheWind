@@ -1,0 +1,46 @@
+syntax = "v1"
+
+info (
+	title:   "Hot Center API"
+	desc:    "Current rolling hot ranking HTTP gateway"
+	version: "1.0.0"
+)
+
+type HotArticlesReq {
+	Page     int32 `form:"page,default=1"`
+	PageSize int32 `form:"page_size,default=20"`
+}
+
+type HotArticleItem {
+	ArticleId     string   `json:"article_id"`
+	Rank          int32    `json:"rank"`
+	HotScore      uint32   `json:"hot_score"`
+	Title         string   `json:"title"`
+	Brief         string   `json:"brief"`
+	CoverImageUrl string   `json:"cover_image_url"`
+	AuthorId      string   `json:"author_id"`
+	CreateTime    int64    `json:"create_time"`
+	ViewCount     int32    `json:"view_count"`
+	LikeCount     int32    `json:"like_count"`
+	CommentCount  int32    `json:"comment_count"`
+	ManualTypeTag string   `json:"manual_type_tag"`
+	SecondaryTags []string `json:"secondary_tags"`
+}
+
+type HotArticlesResp {
+	Items    []HotArticleItem `json:"items"`
+	Total    int64            `json:"total"`
+	Page     int32            `json:"page"`
+	PageSize int32            `json:"page_size"`
+	Scope    string           `json:"scope"`
+}
+
+@server (
+	prefix: "/hot/v1"
+	group:  "hot"
+)
+service hotcenter {
+	@handler GetHotArticles
+	get /articles (HotArticlesReq) returns (HotArticlesResp)
+}
+

@@ -1,0 +1,35 @@
+Name: hotcenter
+Host: 0.0.0.0
+Port: 8893
+
+Log:
+  ServiceName: hotcenter
+  Mode: file
+  Path: ../../../../log/hot-api
+
+Telemetry:
+  Name: hot-api
+  Endpoint: localhost:34317
+  Sampler: 1.0
+  Batcher: otlpgrpc
+
+DevServer:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 16067
+  MetricsPath: /metrics
+  HealthPath: /healthz
+  EnableMetrics: true
+  EnablePprof: true
+
+HotRpcConf:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: hot.rpc
+
+ArticleRpcConf:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: article.rpc
