@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"sea-try-go/service/comment/common/errmsg"
 	kqtypes "sea-try-go/service/comment/rpc/common/types"
 	"sea-try-go/service/comment/rpc/internal/metrics"
 	"sea-try-go/service/comment/rpc/internal/model"
 	"sea-try-go/service/comment/rpc/internal/svc"
 	"sea-try-go/service/comment/rpc/pb"
-	"time"
-
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/common/snowflake"
 
@@ -62,24 +62,23 @@ func (l *CreateCommentLogic) CreateComment(in *pb.CreateCommentReq) (resp *pb.Cr
 
 	if in.TargetId == "" || in.TargetType == "" {
 		result = "biz_fail"
-		logger.LogBusinessErr(ctx, errmsg.ErrorInputWrong, fmt.Errorf("目标类型和ID不能为空"))
+		logger.LogBusinessErr(ctx, errmsg.ErrorInputWrong, fmt.Errorf("target type and id cannot be empty"))
 		err = errmsg.NewGrpcErr(errmsg.ErrorInputWrong, "目标类型和ID不能为空")
 		return nil, err
 	}
 
 	if in.Content == "" {
 		result = "biz_fail"
-		logger.LogBusinessErr(ctx, errmsg.ErrorInputWrong, fmt.Errorf("评论内容不能为空"))
+		logger.LogBusinessErr(ctx, errmsg.ErrorInputWrong, fmt.Errorf("comment content cannot be empty"))
 		err = errmsg.NewGrpcErr(errmsg.ErrorInputWrong, "评论内容不能为空")
 		return nil, err
 	}
 
-	// 查询 owner 还有 bug
-	ownerId, err := l.svcCtx.CommentModel.GetOwnerId(ctx, in.TargetType, in.TargetId)
+	ownerID, err := l.resolveOwnerID(ctx, in.TargetType, in.TargetId)
 	if err != nil {
 		if err == model.ErrorSubjectNotFound {
 			result = "biz_fail"
-			logger.LogBusinessErr(ctx, errmsg.ErrorSubjectNotExist, fmt.Errorf("评论区不存在"))
+			logger.LogBusinessErr(ctx, errmsg.ErrorSubjectNotExist, fmt.Errorf("subject not found"))
 			err = errmsg.NewGrpcErr(errmsg.ErrorSubjectNotExist, "评论区不存在")
 			return nil, err
 		}
@@ -91,25 +90,25 @@ func (l *CreateCommentLogic) CreateComment(in *pb.CreateCommentReq) (resp *pb.Cr
 		return nil, err
 	}
 
-	commentId, err := snowflake.GetID()
+	commentID, err := snowflake.GetID()
 	if err != nil {
 		result = "sys_fail"
 		span.RecordError(err)
-		logger.LogBusinessErr(ctx, errmsg.ErrorSnowflakeID, fmt.Errorf("Snowflake生成ID错误"))
+		logger.LogBusinessErr(ctx, errmsg.ErrorSnowflakeID, fmt.Errorf("snowflake id generation failed"))
 		err = errmsg.NewGrpcErr(errmsg.ErrorSnowflakeID, "雪花算法生成ID出错")
 		return nil, err
 	}
 
 	now := time.Now()
 	msg := kqtypes.CommentKafkaMsg{
-		CommentId:  commentId,
+		CommentId:  commentID,
 		TargetType: in.TargetType,
 		TargetId:   in.TargetId,
 		UserId:     in.UserId,
 		RootId:     in.RootId,
 		ParentId:   in.ParentId,
 		Content:    in.Content,
-		OwnerId:    int64(ownerId),
+		OwnerId:    ownerID,
 		Meta:       in.Meta,
 		Attribute:  0,
 		CreateTime: now.Unix(),
@@ -124,8 +123,7 @@ func (l *CreateCommentLogic) CreateComment(in *pb.CreateCommentReq) (resp *pb.Cr
 		return nil, err
 	}
 
-	err = l.svcCtx.KqPusherClient.Push(ctx, string(msgBytes))
-	if err != nil {
+	if err = l.svcCtx.KqPusherClient.Push(ctx, string(msgBytes)); err != nil {
 		result = "sys_fail"
 		span.RecordError(err)
 		logger.LogBusinessErr(ctx, errmsg.ErrorKafkaPush, err)
@@ -135,10 +133,25 @@ func (l *CreateCommentLogic) CreateComment(in *pb.CreateCommentReq) (resp *pb.Cr
 
 	logger.LogInfo(ctx, "create comment success")
 
-	resp = &pb.CreateCommentResp{
-		Id:           commentId,
+	return &pb.CreateCommentResp{
+		Id:           commentID,
 		CreatedAt:    now.Format(time.DateTime),
 		SubjectCount: 0,
+	}, nil
+}
+
+func (l *CreateCommentLogic) resolveOwnerID(ctx context.Context, targetType, targetID string) (int64, error) {
+	ownerID, err := l.svcCtx.CommentModel.GetOwnerId(ctx, targetType, targetID)
+	if err == nil {
+		return int64(ownerID), nil
 	}
-	return resp, nil
+	if err != model.ErrorSubjectNotFound {
+		return 0, err
+	}
+
+	subject, fallbackErr := resolveSubjectFallback(ctx, l.svcCtx.ArticleRpc, targetType, targetID)
+	if fallbackErr != nil {
+		return 0, err
+	}
+	return subject.OwnerId, nil
 }

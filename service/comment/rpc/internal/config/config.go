@@ -17,4 +17,6 @@ type Config struct {
 	}
 	BizRedis       redis.RedisConf
 	KqConsumerConf kq.KqConf
+	MessageRpc     zrpc.RpcClientConf
+	ArticleRpc     zrpc.RpcClientConf
 }

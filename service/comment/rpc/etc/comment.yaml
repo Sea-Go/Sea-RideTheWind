@@ -38,3 +38,15 @@ BizRedis:
   Host: 127.0.0.1:36379
   Type: node
   Pass: ""
+
+MessageRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: message.rpc
+
+ArticleRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: article.rpc

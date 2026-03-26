@@ -13,6 +13,7 @@ import (
 	"sea-try-go/service/comment/api/internal/handler"
 	"sea-try-go/service/comment/api/internal/svc"
 	"sea-try-go/service/comment/common/errmsg"
+	"sea-try-go/service/common/logger"
 	"sea-try-go/service/common/response"
 
 	"github.com/zeromicro/go-zero/core/conf"
@@ -26,8 +27,8 @@ func main() {
 	flag.Parse()
 
 	var c config.Config
-	//logger.Init(c.Name)
 	conf.MustLoad(*configFile, &c)
+	logger.Init(c.Name)
 
 	server := rest.MustNewServer(c.RestConf)
 	defer server.Stop()

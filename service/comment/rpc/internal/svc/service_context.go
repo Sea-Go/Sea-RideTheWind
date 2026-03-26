@@ -5,8 +5,11 @@ import (
 	"sea-try-go/service/comment/rpc/internal/config"
 	model2 "sea-try-go/service/comment/rpc/internal/model"
 	"sea-try-go/service/comment/rpc/internal/utils"
+	"sea-try-go/service/article/rpc/articleservice"
+	"sea-try-go/service/message/rpc/messageservice"
 
 	"github.com/zeromicro/go-queue/kq"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
 type ServiceContext struct {
@@ -15,6 +18,8 @@ type ServiceContext struct {
 	CommentCache    *cache2.CommentCache
 	KqPusherClient  *kq.Pusher
 	SensitiveFilter *utils.SensitiveFilter
+	MessageRpc      messageservice.MessageService
+	ArticleRpc      articleservice.ArticleService
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -28,5 +33,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		CommentCache:    cache2.NewCommentCache(rdb),
 		KqPusherClient:  pusher,
 		SensitiveFilter: utils.NewSensitiveFilter(blackwords),
+		MessageRpc:      messageservice.NewMessageService(zrpc.MustNewClient(c.MessageRpc)),
+		ArticleRpc:      articleservice.NewArticleService(zrpc.MustNewClient(c.ArticleRpc)),
 	}
 }

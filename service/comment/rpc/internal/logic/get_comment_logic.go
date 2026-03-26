@@ -2,11 +2,12 @@ package logic
 
 import (
 	"context"
+	"time"
+
 	"sea-try-go/service/comment/rpc/internal/metrics"
 	"sea-try-go/service/comment/rpc/internal/model"
 	"sea-try-go/service/comment/rpc/internal/svc"
 	"sea-try-go/service/comment/rpc/pb"
-	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel"
@@ -30,7 +31,6 @@ func NewGetCommentLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetCom
 
 func (l *GetCommentLogic) GetComment(in *pb.GetCommentReq) (resp *pb.GetCommentResp, err error) {
 	start := time.Now()
-
 	defer func() {
 		result := "ok"
 		if err != nil {
@@ -46,7 +46,6 @@ func (l *GetCommentLogic) GetComment(in *pb.GetCommentReq) (resp *pb.GetCommentR
 			Add(time.Since(start).Seconds())
 	}()
 
-	//ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	ctx, cancel := context.WithTimeout(l.ctx, time.Second)
 	defer cancel()
 
@@ -54,150 +53,102 @@ func (l *GetCommentLogic) GetComment(in *pb.GetCommentReq) (resp *pb.GetCommentR
 	ctx, span := tracer.Start(ctx, "GetComment")
 	defer span.End()
 
+	page := int(in.Page)
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := int(in.PageSize)
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+
 	span.SetAttributes(
 		attribute.String("target_id", in.TargetId),
 		attribute.Int64("root_id", in.RootId),
 		attribute.Int64("page", in.Page),
+		attribute.Int64("page_size", in.PageSize),
 		attribute.String("target_type", in.TargetType),
 		attribute.Int64("sort_type", in.SortType),
 	)
 
-	conn := l.svcCtx.CommentModel
-
-	//子span
-	var subject model.Subject
-	{
-		cctx, cspan := tracer.Start(ctx, "cache_aside.GetSubjectWithCache")
-		s, e := l.svcCtx.CommentCache.GetSubjectWithCache(cctx, in.TargetType, in.TargetId, conn)
-		if e != nil {
-			cspan.RecordError(e)
-			cspan.SetStatus(codes.Error, e.Error())
-			cspan.End()
-			span.RecordError(e)
-			span.SetStatus(codes.Error, e.Error())
-			err = e
-			return nil, err
-		}
-		subject = s
-		cspan.End()
+	sortType := model.ReplySortTime
+	if in.SortType == 0 {
+		sortType = model.ReplySortHot
 	}
-	/*subject, err := l.svcCtx.CommentCache.GetSubjectWithCache(ctx, in.TargetType, in.TargetId, conn)
+
+	subject, err := l.loadSubject(ctx, in.TargetType, in.TargetId)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
-	}*/
-	var sortType model.ReplySort
-	if in.SortType == 1 {
-		sortType = model.ReplySortTime
-	} else {
-		sortType = model.ReplySortTime
 	}
 
-	var ids []int64
-	{
-		cctx, cspan := tracer.Start(ctx, "cache_aside.GetReplyIDsPageCache")
-		got, e := l.svcCtx.CommentCache.GetReplyIDsPageCache(cctx, model.GetReplyIDsPageReq{
-			TargetType: in.TargetType,
-			TargetId:   in.TargetId,
-			RootId:     in.RootId,
-			Offset:     0,
-			Limit:      int(in.Page),
-			Sort:       sortType,
-			OnlyNormal: false,
-		}, conn)
-		if e != nil {
-			cspan.RecordError(e)
-			cspan.SetStatus(codes.Error, e.Error())
-			cspan.End()
-			span.RecordError(e)
-			span.SetStatus(codes.Error, e.Error())
-			err = e
-			return nil, err
-		}
-		ids = got
-		cspan.SetAttributes(attribute.Int("reply_ids.count", len(ids)))
-		cspan.End()
-	}
-	/*ids, err := l.svcCtx.CommentCache.GetReplyIDsPageCache(ctx, model.GetReplyIDsPageReq{
+	conn := l.svcCtx.CommentModel
+	ids, err := l.svcCtx.CommentCache.GetReplyIDsPageCache(ctx, model.GetReplyIDsPageReq{
 		TargetType: in.TargetType,
 		TargetId:   in.TargetId,
 		RootId:     in.RootId,
-		Offset:     0,
-		Limit:      int(in.Page),
+		Offset:     offset,
+		Limit:      pageSize,
 		Sort:       sortType,
 		OnlyNormal: false,
 	}, conn)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
-	}*/
-	var index []model.CommentIndex
-	{
-		cctx, cspan := tracer.Start(ctx, "cache_aside.GetCommentIndexCache")
-		got, e := l.svcCtx.CommentCache.GetCommentIndexCache(cctx, ids, conn)
-		if e != nil {
-			cspan.RecordError(e)
-			cspan.SetStatus(codes.Error, e.Error())
-			cspan.End()
-			span.RecordError(e)
-			span.SetStatus(codes.Error, e.Error())
-			err = e
-			return nil, err
-		}
-		index = got
-		cspan.End()
-	}
-	/*index, err := l.svcCtx.CommentCache.GetCommentIndexCache(ctx, ids, conn)
-	if err != nil {
-		return nil, err
-	}*/
-	var content []model.CommentContent
-	{
-		cctx, cspan := tracer.Start(ctx, "cache_aside.BatchGetContentCache")
-		got, e := l.svcCtx.CommentCache.BatchGetContentCache(cctx, ids, conn)
-		if e != nil {
-			cspan.RecordError(e)
-			cspan.SetStatus(codes.Error, e.Error())
-			cspan.End()
-			span.RecordError(e)
-			span.SetStatus(codes.Error, e.Error())
-			err = e
-			return nil, err
-		}
-		content = got
-		cspan.End()
-	}
-	/*content, err := l.svcCtx.CommentCache.BatchGetContentCache(ctx, ids, conn)
-	if err != nil {
-		return nil, err
-	}*/
-	comment := make([]*pb.CommentItem, 0, len(content))
-	for i, _ := range index {
-		u := index[i]
-		v := content[i]
-		comment = append(comment, &pb.CommentItem{
-			Id:           u.Id,
-			UserId:       u.UserId,
-			Content:      v.Content,
-			RootId:       u.RootId,
-			ParentId:     u.ParentId,
-			LikeCount:    u.LikeCount,
-			DislikeCount: u.DislikeCount,
-			ReplyCount:   u.ReplyCount,
-			Attribute:    u.Attribute,
-			State:        pb.CommentState(u.State),
-			CreatedAt:    u.CreatedAt.Format("2006-01-02 15:04:05"),
-			Meta:         v.Meta,
-			Children:     nil, //日后再说
-		})
 	}
 
-	//logger.LogInfo(l.ctx, "get comment success")
+	commentItems := make([]*pb.CommentItem, 0, len(ids))
+	if len(ids) > 0 {
+		indexRows, indexErr := l.svcCtx.CommentCache.GetCommentIndexCache(ctx, ids, conn)
+		if indexErr != nil {
+			span.RecordError(indexErr)
+			span.SetStatus(codes.Error, indexErr.Error())
+			return nil, indexErr
+		}
+
+		contentRows, contentErr := l.svcCtx.CommentCache.BatchGetContentCache(ctx, ids, conn)
+		if contentErr != nil {
+			span.RecordError(contentErr)
+			span.SetStatus(codes.Error, contentErr.Error())
+			return nil, contentErr
+		}
+
+		for idx := range indexRows {
+			if idx >= len(contentRows) {
+				break
+			}
+			indexRow := indexRows[idx]
+			contentRow := contentRows[idx]
+			commentItems = append(commentItems, &pb.CommentItem{
+				Id:           indexRow.Id,
+				UserId:       indexRow.UserId,
+				Content:      contentRow.Content,
+				RootId:       indexRow.RootId,
+				ParentId:     indexRow.ParentId,
+				LikeCount:    indexRow.LikeCount,
+				DislikeCount: indexRow.DislikeCount,
+				ReplyCount:   indexRow.ReplyCount,
+				Attribute:    indexRow.Attribute,
+				State:        pb.CommentState(indexRow.State),
+				CreatedAt:    indexRow.CreatedAt.Format("2006-01-02 15:04:05"),
+				Meta:         contentRow.Meta,
+				Children:     nil,
+			})
+		}
+	}
 
 	metrics.CommentListSizeGaugeMetric.
 		WithLabelValues("comment_list", "GetComment").
-		Set(float64(len(comment)))
-	
-	resp = &pb.GetCommentResp{
-		Comment: comment,
+		Set(float64(len(commentItems)))
+
+	return &pb.GetCommentResp{
+		Comment: commentItems,
 		Subject: &pb.SubjectInfo{
 			TargetType: subject.TargetType,
 			TargetId:   subject.TargetId,
@@ -206,6 +157,22 @@ func (l *GetCommentLogic) GetComment(in *pb.GetCommentReq) (resp *pb.GetCommentR
 			State:      pb.SubjectState(subject.State),
 			Attribute:  subject.Attribute,
 		},
+	}, nil
+}
+
+func (l *GetCommentLogic) loadSubject(ctx context.Context, targetType, targetID string) (model.Subject, error) {
+	subject, err := l.svcCtx.CommentCache.GetSubjectWithCache(ctx, targetType, targetID, l.svcCtx.CommentModel)
+	if err == nil {
+		return subject, nil
 	}
-	return resp, nil
+	if err != model.ErrorSubjectNotFound {
+		return model.Subject{}, err
+	}
+
+	subject, fallbackErr := resolveSubjectFallback(ctx, l.svcCtx.ArticleRpc, targetType, targetID)
+	if fallbackErr != nil {
+		return model.Subject{}, err
+	}
+	_ = l.svcCtx.CommentCache.SetSubjectCache(ctx, targetID, &subject, 5*time.Minute)
+	return subject, nil
 }

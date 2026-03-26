@@ -2,9 +2,11 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	kqtypes "sea-try-go/service/comment/rpc/common/types"
 	"sea-try-go/service/comment/rpc/internal/metrics"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -37,12 +39,13 @@ func (m *CommentModel) InsertCommentTx(ctx context.Context, msg kqtypes.CommentK
 		}
 
 		createTime := time.Unix(msg.CreateTime, 0)
+		meta := normalizeCommentMeta(msg.Meta)
 
 		// 2. 插入 CommentContent
 		content := &CommentContent{
 			CommentId: msg.CommentId,
 			Content:   msg.Content,
-			Meta:      msg.Meta,
+			Meta:      meta,
 			CreatedAt: createTime,
 		}
 		if err := tx.Create(content).Error; err != nil {
@@ -84,9 +87,9 @@ func (m *CommentModel) InsertCommentTx(ctx context.Context, msg kqtypes.CommentK
 		if msg.RootId == 0 {
 			newSubject.RootCount = 1
 		}
-		updateCols := map[string]interface{}{"total_count": gorm.Expr("total_count + 1")}
+		updateCols := map[string]interface{}{"total_count": gorm.Expr(`"subject"."total_count" + 1`)}
 		if msg.RootId == 0 {
-			updateCols["root_count"] = gorm.Expr("root_count + 1")
+			updateCols["root_count"] = gorm.Expr(`"subject"."root_count" + 1`)
 		}
 		if err := tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "target_type"}, {Name: "target_id"}},
@@ -183,6 +186,26 @@ func (m *CommentModel) GetOwnerId(ctx context.Context, targetType, targetId stri
 	}
 
 	return ownerId, nil
+}
+
+func normalizeCommentMeta(meta string) string {
+	meta = strings.TrimSpace(meta)
+	if meta == "" {
+		return "{}"
+	}
+
+	var payload any
+	if err := json.Unmarshal([]byte(meta), &payload); err == nil {
+		return meta
+	}
+
+	fallback, err := json.Marshal(map[string]string{
+		"raw": meta,
+	})
+	if err != nil {
+		return "{}"
+	}
+	return string(fallback)
 }
 
 func (m *CommentModel) InsertReport(ctx context.Context, report *ReportRecord) error {

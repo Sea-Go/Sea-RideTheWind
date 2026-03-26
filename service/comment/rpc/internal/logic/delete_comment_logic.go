@@ -109,6 +109,12 @@ func (l *DeleteCommentLogic) DeleteComment(in *pb.DeleteCommentReq) (resp *pb.De
 		err = errmsg.NewGrpcErr(errmsg.ErrorDbUpdate, "DB更新失败")
 		return nil, err
 	}
+	if err := l.svcCtx.CommentCache.InvalidateTargetCaches(ctx, in.TargetType, in.TargetId); err != nil {
+		l.Errorf("invalidate comment target cache failed after delete, comment %d: %v", in.CommentId, err)
+	}
+	if err := l.svcCtx.CommentCache.DeleteCommentIndexCache(ctx, in.CommentId, comment.ParentId); err != nil {
+		l.Errorf("invalidate comment item cache failed after delete, comment %d: %v", in.CommentId, err)
+	}
 
 	logger.LogInfo(ctx, "delete comment success")
 

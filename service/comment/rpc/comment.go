@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"sea-try-go/service/common/logger"
 	"sea-try-go/service/comment/rpc/internal/config"
 	"sea-try-go/service/comment/rpc/internal/metrics"
 	"sea-try-go/service/comment/rpc/internal/mqs"
@@ -27,8 +28,8 @@ var configFile = flag.String("f", "etc/comment.yaml", "the config file")
 func main() {
 	flag.Parse()
 	var c config.Config
-	//logger.Init(c.Name)
 	conf.MustLoad(*configFile, &c)
+	logger.Init(c.Name)
 	ctx := svc.NewServiceContext(c)
 	bgCtx := context.Background()
 	metrics.InitMetrics(&c)

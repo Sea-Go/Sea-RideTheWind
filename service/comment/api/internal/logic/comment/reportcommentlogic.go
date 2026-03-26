@@ -5,7 +5,6 @@ package comment
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"sea-try-go/service/comment/api/internal/svc"
@@ -33,15 +32,9 @@ func NewReportCommentLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Rep
 }
 
 func (l *ReportCommentLogic) ReportComment(req *types.ReportCommentReq) (resp *types.ReportCommentResp, err error) {
-	userId, ok := l.ctx.Value("userId").(json.Number)
-	if !ok {
-		logger.LogBusinessErr(l.ctx, errmsg.ErrorTokenRuntime, fmt.Errorf("ctx userId is not json.Number"))
-		return nil, errmsg.NewErrCode(errmsg.ErrorTokenRuntime)
-	}
-	uid, err := userId.Int64()
-
+	uid, err := extractUserID(l.ctx)
 	if err != nil {
-		logger.LogBusinessErr(l.ctx, errmsg.ErrorTokenRuntime, fmt.Errorf("parse userId to int64 failed: %v", err))
+		logger.LogBusinessErr(l.ctx, errmsg.ErrorTokenRuntime, fmt.Errorf("extract userId from context failed: %w", err))
 		return nil, errmsg.NewErrCode(errmsg.ErrorTokenRuntime)
 	}
 

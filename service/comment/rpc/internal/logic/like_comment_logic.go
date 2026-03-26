@@ -86,6 +86,9 @@ func (l *LikeCommentLogic) LikeComment(in *pb.LikeCommentReq) (resp *pb.LikeComm
 		err = errmsg.NewGrpcErr(errmsg.ErrorDbUpdate, "DB更新失败")
 		return nil, err
 	}
+	if err := l.svcCtx.CommentCache.DeleteCommentIndexCache(l.ctx, in.CommentId); err != nil {
+		l.Errorf("invalidate comment cache failed after like, comment %d: %v", in.CommentId, err)
+	}
 
 	logger.LogInfo(l.ctx, "like comment success")
 	resp = &pb.LikeCommentResp{
