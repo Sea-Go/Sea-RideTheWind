@@ -47,8 +47,8 @@ func userLogOption(userID int64) logger.LogOption {
 	return logger.WithUserID(strconv.FormatInt(userID, 10))
 }
 
-func articleLogOption(articleID int64) logger.LogOption {
-	return logger.WithArticleID(strconv.FormatInt(articleID, 10))
+func articleLogOption(articleID string) logger.LogOption {
+	return logger.WithArticleID(strings.TrimSpace(articleID))
 }
 
 func normalizeFolderName(name string) string {
@@ -113,13 +113,17 @@ func ensureUserExists(ctx context.Context, svcCtx *svc.ServiceContext, userID in
 	return nil
 }
 
-func resolveArticleSnapshot(ctx context.Context, svcCtx *svc.ServiceContext, targetID int64) (articleSnapshot, error) {
+func resolveArticleSnapshot(ctx context.Context, svcCtx *svc.ServiceContext, targetID string) (articleSnapshot, error) {
 	depCtx, span := otel.Tracer("favorite-rpc").Start(ctx, "Dependency.Article.GetArticle")
 	defer span.End()
 
-	span.SetAttributes(attribute.Int64("biz.article_id", targetID))
+	normalizedTargetID := strings.TrimSpace(targetID)
+	span.SetAttributes(attribute.String("biz.article_id", normalizedTargetID))
 
-	resp, err := svcCtx.ArticleRpc.GetArticle(depCtx, &articleservice.GetArticleReq{Id: uint64(targetID)})
+	resp, err := svcCtx.ArticleRpc.GetArticle(depCtx, &articleservice.GetArticleRequest{
+		ArticleId: normalizedTargetID,
+		IncrView:  false,
+	})
 	if err != nil {
 		span.RecordError(err)
 		metrics.ObserveOp("dependency", "article_get", resultFail)
@@ -130,7 +134,7 @@ func resolveArticleSnapshot(ctx context.Context, svcCtx *svc.ServiceContext, tar
 		}
 		return articleSnapshot{}, favoritecommon.GRPCError(codes.Internal, favoritecommon.ErrorServerCommon)
 	}
-	if resp == nil || !resp.Found || resp.Article == nil {
+	if resp == nil || resp.Article == nil {
 		metrics.ObserveOp("dependency", "article_get", resultFail)
 		return articleSnapshot{}, favoritecommon.GRPCError(codes.NotFound, favoritecommon.ErrorNotFound)
 	}
@@ -138,11 +142,20 @@ func resolveArticleSnapshot(ctx context.Context, svcCtx *svc.ServiceContext, tar
 	metrics.ObserveOp("dependency", "article_get", resultSuccess)
 	return articleSnapshot{
 		Title: strings.TrimSpace(resp.Article.Title),
-		Cover: articleCoverFromExtraInfo(resp.Article.ExtraInfo),
+		Cover: articleCover(resp.Article),
 	}, nil
 }
 
-func articleCoverFromExtraInfo(extra map[string]string) string {
+func articleCover(article *articleservice.Article) string {
+	if article == nil {
+		return ""
+	}
+
+	if value := strings.TrimSpace(article.CoverImageUrl); value != "" {
+		return value
+	}
+
+	extra := article.GetExtInfo()
 	if len(extra) == 0 {
 		return ""
 	}

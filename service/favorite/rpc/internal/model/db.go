@@ -28,11 +28,37 @@ func InitDB(conf DBConf) *gorm.DB {
 	)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalln("数据库连接失败")
+		log.Fatalln("database connection failed")
 	}
 	err = db.AutoMigrate(&FavoriteFolder{}, &FavoriteItem{})
 	if err != nil {
-		log.Fatalln("数据表迁移失败")
+		log.Fatalln("database migration failed")
+	}
+	if err = migrateFavoriteTargetIDToString(db); err != nil {
+		log.Fatalf("favorite_item.target_id migration failed: %v", err)
 	}
 	return db
+}
+
+func migrateFavoriteTargetIDToString(db *gorm.DB) error {
+	var dataType string
+	err := db.Raw(`
+		SELECT data_type
+		FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'favorite_item'
+		  AND column_name = 'target_id'
+	`).Scan(&dataType).Error
+	if err != nil {
+		return err
+	}
+	if dataType == "" || dataType == "character varying" || dataType == "text" {
+		return nil
+	}
+
+	return db.Exec(`
+		ALTER TABLE favorite_item
+		ALTER COLUMN target_id TYPE varchar(255)
+		USING target_id::varchar
+	`).Error
 }

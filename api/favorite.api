@@ -16,7 +16,7 @@ type FavoriteFolder {
 type FavoriteItem {
 	FavoriteId int64  `json:"favoriteId,string"`
 	FolderId   int64  `json:"folderId,string"`
-	TargetId   int64  `json:"targetId,string"`
+	TargetId   string `json:"targetId"`
 	TargetType string `json:"targetType"`
 	Title      string `json:"title,optional"`
 	Cover      string `json:"cover,optional"`
@@ -35,7 +35,7 @@ type CreateFavoriteFolderResp {
 /************** 2. 新增收藏 **************/
 type CreateFavoriteReq {
 	FolderId   int64  `json:"folderId,string"`
-	TargetId   int64  `json:"targetId,string"`
+	TargetId   string `json:"targetId"`
 	TargetType string `json:"targetType"`
 	Title      string `json:"title,optional"`
 	Cover      string `json:"cover,optional"`
@@ -82,7 +82,7 @@ type GetFavoriteFoldersResp {
 
 /************** 7. 查询收藏夹下的收藏 **************/
 type GetFavoritesByFolderReq {
-	FolderId int64 `json:"folderId,string"`
+	FolderId int64 `form:"folderId,string"`
 }
 
 type GetFavoritesByFolderResp {

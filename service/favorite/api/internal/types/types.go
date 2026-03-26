@@ -13,7 +13,7 @@ type CreateFavoriteFolderResp struct {
 
 type CreateFavoriteReq struct {
 	FolderId   int64  `json:"folderId,string"`
-	TargetId   int64  `json:"targetId,string"`
+	TargetId   string `json:"targetId"`
 	TargetType string `json:"targetType"`
 	Title      string `json:"title,optional"`
 	Cover      string `json:"cover,optional"`
@@ -49,7 +49,7 @@ type FavoriteFolder struct {
 type FavoriteItem struct {
 	FavoriteId int64  `json:"favoriteId,string"`
 	FolderId   int64  `json:"folderId,string"`
-	TargetId   int64  `json:"targetId,string"`
+	TargetId   string `json:"targetId"`
 	TargetType string `json:"targetType"`
 	Title      string `json:"title,optional"`
 	Cover      string `json:"cover,optional"`
@@ -64,7 +64,7 @@ type GetFavoriteFoldersResp struct {
 }
 
 type GetFavoritesByFolderReq struct {
-	FolderId int64 `json:"folderId,string"`
+	FolderId int64 `form:"folderId,string"`
 }
 
 type GetFavoritesByFolderResp struct {

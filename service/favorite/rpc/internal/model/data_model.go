@@ -20,7 +20,7 @@ type FavoriteItem struct {
 	FavoriteId int64     `gorm:"column:favorite_id;uniqueIndex;not null"`
 	FolderId   int64     `gorm:"column:folder_id;not null;index;uniqueIndex:uk_folder_target"`
 	UserId     int64     `gorm:"column:user_id;not null;index"`
-	TargetId   int64     `gorm:"column:target_id;not null;index;uniqueIndex:uk_folder_target"`
+	TargetId   string    `gorm:"column:target_id;type:varchar(255);not null;index;uniqueIndex:uk_folder_target"`
 	TargetType string    `gorm:"column:target_type;type:varchar(50);not null;index;uniqueIndex:uk_folder_target"`
 	Title      string    `gorm:"column:title;type:varchar(255)"`
 	Cover      string    `gorm:"column:cover;type:varchar(500)"`

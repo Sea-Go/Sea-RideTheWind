@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"sea-try-go/service/common/logger"
 	favoritecommon "sea-try-go/service/favorite/common"
@@ -36,8 +37,8 @@ func userLogOption(userID int64) logger.LogOption {
 	return logger.WithUserID(strconv.FormatInt(userID, 10))
 }
 
-func articleLogOption(articleID int64) logger.LogOption {
-	return logger.WithArticleID(strconv.FormatInt(articleID, 10))
+func articleLogOption(articleID string) logger.LogOption {
+	return logger.WithArticleID(strings.TrimSpace(articleID))
 }
 
 func codeFromRPCError(err error) int {

@@ -15,7 +15,7 @@ message FavoriteItem {
   int64 favorite_id = 1;
   int64 folder_id = 2;
   int64 user_id = 3;
-  int64 target_id = 4;      // 被收藏对象ID，比如文章ID
+  string target_id = 4;     // 被收藏对象ID，比如文章ID
   string target_type = 5;   // 被收藏对象类型，比如 article / post / video
   string title = 6;         // 冗余展示字段，可选
   string cover = 7;         // 冗余展示字段，可选
@@ -36,7 +36,7 @@ message CreateFavoriteFolderResp {
 message CreateFavoriteReq {
   int64 user_id = 1;
   int64 folder_id = 2;
-  int64 target_id = 3;
+  string target_id = 3;
   string target_type = 4;
   string title = 5;
   string cover = 6;

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v5.29.3
-// source: proto/favorite.proto
+// source: favorite.proto
 
 package __
 
@@ -34,7 +34,7 @@ type FavoriteFolder struct {
 
 func (x *FavoriteFolder) Reset() {
 	*x = FavoriteFolder{}
-	mi := &file_proto_favorite_proto_msgTypes[0]
+	mi := &file_favorite_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46,7 +46,7 @@ func (x *FavoriteFolder) String() string {
 func (*FavoriteFolder) ProtoMessage() {}
 
 func (x *FavoriteFolder) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[0]
+	mi := &file_favorite_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -59,7 +59,7 @@ func (x *FavoriteFolder) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FavoriteFolder.ProtoReflect.Descriptor instead.
 func (*FavoriteFolder) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{0}
+	return file_favorite_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *FavoriteFolder) GetFolderId() int64 {
@@ -102,7 +102,7 @@ type FavoriteItem struct {
 	FavoriteId    int64                  `protobuf:"varint,1,opt,name=favorite_id,json=favoriteId,proto3" json:"favorite_id,omitempty"`
 	FolderId      int64                  `protobuf:"varint,2,opt,name=folder_id,json=folderId,proto3" json:"folder_id,omitempty"`
 	UserId        int64                  `protobuf:"varint,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	TargetId      int64                  `protobuf:"varint,4,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`      // 被收藏对象ID，比如文章ID
+	TargetId      string                 `protobuf:"bytes,4,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`       // 被收藏对象ID，比如文章ID
 	TargetType    string                 `protobuf:"bytes,5,opt,name=target_type,json=targetType,proto3" json:"target_type,omitempty"` // 被收藏对象类型，比如 article / post / video
 	Title         string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`                             // 冗余展示字段，可选
 	Cover         string                 `protobuf:"bytes,7,opt,name=cover,proto3" json:"cover,omitempty"`                             // 冗余展示字段，可选
@@ -113,7 +113,7 @@ type FavoriteItem struct {
 
 func (x *FavoriteItem) Reset() {
 	*x = FavoriteItem{}
-	mi := &file_proto_favorite_proto_msgTypes[1]
+	mi := &file_favorite_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -125,7 +125,7 @@ func (x *FavoriteItem) String() string {
 func (*FavoriteItem) ProtoMessage() {}
 
 func (x *FavoriteItem) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[1]
+	mi := &file_favorite_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -138,7 +138,7 @@ func (x *FavoriteItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FavoriteItem.ProtoReflect.Descriptor instead.
 func (*FavoriteItem) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{1}
+	return file_favorite_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *FavoriteItem) GetFavoriteId() int64 {
@@ -162,11 +162,11 @@ func (x *FavoriteItem) GetUserId() int64 {
 	return 0
 }
 
-func (x *FavoriteItem) GetTargetId() int64 {
+func (x *FavoriteItem) GetTargetId() string {
 	if x != nil {
 		return x.TargetId
 	}
-	return 0
+	return ""
 }
 
 func (x *FavoriteItem) GetTargetType() string {
@@ -208,7 +208,7 @@ type CreateFavoriteFolderReq struct {
 
 func (x *CreateFavoriteFolderReq) Reset() {
 	*x = CreateFavoriteFolderReq{}
-	mi := &file_proto_favorite_proto_msgTypes[2]
+	mi := &file_favorite_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -220,7 +220,7 @@ func (x *CreateFavoriteFolderReq) String() string {
 func (*CreateFavoriteFolderReq) ProtoMessage() {}
 
 func (x *CreateFavoriteFolderReq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[2]
+	mi := &file_favorite_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -233,7 +233,7 @@ func (x *CreateFavoriteFolderReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateFavoriteFolderReq.ProtoReflect.Descriptor instead.
 func (*CreateFavoriteFolderReq) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{2}
+	return file_favorite_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateFavoriteFolderReq) GetUserId() int64 {
@@ -259,7 +259,7 @@ type CreateFavoriteFolderResp struct {
 
 func (x *CreateFavoriteFolderResp) Reset() {
 	*x = CreateFavoriteFolderResp{}
-	mi := &file_proto_favorite_proto_msgTypes[3]
+	mi := &file_favorite_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -271,7 +271,7 @@ func (x *CreateFavoriteFolderResp) String() string {
 func (*CreateFavoriteFolderResp) ProtoMessage() {}
 
 func (x *CreateFavoriteFolderResp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[3]
+	mi := &file_favorite_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -284,7 +284,7 @@ func (x *CreateFavoriteFolderResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateFavoriteFolderResp.ProtoReflect.Descriptor instead.
 func (*CreateFavoriteFolderResp) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{3}
+	return file_favorite_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateFavoriteFolderResp) GetFolderId() int64 {
@@ -299,7 +299,7 @@ type CreateFavoriteReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	FolderId      int64                  `protobuf:"varint,2,opt,name=folder_id,json=folderId,proto3" json:"folder_id,omitempty"`
-	TargetId      int64                  `protobuf:"varint,3,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
+	TargetId      string                 `protobuf:"bytes,3,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
 	TargetType    string                 `protobuf:"bytes,4,opt,name=target_type,json=targetType,proto3" json:"target_type,omitempty"`
 	Title         string                 `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"`
 	Cover         string                 `protobuf:"bytes,6,opt,name=cover,proto3" json:"cover,omitempty"`
@@ -309,7 +309,7 @@ type CreateFavoriteReq struct {
 
 func (x *CreateFavoriteReq) Reset() {
 	*x = CreateFavoriteReq{}
-	mi := &file_proto_favorite_proto_msgTypes[4]
+	mi := &file_favorite_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -321,7 +321,7 @@ func (x *CreateFavoriteReq) String() string {
 func (*CreateFavoriteReq) ProtoMessage() {}
 
 func (x *CreateFavoriteReq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[4]
+	mi := &file_favorite_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -334,7 +334,7 @@ func (x *CreateFavoriteReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateFavoriteReq.ProtoReflect.Descriptor instead.
 func (*CreateFavoriteReq) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{4}
+	return file_favorite_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateFavoriteReq) GetUserId() int64 {
@@ -351,11 +351,11 @@ func (x *CreateFavoriteReq) GetFolderId() int64 {
 	return 0
 }
 
-func (x *CreateFavoriteReq) GetTargetId() int64 {
+func (x *CreateFavoriteReq) GetTargetId() string {
 	if x != nil {
 		return x.TargetId
 	}
-	return 0
+	return ""
 }
 
 func (x *CreateFavoriteReq) GetTargetType() string {
@@ -388,7 +388,7 @@ type CreateFavoriteResp struct {
 
 func (x *CreateFavoriteResp) Reset() {
 	*x = CreateFavoriteResp{}
-	mi := &file_proto_favorite_proto_msgTypes[5]
+	mi := &file_favorite_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -400,7 +400,7 @@ func (x *CreateFavoriteResp) String() string {
 func (*CreateFavoriteResp) ProtoMessage() {}
 
 func (x *CreateFavoriteResp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[5]
+	mi := &file_favorite_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -413,7 +413,7 @@ func (x *CreateFavoriteResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateFavoriteResp.ProtoReflect.Descriptor instead.
 func (*CreateFavoriteResp) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{5}
+	return file_favorite_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateFavoriteResp) GetFavoriteId() int64 {
@@ -434,7 +434,7 @@ type DeleteFavoriteFolderReq struct {
 
 func (x *DeleteFavoriteFolderReq) Reset() {
 	*x = DeleteFavoriteFolderReq{}
-	mi := &file_proto_favorite_proto_msgTypes[6]
+	mi := &file_favorite_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -446,7 +446,7 @@ func (x *DeleteFavoriteFolderReq) String() string {
 func (*DeleteFavoriteFolderReq) ProtoMessage() {}
 
 func (x *DeleteFavoriteFolderReq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[6]
+	mi := &file_favorite_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -459,7 +459,7 @@ func (x *DeleteFavoriteFolderReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteFavoriteFolderReq.ProtoReflect.Descriptor instead.
 func (*DeleteFavoriteFolderReq) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{6}
+	return file_favorite_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DeleteFavoriteFolderReq) GetUserId() int64 {
@@ -485,7 +485,7 @@ type DeleteFavoriteFolderResp struct {
 
 func (x *DeleteFavoriteFolderResp) Reset() {
 	*x = DeleteFavoriteFolderResp{}
-	mi := &file_proto_favorite_proto_msgTypes[7]
+	mi := &file_favorite_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -497,7 +497,7 @@ func (x *DeleteFavoriteFolderResp) String() string {
 func (*DeleteFavoriteFolderResp) ProtoMessage() {}
 
 func (x *DeleteFavoriteFolderResp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[7]
+	mi := &file_favorite_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -510,7 +510,7 @@ func (x *DeleteFavoriteFolderResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteFavoriteFolderResp.ProtoReflect.Descriptor instead.
 func (*DeleteFavoriteFolderResp) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{7}
+	return file_favorite_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DeleteFavoriteFolderResp) GetSuccess() bool {
@@ -531,7 +531,7 @@ type DeleteFavoriteReq struct {
 
 func (x *DeleteFavoriteReq) Reset() {
 	*x = DeleteFavoriteReq{}
-	mi := &file_proto_favorite_proto_msgTypes[8]
+	mi := &file_favorite_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -543,7 +543,7 @@ func (x *DeleteFavoriteReq) String() string {
 func (*DeleteFavoriteReq) ProtoMessage() {}
 
 func (x *DeleteFavoriteReq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[8]
+	mi := &file_favorite_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -556,7 +556,7 @@ func (x *DeleteFavoriteReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteFavoriteReq.ProtoReflect.Descriptor instead.
 func (*DeleteFavoriteReq) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{8}
+	return file_favorite_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DeleteFavoriteReq) GetUserId() int64 {
@@ -582,7 +582,7 @@ type DeleteFavoriteResp struct {
 
 func (x *DeleteFavoriteResp) Reset() {
 	*x = DeleteFavoriteResp{}
-	mi := &file_proto_favorite_proto_msgTypes[9]
+	mi := &file_favorite_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -594,7 +594,7 @@ func (x *DeleteFavoriteResp) String() string {
 func (*DeleteFavoriteResp) ProtoMessage() {}
 
 func (x *DeleteFavoriteResp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[9]
+	mi := &file_favorite_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -607,7 +607,7 @@ func (x *DeleteFavoriteResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteFavoriteResp.ProtoReflect.Descriptor instead.
 func (*DeleteFavoriteResp) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{9}
+	return file_favorite_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DeleteFavoriteResp) GetSuccess() bool {
@@ -629,7 +629,7 @@ type UpdateFavoriteFolderNameReq struct {
 
 func (x *UpdateFavoriteFolderNameReq) Reset() {
 	*x = UpdateFavoriteFolderNameReq{}
-	mi := &file_proto_favorite_proto_msgTypes[10]
+	mi := &file_favorite_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -641,7 +641,7 @@ func (x *UpdateFavoriteFolderNameReq) String() string {
 func (*UpdateFavoriteFolderNameReq) ProtoMessage() {}
 
 func (x *UpdateFavoriteFolderNameReq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[10]
+	mi := &file_favorite_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -654,7 +654,7 @@ func (x *UpdateFavoriteFolderNameReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateFavoriteFolderNameReq.ProtoReflect.Descriptor instead.
 func (*UpdateFavoriteFolderNameReq) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{10}
+	return file_favorite_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateFavoriteFolderNameReq) GetUserId() int64 {
@@ -687,7 +687,7 @@ type UpdateFavoriteFolderNameResp struct {
 
 func (x *UpdateFavoriteFolderNameResp) Reset() {
 	*x = UpdateFavoriteFolderNameResp{}
-	mi := &file_proto_favorite_proto_msgTypes[11]
+	mi := &file_favorite_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -699,7 +699,7 @@ func (x *UpdateFavoriteFolderNameResp) String() string {
 func (*UpdateFavoriteFolderNameResp) ProtoMessage() {}
 
 func (x *UpdateFavoriteFolderNameResp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[11]
+	mi := &file_favorite_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -712,7 +712,7 @@ func (x *UpdateFavoriteFolderNameResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateFavoriteFolderNameResp.ProtoReflect.Descriptor instead.
 func (*UpdateFavoriteFolderNameResp) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{11}
+	return file_favorite_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UpdateFavoriteFolderNameResp) GetSuccess() bool {
@@ -732,7 +732,7 @@ type GetFavoriteFoldersReq struct {
 
 func (x *GetFavoriteFoldersReq) Reset() {
 	*x = GetFavoriteFoldersReq{}
-	mi := &file_proto_favorite_proto_msgTypes[12]
+	mi := &file_favorite_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -744,7 +744,7 @@ func (x *GetFavoriteFoldersReq) String() string {
 func (*GetFavoriteFoldersReq) ProtoMessage() {}
 
 func (x *GetFavoriteFoldersReq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[12]
+	mi := &file_favorite_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -757,7 +757,7 @@ func (x *GetFavoriteFoldersReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFavoriteFoldersReq.ProtoReflect.Descriptor instead.
 func (*GetFavoriteFoldersReq) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{12}
+	return file_favorite_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetFavoriteFoldersReq) GetUserId() int64 {
@@ -776,7 +776,7 @@ type GetFavoriteFoldersResp struct {
 
 func (x *GetFavoriteFoldersResp) Reset() {
 	*x = GetFavoriteFoldersResp{}
-	mi := &file_proto_favorite_proto_msgTypes[13]
+	mi := &file_favorite_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -788,7 +788,7 @@ func (x *GetFavoriteFoldersResp) String() string {
 func (*GetFavoriteFoldersResp) ProtoMessage() {}
 
 func (x *GetFavoriteFoldersResp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[13]
+	mi := &file_favorite_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -801,7 +801,7 @@ func (x *GetFavoriteFoldersResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFavoriteFoldersResp.ProtoReflect.Descriptor instead.
 func (*GetFavoriteFoldersResp) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{13}
+	return file_favorite_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetFavoriteFoldersResp) GetFolders() []*FavoriteFolder {
@@ -822,7 +822,7 @@ type GetFavoritesByFolderReq struct {
 
 func (x *GetFavoritesByFolderReq) Reset() {
 	*x = GetFavoritesByFolderReq{}
-	mi := &file_proto_favorite_proto_msgTypes[14]
+	mi := &file_favorite_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -834,7 +834,7 @@ func (x *GetFavoritesByFolderReq) String() string {
 func (*GetFavoritesByFolderReq) ProtoMessage() {}
 
 func (x *GetFavoritesByFolderReq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[14]
+	mi := &file_favorite_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -847,7 +847,7 @@ func (x *GetFavoritesByFolderReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFavoritesByFolderReq.ProtoReflect.Descriptor instead.
 func (*GetFavoritesByFolderReq) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{14}
+	return file_favorite_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetFavoritesByFolderReq) GetUserId() int64 {
@@ -873,7 +873,7 @@ type GetFavoritesByFolderResp struct {
 
 func (x *GetFavoritesByFolderResp) Reset() {
 	*x = GetFavoritesByFolderResp{}
-	mi := &file_proto_favorite_proto_msgTypes[15]
+	mi := &file_favorite_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -885,7 +885,7 @@ func (x *GetFavoritesByFolderResp) String() string {
 func (*GetFavoritesByFolderResp) ProtoMessage() {}
 
 func (x *GetFavoritesByFolderResp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_favorite_proto_msgTypes[15]
+	mi := &file_favorite_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -898,7 +898,7 @@ func (x *GetFavoritesByFolderResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFavoritesByFolderResp.ProtoReflect.Descriptor instead.
 func (*GetFavoritesByFolderResp) Descriptor() ([]byte, []int) {
-	return file_proto_favorite_proto_rawDescGZIP(), []int{15}
+	return file_favorite_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetFavoritesByFolderResp) GetFavorites() []*FavoriteItem {
@@ -908,11 +908,11 @@ func (x *GetFavoritesByFolderResp) GetFavorites() []*FavoriteItem {
 	return nil
 }
 
-var File_proto_favorite_proto protoreflect.FileDescriptor
+var File_favorite_proto protoreflect.FileDescriptor
 
-const file_proto_favorite_proto_rawDesc = "" +
+const file_favorite_proto_rawDesc = "" +
 	"\n" +
-	"\x14proto/favorite.proto\x12\bfavorite\"\x98\x01\n" +
+	"\x0efavorite.proto\x12\bfavorite\"\x98\x01\n" +
 	"\x0eFavoriteFolder\x12\x1b\n" +
 	"\tfolder_id\x18\x01 \x01(\x03R\bfolderId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x12\n" +
@@ -926,7 +926,7 @@ const file_proto_favorite_proto_rawDesc = "" +
 	"favoriteId\x12\x1b\n" +
 	"\tfolder_id\x18\x02 \x01(\x03R\bfolderId\x12\x17\n" +
 	"\auser_id\x18\x03 \x01(\x03R\x06userId\x12\x1b\n" +
-	"\ttarget_id\x18\x04 \x01(\x03R\btargetId\x12\x1f\n" +
+	"\ttarget_id\x18\x04 \x01(\tR\btargetId\x12\x1f\n" +
 	"\vtarget_type\x18\x05 \x01(\tR\n" +
 	"targetType\x12\x14\n" +
 	"\x05title\x18\x06 \x01(\tR\x05title\x12\x14\n" +
@@ -941,7 +941,7 @@ const file_proto_favorite_proto_rawDesc = "" +
 	"\x11CreateFavoriteReq\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x1b\n" +
 	"\tfolder_id\x18\x02 \x01(\x03R\bfolderId\x12\x1b\n" +
-	"\ttarget_id\x18\x03 \x01(\x03R\btargetId\x12\x1f\n" +
+	"\ttarget_id\x18\x03 \x01(\tR\btargetId\x12\x1f\n" +
 	"\vtarget_type\x18\x04 \x01(\tR\n" +
 	"targetType\x12\x14\n" +
 	"\x05title\x18\x05 \x01(\tR\x05title\x12\x14\n" +
@@ -985,19 +985,19 @@ const file_proto_favorite_proto_rawDesc = "" +
 	"\x14GetFavoritesByFolder\x12!.favorite.GetFavoritesByFolderReq\x1a\".favorite.GetFavoritesByFolderRespB\x03Z\x01.b\x06proto3"
 
 var (
-	file_proto_favorite_proto_rawDescOnce sync.Once
-	file_proto_favorite_proto_rawDescData []byte
+	file_favorite_proto_rawDescOnce sync.Once
+	file_favorite_proto_rawDescData []byte
 )
 
-func file_proto_favorite_proto_rawDescGZIP() []byte {
-	file_proto_favorite_proto_rawDescOnce.Do(func() {
-		file_proto_favorite_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_favorite_proto_rawDesc), len(file_proto_favorite_proto_rawDesc)))
+func file_favorite_proto_rawDescGZIP() []byte {
+	file_favorite_proto_rawDescOnce.Do(func() {
+		file_favorite_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_favorite_proto_rawDesc), len(file_favorite_proto_rawDesc)))
 	})
-	return file_proto_favorite_proto_rawDescData
+	return file_favorite_proto_rawDescData
 }
 
-var file_proto_favorite_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
-var file_proto_favorite_proto_goTypes = []any{
+var file_favorite_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_favorite_proto_goTypes = []any{
 	(*FavoriteFolder)(nil),               // 0: favorite.FavoriteFolder
 	(*FavoriteItem)(nil),                 // 1: favorite.FavoriteItem
 	(*CreateFavoriteFolderReq)(nil),      // 2: favorite.CreateFavoriteFolderReq
@@ -1015,7 +1015,7 @@ var file_proto_favorite_proto_goTypes = []any{
 	(*GetFavoritesByFolderReq)(nil),      // 14: favorite.GetFavoritesByFolderReq
 	(*GetFavoritesByFolderResp)(nil),     // 15: favorite.GetFavoritesByFolderResp
 }
-var file_proto_favorite_proto_depIdxs = []int32{
+var file_favorite_proto_depIdxs = []int32{
 	0,  // 0: favorite.GetFavoriteFoldersResp.folders:type_name -> favorite.FavoriteFolder
 	1,  // 1: favorite.GetFavoritesByFolderResp.favorites:type_name -> favorite.FavoriteItem
 	2,  // 2: favorite.FavoriteService.CreateFavoriteFolder:input_type -> favorite.CreateFavoriteFolderReq
@@ -1039,26 +1039,26 @@ var file_proto_favorite_proto_depIdxs = []int32{
 	0,  // [0:2] is the sub-list for field type_name
 }
 
-func init() { file_proto_favorite_proto_init() }
-func file_proto_favorite_proto_init() {
-	if File_proto_favorite_proto != nil {
+func init() { file_favorite_proto_init() }
+func file_favorite_proto_init() {
+	if File_favorite_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_favorite_proto_rawDesc), len(file_proto_favorite_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_favorite_proto_rawDesc), len(file_favorite_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_favorite_proto_goTypes,
-		DependencyIndexes: file_proto_favorite_proto_depIdxs,
-		MessageInfos:      file_proto_favorite_proto_msgTypes,
+		GoTypes:           file_favorite_proto_goTypes,
+		DependencyIndexes: file_favorite_proto_depIdxs,
+		MessageInfos:      file_favorite_proto_msgTypes,
 	}.Build()
-	File_proto_favorite_proto = out.File
-	file_proto_favorite_proto_goTypes = nil
-	file_proto_favorite_proto_depIdxs = nil
+	File_favorite_proto = out.File
+	file_favorite_proto_goTypes = nil
+	file_favorite_proto_depIdxs = nil
 }

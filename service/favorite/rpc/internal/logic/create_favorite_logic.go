@@ -47,7 +47,7 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 	span.SetAttributes(
 		attribute.Int64("biz.user_id", in.GetUserId()),
 		attribute.Int64("biz.folder_id", in.GetFolderId()),
-		attribute.Int64("biz.target_id", in.GetTargetId()),
+		attribute.String("biz.target_id", strings.TrimSpace(in.GetTargetId())),
 		attribute.String("biz.target_type", in.GetTargetType()),
 	)
 
@@ -60,7 +60,8 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 	}
 
 	targetType := normalizeTargetType(in.GetTargetType())
-	if in.GetTargetId() <= 0 || targetType == "" {
+	targetID := strings.TrimSpace(in.GetTargetId())
+	if targetID == "" || targetType == "" {
 		err = favoritecommon.GRPCError(codes.InvalidArgument, favoritecommon.ErrorFavoriteTargetEmpty)
 		span.RecordError(err)
 		metrics.ObserveOp(itemModule, itemCreate, resultFail)
@@ -71,7 +72,7 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 	if err = ensureUserExists(ctx, l.svcCtx, in.GetUserId()); err != nil {
 		span.RecordError(err)
 		metrics.ObserveOp(itemModule, itemCreate, resultFail)
-		logger.LogBusinessErr(ctx, favoritecommon.BizCodeFromError(err), err, userLogOption(in.GetUserId()), articleLogOption(in.GetTargetId()))
+		logger.LogBusinessErr(ctx, favoritecommon.BizCodeFromError(err), err, userLogOption(in.GetUserId()), articleLogOption(targetID))
 		return nil, err
 	}
 
@@ -101,11 +102,11 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 	title := strings.TrimSpace(in.GetTitle())
 	cover := strings.TrimSpace(in.GetCover())
 	if targetType == "article" {
-		snapshot, depErr := resolveArticleSnapshot(ctx, l.svcCtx, in.GetTargetId())
+		snapshot, depErr := resolveArticleSnapshot(ctx, l.svcCtx, targetID)
 		if depErr != nil {
 			span.RecordError(depErr)
 			metrics.ObserveOp(itemModule, itemCreate, resultFail)
-			logger.LogBusinessErr(ctx, favoritecommon.BizCodeFromError(depErr), depErr, userLogOption(in.GetUserId()), articleLogOption(in.GetTargetId()))
+			logger.LogBusinessErr(ctx, favoritecommon.BizCodeFromError(depErr), depErr, userLogOption(in.GetUserId()), articleLogOption(targetID))
 			return nil, depErr
 		}
 		if title == "" {
@@ -116,17 +117,17 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 		}
 	}
 
-	if _, dbErr = l.svcCtx.FavoriteModel.FindFavoriteByFolderTarget(ctx, in.GetFolderId(), in.GetTargetId(), targetType); dbErr == nil {
+	if _, dbErr = l.svcCtx.FavoriteModel.FindFavoriteByFolderTarget(ctx, in.GetFolderId(), targetID, targetType); dbErr == nil {
 		err = favoritecommon.GRPCError(codes.AlreadyExists, favoritecommon.ErrorFavoriteAlreadyExist)
 		span.RecordError(err)
 		metrics.ObserveOp(itemModule, itemCreate, resultFail)
-		logger.LogBusinessErr(ctx, favoritecommon.ErrorFavoriteAlreadyExist, err, userLogOption(in.GetUserId()), articleLogOption(in.GetTargetId()))
+		logger.LogBusinessErr(ctx, favoritecommon.ErrorFavoriteAlreadyExist, err, userLogOption(in.GetUserId()), articleLogOption(targetID))
 		return nil, err
 	} else if !errors.Is(dbErr, model.ErrorNotFound) {
 		span.RecordError(dbErr)
 		metrics.ObserveDBError(itemModule, "select", "db")
 		metrics.ObserveOp(itemModule, itemCreate, resultFail)
-		logger.LogBusinessErr(ctx, favoritecommon.ErrorDbSelect, dbErr, userLogOption(in.GetUserId()), articleLogOption(in.GetTargetId()))
+		logger.LogBusinessErr(ctx, favoritecommon.ErrorDbSelect, dbErr, userLogOption(in.GetUserId()), articleLogOption(targetID))
 		return nil, favoritecommon.GRPCError(codes.Internal, favoritecommon.ErrorDbSelect)
 	}
 
@@ -134,7 +135,7 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 	if genErr != nil {
 		span.RecordError(genErr)
 		metrics.ObserveOp(itemModule, itemCreate, resultFail)
-		logger.LogBusinessErr(ctx, favoritecommon.ErrorGenerateID, genErr, userLogOption(in.GetUserId()), articleLogOption(in.GetTargetId()))
+		logger.LogBusinessErr(ctx, favoritecommon.ErrorGenerateID, genErr, userLogOption(in.GetUserId()), articleLogOption(targetID))
 		return nil, favoritecommon.GRPCError(codes.Internal, favoritecommon.ErrorGenerateID)
 	}
 
@@ -142,7 +143,7 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 		FavoriteId: favoriteID,
 		FolderId:   in.GetFolderId(),
 		UserId:     in.GetUserId(),
-		TargetId:   in.GetTargetId(),
+		TargetId:   targetID,
 		TargetType: targetType,
 		Title:      title,
 		Cover:      cover,
@@ -152,15 +153,15 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 		metrics.ObserveOp(itemModule, itemCreate, resultFail)
 		if isUniqueViolation(dbErr) {
 			metrics.ObserveDBError(itemModule, "insert", "duplicate")
-			logger.LogBusinessErr(ctx, favoritecommon.ErrorFavoriteAlreadyExist, dbErr, userLogOption(in.GetUserId()), articleLogOption(in.GetTargetId()))
+			logger.LogBusinessErr(ctx, favoritecommon.ErrorFavoriteAlreadyExist, dbErr, userLogOption(in.GetUserId()), articleLogOption(targetID))
 			return nil, favoritecommon.GRPCError(codes.AlreadyExists, favoritecommon.ErrorFavoriteAlreadyExist)
 		}
 		metrics.ObserveDBError(itemModule, "insert", "db")
-		logger.LogBusinessErr(ctx, favoritecommon.ErrorDbUpdate, dbErr, userLogOption(in.GetUserId()), articleLogOption(in.GetTargetId()))
+		logger.LogBusinessErr(ctx, favoritecommon.ErrorDbUpdate, dbErr, userLogOption(in.GetUserId()), articleLogOption(targetID))
 		return nil, favoritecommon.GRPCError(codes.Internal, favoritecommon.ErrorDbUpdate)
 	}
 
 	metrics.ObserveOp(itemModule, itemCreate, resultSuccess)
-	logger.LogInfo(ctx, fmt.Sprintf("favorite item created, favorite_id=%d", favoriteID), userLogOption(in.GetUserId()), articleLogOption(in.GetTargetId()))
+	logger.LogInfo(ctx, fmt.Sprintf("favorite item created, favorite_id=%d", favoriteID), userLogOption(in.GetUserId()), articleLogOption(targetID))
 	return &favoritepb.CreateFavoriteResp{FavoriteId: favoriteID}, nil
 }

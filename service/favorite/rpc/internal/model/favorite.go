@@ -104,7 +104,7 @@ func (m *FavoriteModel) FindFavoriteByFavoriteId(ctx context.Context, favoriteId
 	return nil, err
 }
 
-func (m *FavoriteModel) FindFavoriteByFolderTarget(ctx context.Context, folderId, targetId int64, targetType string) (*FavoriteItem, error) {
+func (m *FavoriteModel) FindFavoriteByFolderTarget(ctx context.Context, folderId int64, targetId, targetType string) (*FavoriteItem, error) {
 	var favorite FavoriteItem
 	err := m.conn.WithContext(ctx).
 		Where("folder_id = ? AND target_id = ? AND target_type = ?", folderId, targetId, targetType).

@@ -3,6 +3,7 @@ package favorite
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/favorite/api/internal/svc"
@@ -42,7 +43,7 @@ func (l *CreateFavoriteLogic) CreateFavorite(req *types.CreateFavoriteReq) (resp
 	span.SetAttributes(
 		attribute.Int64("biz.user_id", userID),
 		attribute.Int64("biz.folder_id", req.FolderId),
-		attribute.Int64("biz.target_id", req.TargetId),
+		attribute.String("biz.target_id", strings.TrimSpace(req.TargetId)),
 		attribute.String("biz.target_type", req.TargetType),
 	)
 
