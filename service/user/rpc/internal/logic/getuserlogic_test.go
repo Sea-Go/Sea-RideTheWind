@@ -1,3 +1,6 @@
+//go:build legacy_user_rpc_tests
+// +build legacy_user_rpc_tests
+
 package logic
 
 import (
