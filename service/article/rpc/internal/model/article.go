@@ -87,12 +87,35 @@ func (m *ArticleRepo) FindOne(ctx context.Context, id string) (*Article, error) 
 	return &article, nil
 }
 
+func (m *ArticleRepo) FindOneUnscoped(ctx context.Context, id string) (*Article, error) {
+	var article Article
+	err := m.Db.WithContext(ctx).Unscoped().Where("id = ?", id).First(&article).Error
+	if err != nil {
+		return nil, err
+	}
+	return &article, nil
+}
+
 func (m *ArticleRepo) Update(ctx context.Context, article *Article) error {
 	return m.Db.WithContext(ctx).Save(article).Error
 }
 
+func (m *ArticleRepo) UpdateTx(ctx context.Context, tx *gorm.DB, article *Article) error {
+	return tx.WithContext(ctx).Save(article).Error
+}
+
 func (m *ArticleRepo) Delete(ctx context.Context, id string) error {
 	return m.Db.WithContext(ctx).Delete(&Article{}, "id = ?", id).Error
+}
+
+func (m *ArticleRepo) DeleteTx(ctx context.Context, tx *gorm.DB, id string) error {
+	return tx.WithContext(ctx).Delete(&Article{}, "id = ?", id).Error
+}
+
+func (m *ArticleRepo) RunInTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
+	return m.Db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(tx)
+	})
 }
 
 func (m *ArticleRepo) IncrViewCount(ctx context.Context, id string) error {

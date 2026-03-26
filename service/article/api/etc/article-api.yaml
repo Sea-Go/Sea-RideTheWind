@@ -1,18 +1,26 @@
 Name: article-api
 Host: 0.0.0.0
 Port: 8889
+Timeout: 70000
 
 ArticleRpcConf:
   Etcd:
     Hosts:
       - 127.0.0.1:32379
     Key: article.rpc
+  Timeout: 70000
 
 SecurityRpcConf:
   Etcd:
     Hosts:
       - 127.0.0.1:32379
     Key: security.rpc
+
+UserRpcConf:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: user.rpc
 
 Auth:
   AccessSecret: ae0536f9-6450-4606-8e13-5a19ed505da0

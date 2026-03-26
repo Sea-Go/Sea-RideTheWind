@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
+	"time"
+
 	"github.com/zeromicro/go-queue/kq"
 	"github.com/zeromicro/go-zero/core/logx"
 	"sea-try-go/service/article/rpc/internal/config"
@@ -49,11 +50,61 @@ func main() {
 
 	serviceGroup.Add(s)
 
-	// Add Kafka consumer
-	consumer := mqs.NewArticleConsumer(context.Background(), ctx)
+	backgroundCtx := context.Background()
+	consumer := mqs.NewArticleConsumer(backgroundCtx, ctx)
 	serviceGroup.Add(kq.MustNewQueue(c.KqConsumerConf, consumer))
+	resultConsumer := mqs.NewArticleSyncResultConsumer(backgroundCtx, ctx)
+	serviceGroup.Add(kq.MustNewQueue(c.ArticleSyncResultConsumerConf, resultConsumer))
 
-	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
-	fmt.Printf("Starting kafka consumer...\n")
+	relayInterval := time.Duration(c.ArticleSyncOutbox.PollIntervalMs) * time.Millisecond
+	if relayInterval <= 0 {
+		relayInterval = time.Second
+	}
+	batchSize := c.ArticleSyncOutbox.BatchSize
+	if batchSize <= 0 {
+		batchSize = 100
+	}
+	serviceGroup.Add(&articleSyncRelayService{
+		ctx:       backgroundCtx,
+		interval:  relayInterval,
+		batchSize: batchSize,
+		sender:    mqs.NewArticleSyncOutboxSender(ctx),
+	})
+
+	logx.Infof("starting article rpc server at %s", c.ListenOn)
+	logx.Infof("starting article review consumer on topic %s", c.KqConsumerConf.Topic)
+	logx.Infof("starting article sync result consumer on topic %s", c.ArticleSyncResultConsumerConf.Topic)
 	serviceGroup.Start()
+}
+
+type articleSyncRelayService struct {
+	ctx       context.Context
+	interval  time.Duration
+	batchSize int
+	sender    *mqs.ArticleSyncOutboxSender
+	cancel    context.CancelFunc
+}
+
+func (s *articleSyncRelayService) Start() {
+	relayCtx, cancel := context.WithCancel(s.ctx)
+	s.cancel = cancel
+	ticker := time.NewTicker(s.interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-relayCtx.Done():
+			return
+		case <-ticker.C:
+			if err := s.sender.SendPending(relayCtx, s.batchSize); err != nil {
+				logx.Errorf("send article sync outbox failed: %v", err)
+			}
+		}
+	}
+}
+
+func (s *articleSyncRelayService) Stop() {
+	if s.cancel != nil {
+		s.cancel()
+	}
 }

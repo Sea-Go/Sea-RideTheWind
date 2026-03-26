@@ -7,11 +7,12 @@ import (
 	"github.com/minio/minio-go/v7"
 	"mime"
 	"path/filepath"
+	"strings"
 
 	"sea-try-go/service/article/common/errmsg"
 	"sea-try-go/service/article/rpc/internal/svc"
 	"sea-try-go/service/article/rpc/metrics"
-	"sea-try-go/service/article/rpc/pb"
+	__ "sea-try-go/service/article/rpc/pb"
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/common/snowflake"
 
@@ -79,9 +80,27 @@ func (l *UploadFileLogic) UploadFile(in *__.UploadFileRequest) (*__.UploadFileRe
 	//统计图片文件上传总数
 	metrics.FileUploadTotal.WithLabelValues("image").Inc()
 
-	fileUrl := fmt.Sprintf("http://%s/%s/%s", l.svcCtx.Config.MinIO.Endpoint, l.svcCtx.Config.MinIO.BucketName, objectName)
+	fileUrl := l.buildPublicFileURL(objectName)
 
 	return &__.UploadFileResponse{
 		FileUrl: fileUrl,
 	}, nil
+}
+
+func (l *UploadFileLogic) buildPublicFileURL(objectName string) string {
+	baseURL := strings.TrimSpace(l.svcCtx.Config.MinIO.PublicBaseURL)
+	if baseURL == "" {
+		scheme := "http"
+		if l.svcCtx.Config.MinIO.UseSSL {
+			scheme = "https"
+		}
+		baseURL = fmt.Sprintf("%s://%s", scheme, strings.TrimSpace(l.svcCtx.Config.MinIO.Endpoint))
+	}
+
+	return fmt.Sprintf(
+		"%s/%s/%s",
+		strings.TrimRight(baseURL, "/"),
+		strings.Trim(l.svcCtx.Config.MinIO.BucketName, "/"),
+		strings.TrimLeft(objectName, "/"),
+	)
 }

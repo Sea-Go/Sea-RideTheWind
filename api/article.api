@@ -25,7 +25,7 @@ type (
 		Brief         string   `json:"brief,optional"`
 		Content       string   `json:"content"`
 		CoverImageUrl string   `json:"cover_image_url,optional"`
-		ManualTypeTag string   `json:"manual_type_tag"`
+		ManualTypeTag string   `json:"manual_type_tag,optional"`
 		SecondaryTags []string `json:"secondary_tags,optional"`
 	}
 	CreateArticleResp {

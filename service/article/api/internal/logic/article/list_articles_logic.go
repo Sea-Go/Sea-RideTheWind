@@ -71,8 +71,11 @@ func (l *ListArticlesLogic) ListArticles(req *types.ListArticlesReq) (resp *type
 			ViewCount:     item.ViewCount,
 			LikeCount:     item.LikeCount,
 			CommentCount:  item.CommentCount,
+			ShareCount:    item.ShareCount,
+			ExtInfo:       cloneStringMap(item.ExtInfo),
 		})
 	}
+	enrichArticleAuthors(l.ctx, l.svcCtx, articles)
 
 	return &types.ListArticlesResp{
 		Articles: articles,

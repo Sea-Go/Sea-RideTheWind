@@ -57,6 +57,7 @@ func InitDB(c config.Config) (db *gorm.DB, err error) {
 	// 自动迁移模型
 	err = db.AutoMigrate(
 		&Article{},
+		&ArticleSyncOutboxEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto migrate models: %w", err)

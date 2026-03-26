@@ -65,7 +65,7 @@ var (
 			Name:      "kafka_push_errors_total",
 			Help:      "Total number of errors for Kafka push",
 		},
-		[]string{},
+		[]string{"topic"},
 	)
 )
 

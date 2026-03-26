@@ -12,6 +12,7 @@ type Article struct {
 	ManualTypeTag string            `json:"manual_type_tag"`
 	SecondaryTags []string          `json:"secondary_tags"`
 	AuthorId      string            `json:"author_id"`
+	AuthorName    string            `json:"author_name,omitempty"`
 	CreateTime    int64             `json:"create_time"`
 	UpdateTime    int64             `json:"update_time"`
 	Status        int32             `json:"status"`
@@ -27,7 +28,7 @@ type CreateArticleReq struct {
 	Brief         string   `json:"brief,optional"`
 	Content       string   `json:"content"`
 	CoverImageUrl string   `json:"cover_image_url,optional"`
-	ManualTypeTag string   `json:"manual_type_tag"`
+	ManualTypeTag string   `json:"manual_type_tag,optional"`
 	SecondaryTags []string `json:"secondary_tags,optional"`
 }
 

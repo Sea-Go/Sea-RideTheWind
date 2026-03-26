@@ -5,6 +5,7 @@ package article
 
 import (
 	"context"
+	"fmt"
 
 	"sea-try-go/service/article/api/internal/svc"
 	"sea-try-go/service/article/api/internal/types"
@@ -33,6 +34,35 @@ func NewUpdateArticleLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Upd
 }
 
 func (l *UpdateArticleLogic) UpdateArticle(req *types.UpdateArticleReq) (resp *types.UpdateArticleResp, code int) {
+	currentUserID, code := extractCurrentUserID(l.ctx)
+	if code != errmsg.Success {
+		logger.LogBusinessErr(l.ctx, code, fmt.Errorf("missing login userId in article update context"))
+		return nil, code
+	}
+
+	articleResp, err := l.svcCtx.ArticleRpc.GetArticle(l.ctx, &articleservice.GetArticleRequest{
+		ArticleId: req.ArticleId,
+		IncrView:  false,
+	})
+	if err != nil {
+		logger.LogBusinessErr(l.ctx, errmsg.Error, err)
+		st, _ := status.FromError(err)
+		switch st.Code() {
+		case codes.NotFound:
+			return nil, errmsg.ErrorArticleNone
+		case codes.Internal:
+			return nil, errmsg.ErrorServerCommon
+		default:
+			return nil, errmsg.CodeServerBusy
+		}
+	}
+	if articleResp == nil || articleResp.Article == nil {
+		return nil, errmsg.ErrorArticleNone
+	}
+	if articleResp.Article.AuthorId != currentUserID {
+		return nil, errmsg.ErrorArticleForbidden
+	}
+
 	rpcReq := &articleservice.UpdateArticleRequest{
 		ArticleId:     req.ArticleId,
 		SecondaryTags: req.SecondaryTags,
@@ -58,7 +88,7 @@ func (l *UpdateArticleLogic) UpdateArticle(req *types.UpdateArticleReq) (resp *t
 		rpcReq.Status = status.Enum()
 	}
 
-	_, err := l.svcCtx.ArticleRpc.UpdateArticle(l.ctx, rpcReq)
+	rpcResp, err := l.svcCtx.ArticleRpc.UpdateArticle(l.ctx, rpcReq)
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, errmsg.Error, err)
 		st, _ := status.FromError(err)
@@ -72,5 +102,7 @@ func (l *UpdateArticleLogic) UpdateArticle(req *types.UpdateArticleReq) (resp *t
 		}
 	}
 
-	return &types.UpdateArticleResp{}, errmsg.Success
+	return &types.UpdateArticleResp{
+		Success: rpcResp.GetSuccess(),
+	}, errmsg.Success
 }

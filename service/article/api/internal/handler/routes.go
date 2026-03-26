@@ -5,6 +5,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	article "sea-try-go/service/article/api/internal/handler/article"
 	"sea-try-go/service/article/api/internal/svc"
@@ -33,6 +34,7 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
 		rest.WithPrefix("/v1"),
+		rest.WithTimeout(70*time.Second),
 	)
 
 	server.AddRoutes(

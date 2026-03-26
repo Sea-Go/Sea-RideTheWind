@@ -105,6 +105,20 @@ func (l *GetArticleLogic) GetArticle(in *__.GetArticleRequest) (*__.GetArticleRe
 			ViewCount:       article.ViewCount,
 			LikeCount:       article.LikeCount,
 			CommentCount:    article.CommentCount,
+			ShareCount:      article.ShareCount,
+			ExtInfo:         cloneStringMap(map[string]string(article.ExtInfo)),
 		},
 	}, nil
+}
+
+func cloneStringMap(source map[string]string) map[string]string {
+	if len(source) == 0 {
+		return nil
+	}
+
+	cloned := make(map[string]string, len(source))
+	for key, value := range source {
+		cloned[key] = value
+	}
+	return cloned
 }

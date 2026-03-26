@@ -84,6 +84,8 @@ func (l *ListArticlesLogic) ListArticles(in *__.ListArticlesRequest) (*__.ListAr
 			ViewCount:       article.ViewCount,
 			LikeCount:       article.LikeCount,
 			CommentCount:    article.CommentCount,
+			ShareCount:      article.ShareCount,
+			ExtInfo:         cloneStringMap(map[string]string(article.ExtInfo)),
 		})
 	}
 

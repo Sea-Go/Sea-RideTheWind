@@ -1,5 +1,6 @@
 Name: article.rpc
 ListenOn: 0.0.0.0:9001
+Timeout: 70000
 Etcd:
   Hosts:
   - 127.0.0.1:32379
@@ -31,6 +32,8 @@ KqPusherConf:
 
 MinIO:
   Endpoint: "127.0.0.1:39000"
+  # 部署环境建议填写对外可访问的静态资源基址；留空时回退到 Endpoint。
+  PublicBaseURL: ""
   AccessKeyID: "minioadmin"
   SecretAccessKey: "minioadmin"
   BucketName: "articles"
@@ -46,6 +49,27 @@ KqConsumerConf:
   Topic: article-creation-topic
   Offset: first
   Consumers: 1
+
+ArticleSyncPusherConf:
+  Name: article-sync-pusher
+  Group: article-sync-pusher
+  Brokers:
+    - 127.0.0.1:39092
+  Topic: article-sync-events
+
+ArticleSyncResultConsumerConf:
+  Name: article-sync-result-consumer
+  Brokers:
+    - 127.0.0.1:39092
+  Group: article-sync-result
+  Topic: article-sync-results
+  Offset: first
+  Consumers: 1
+
+ArticleSyncOutbox:
+  PollIntervalMs: 1000
+  BatchSize: 100
+  MaxRetry: 10
 
 Telemetry:
   Name: article-rpc
@@ -64,3 +88,9 @@ SecurityConf:
       - 127.0.0.1:32379
     Key: security.rpc
   Timeout: 10000
+
+MessageRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: message.rpc

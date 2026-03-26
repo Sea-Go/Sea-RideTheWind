@@ -5,7 +5,6 @@ package article
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sea-try-go/service/article/rpc/articleservice"
 
@@ -34,19 +33,15 @@ func NewDeleteArticleLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Del
 }
 
 func (l *DeleteArticleLogic) DeleteArticle(req *types.DeleteArticleReq) (resp *types.DeleteArticleResp, code int) {
-	var OperatorId string
-	if uid := l.ctx.Value("userId"); uid != nil {
-		if idNum, ok := uid.(json.Number); ok {
-			OperatorId = idNum.String()
-		} else {
-			OperatorId = fmt.Sprintf("%v", uid)
-		}
-	} else {
-		OperatorId = "dev_test_user"
+	operatorID, code := extractCurrentUserID(l.ctx)
+	if code != errmsg.Success {
+		logger.LogBusinessErr(l.ctx, code, fmt.Errorf("missing login userId in article delete context"))
+		return nil, code
 	}
-	_, err := l.svcCtx.ArticleRpc.DeleteArticle(l.ctx, &articleservice.DeleteArticleRequest{
-		ArticleId:  req.ArticleId,
-		OperatorId: OperatorId,
+
+	articleResp, err := l.svcCtx.ArticleRpc.GetArticle(l.ctx, &articleservice.GetArticleRequest{
+		ArticleId: req.ArticleId,
+		IncrView:  false,
 	})
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, errmsg.Error, err)
@@ -54,6 +49,31 @@ func (l *DeleteArticleLogic) DeleteArticle(req *types.DeleteArticleReq) (resp *t
 		switch st.Code() {
 		case codes.NotFound:
 			return nil, errmsg.ErrorArticleNone
+		case codes.Internal:
+			return nil, errmsg.ErrorServerCommon
+		default:
+			return nil, errmsg.CodeServerBusy
+		}
+	}
+	if articleResp == nil || articleResp.Article == nil {
+		return nil, errmsg.ErrorArticleNone
+	}
+	if articleResp.Article.AuthorId != operatorID {
+		return nil, errmsg.ErrorArticleForbidden
+	}
+
+	_, err = l.svcCtx.ArticleRpc.DeleteArticle(l.ctx, &articleservice.DeleteArticleRequest{
+		ArticleId:  req.ArticleId,
+		OperatorId: operatorID,
+	})
+	if err != nil {
+		logger.LogBusinessErr(l.ctx, errmsg.Error, err)
+		st, _ := status.FromError(err)
+		switch st.Code() {
+		case codes.NotFound:
+			return nil, errmsg.ErrorArticleNone
+		case codes.PermissionDenied:
+			return nil, errmsg.ErrorArticleForbidden
 		case codes.Internal:
 			return nil, errmsg.ErrorServerCommon
 		default:

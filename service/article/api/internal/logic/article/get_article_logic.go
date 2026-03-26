@@ -53,7 +53,7 @@ func (l *GetArticleLogic) GetArticle(req *types.GetArticleReq) (resp *types.GetA
 		return nil, errmsg.ErrorArticleNone
 	}
 
-	return &types.GetArticleResp{
+	resp = &types.GetArticleResp{
 		Article: types.Article{
 			Id:            res.Article.Id,
 			Title:         res.Article.Title,
@@ -61,12 +61,18 @@ func (l *GetArticleLogic) GetArticle(req *types.GetArticleReq) (resp *types.GetA
 			Content:       res.Article.MarkdownContent,
 			CoverImageUrl: res.Article.CoverImageUrl,
 			AuthorId:      res.Article.AuthorId,
+			CreateTime:    res.Article.CreateTime,
+			UpdateTime:    res.Article.UpdateTime,
 			Status:        int32(res.Article.Status),
 			ManualTypeTag: res.Article.ManualTypeTag,
 			SecondaryTags: res.Article.SecondaryTags,
 			ViewCount:     res.Article.ViewCount,
 			LikeCount:     res.Article.LikeCount,
 			CommentCount:  res.Article.CommentCount,
+			ShareCount:    res.Article.ShareCount,
+			ExtInfo:       cloneStringMap(res.Article.ExtInfo),
 		},
-	}, errmsg.Success
+	}
+	enrichArticleAuthor(l.ctx, l.svcCtx, &resp.Article)
+	return resp, errmsg.Success
 }
