@@ -18,3 +18,8 @@ type ArticleHotEvent struct {
 	Timestamp int64  `json:"timestamp"`
 	IsFirst   bool   `json:"is_first"`
 }
+
+type TaskArticleProgressMsg struct {
+	UserID string `json:"user_id"`
+	Cur    int64  `json:"cur"`
+}

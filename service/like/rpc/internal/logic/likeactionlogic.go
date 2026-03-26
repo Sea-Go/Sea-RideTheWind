@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"sea-try-go/service/like/rpc/internal/svc"
 	"sea-try-go/service/like/rpc/internal/types"
 	"sea-try-go/service/like/rpc/pb"
+	messagepb "sea-try-go/service/message/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel/attribute"
@@ -118,6 +120,10 @@ end
 
 return 1
 `
+
+const (
+	activeLikeState = 1
+)
 
 type LikeActionLogic struct {
 	ctx    context.Context
@@ -245,7 +251,6 @@ func (l *LikeActionLogic) LikeAction(in *pb.LikeActionReq) (*pb.LikeActionResp, 
 		}
 		logger.LogInfo(l.ctx, "like action success")
 	}
-
 	likecountStr, err := l.svcCtx.BizRedis.HgetCtx(l.ctx, countKey, in.TargetId)
 	var finallikeCount int64
 	if err == nil && likecountStr != "" {
@@ -275,10 +280,119 @@ func (l *LikeActionLogic) LikeAction(in *pb.LikeActionReq) (*pb.LikeActionResp, 
 		metrics.LikeActionCount.WithLabelValues(in.TargetType, actionStr, "redis_read_error").Inc()
 		logger.LogBusinessErr(l.ctx, errmsg.ErrorRedisSelect, err)
 	}
+
+	if resInt != 0 &&
+		in.ActionType == pb.ActionType_ACTION_LIKE &&
+		strings.EqualFold(in.TargetType, "article") {
+		finallikeCount = l.currentArticleLikeTotal(in.TargetType, in.TargetId, finallikeCount)
+	}
+
+	if resInt != 0 &&
+		in.ActionType == pb.ActionType_ACTION_LIKE &&
+		strings.EqualFold(in.TargetType, "article") {
+		l.syncTaskProgress(in, userListKey, finallikeCount)
+	}
+	if resInt != 0 &&
+		in.ActionType == pb.ActionType_ACTION_LIKE &&
+		strings.EqualFold(in.TargetType, "article") &&
+		in.AuthorId > 0 &&
+		in.UserId != in.AuthorId {
+		l.notifyArticleLiked(in)
+	}
+
 	return &pb.LikeActionResp{
 		Success:      true,
 		Message:      "action success",
 		LikeCount:    finallikeCount,
 		DislikeCount: finalDislikeCount,
 	}, nil
+}
+
+func (l *LikeActionLogic) syncTaskProgress(in *pb.LikeActionReq, userListKey string, articleLikes int64) {
+	if l.svcCtx.TaskUserPusher != nil {
+		totalLikesGiven, err := l.currentUserLikeTotal(in.UserId, in.TargetType, userListKey)
+		if err != nil {
+			logger.LogBusinessErr(l.ctx, errmsg.ErrorRedisSelect, fmt.Errorf("sync task user progress failed: %w", err))
+		} else if totalLikesGiven > 0 {
+			if err := l.svcCtx.TaskUserPusher.PushWithKey(
+				l.ctx,
+				strconv.FormatInt(in.UserId, 10),
+				strconv.FormatInt(totalLikesGiven, 10),
+			); err != nil {
+				logger.LogBusinessErr(l.ctx, errmsg.ErrorKafkaPush, fmt.Errorf("push task user progress failed: %w", err))
+			}
+		}
+	}
+
+	if l.svcCtx.TaskArticlePusher == nil || in.AuthorId <= 0 || articleLikes <= 0 {
+		return
+	}
+
+	payload, err := json.Marshal(types.TaskArticleProgressMsg{
+		UserID: strconv.FormatInt(in.AuthorId, 10),
+		Cur:    articleLikes,
+	})
+	if err != nil {
+		logger.LogBusinessErr(l.ctx, errmsg.ErrorJsonMarshal, fmt.Errorf("marshal task article progress failed: %w", err))
+		return
+	}
+
+	if err := l.svcCtx.TaskArticlePusher.PushWithKey(l.ctx, in.TargetId, string(payload)); err != nil {
+		logger.LogBusinessErr(l.ctx, errmsg.ErrorKafkaPush, fmt.Errorf("push task article progress failed: %w", err))
+	}
+}
+
+func (l *LikeActionLogic) currentUserLikeTotal(userID int64, targetType string, userListKey string) (int64, error) {
+	total, err := l.svcCtx.BizRedis.ZcardCtx(l.ctx, userListKey)
+	if err != nil {
+		total = 0
+	}
+
+	dbTotal, dbErr := l.svcCtx.LikeModel.GetUserActiveLikeCount(l.ctx, userID, targetType)
+	if dbErr != nil {
+		if err == nil {
+			return int64(total), nil
+		}
+		return 0, dbErr
+	}
+
+	if dbTotal > int64(total) {
+		return dbTotal, nil
+	}
+
+	return int64(total), nil
+}
+
+func (l *LikeActionLogic) currentArticleLikeTotal(targetType string, targetID string, redisTotal int64) int64 {
+	dbTotal, err := l.svcCtx.LikeModel.GetTargetActiveLikeCount(l.ctx, targetType, targetID)
+	if err != nil {
+		return redisTotal
+	}
+
+	if dbTotal > redisTotal {
+		return dbTotal
+	}
+
+	return redisTotal
+}
+
+func (l *LikeActionLogic) notifyArticleLiked(in *pb.LikeActionReq) {
+	_, err := l.svcCtx.MessageRpc.SendNotification(l.ctx, &messagepb.SendNotificationReq{
+		RecipientIds: []int64{in.AuthorId},
+		Broadcast:    false,
+		SenderId:     in.UserId,
+		SenderRole:   messagepb.SenderRole_USER,
+		Kind:         messagepb.NotificationKind_ARTICLE_LIKED,
+		Title:        "文章收获新点赞",
+		Content:      fmt.Sprintf("用户 %d 点赞了你的文章。", in.UserId),
+		Extra: map[string]string{
+			"target_type": in.TargetType,
+			"target_id":   in.TargetId,
+			"liker_id":    fmt.Sprintf("%d", in.UserId),
+			"author_id":   fmt.Sprintf("%d", in.AuthorId),
+		},
+	})
+	if err != nil {
+		logger.LogBusinessErr(l.ctx, errmsg.ErrorServerCommon, fmt.Errorf("send article liked notification failed: %w", err))
+	}
 }

@@ -10,6 +10,8 @@ import (
 
 type LikeRecordModel interface {
 	GetTotalLikeCount(ctx context.Context, authorId int64) (int64, error)
+	GetUserActiveLikeCount(ctx context.Context, userId int64, targetType string) (int64, error)
+	GetTargetActiveLikeCount(ctx context.Context, targetType string, targetId string) (int64, error)
 	GetBatchLikeCount(ctx context.Context, targetType string, targetIds []string) (map[string]map[int32]int64, error)
 	GetUserBatchLikeState(ctx context.Context, userId int64, targetType string, targetIds []string) (map[string]int32, error)
 	GetUserLikeList(ctx context.Context, userId int64, targetType string, cursor int64, limit int) ([]UserLikeListResult, error)
@@ -42,6 +44,24 @@ type LikeProcessPayload struct {
 func (m *defaultLikeRecordModel) GetTotalLikeCount(ctx context.Context, authorId int64) (int64, error) {
 	var count int64
 	err := m.db.WithContext(ctx).Model(&LikeRecord{}).Where("author_id = ? AND state = ?", authorId, 1).Count(&count).Error
+	return count, err
+}
+
+func (m *defaultLikeRecordModel) GetUserActiveLikeCount(ctx context.Context, userId int64, targetType string) (int64, error) {
+	var count int64
+	err := m.db.WithContext(ctx).
+		Model(&LikeRecord{}).
+		Where("user_id = ? AND target_type = ? AND state = ?", userId, targetType, 1).
+		Count(&count).Error
+	return count, err
+}
+
+func (m *defaultLikeRecordModel) GetTargetActiveLikeCount(ctx context.Context, targetType string, targetId string) (int64, error) {
+	var count int64
+	err := m.db.WithContext(ctx).
+		Model(&LikeRecord{}).
+		Where("target_type = ? AND target_id = ? AND state = ?", targetType, targetId, 1).
+		Count(&count).Error
 	return count, err
 }
 

@@ -84,6 +84,20 @@ KafkaPusher:
     - 127.0.0.1:39092
   Topic: like_update_topic
 
+TaskUserPusherConf:
+  Name: like.task.user.pusher
+  Group: like.task.user.pusher
+  Brokers:
+    - 127.0.0.1:39092
+  Topic: task.logs.filtered.User
+
+TaskArticlePusherConf:
+  Name: like.task.article.pusher
+  Group: like.task.article.pusher
+  Brokers:
+    - 127.0.0.1:39092
+  Topic: task.logs.filtered.Article
+
 #防刷系统
 AntiBrush:
   #针对所有人
@@ -96,3 +110,9 @@ AntiBrush:
     #一天最多1000赞,每分钟最多60赞,否则判定为刷赞号,直接封
     DailyMax: 1000
     PerMinuteMax: 60
+
+MessageRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: message.rpc

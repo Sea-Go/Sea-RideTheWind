@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/zeromicro/go-queue/kq"
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/zrpc"
 )
@@ -74,8 +75,11 @@ type Config struct {
 	KafkaConf   KafkaConf
 	HotSpot     HotSpotConf
 	AntiBrush   AntiBrushConf
+	MessageRpc  zrpc.RpcClientConf
 	KafkaPusher struct {
 		Brokers []string
 		Topic   string
 	}
+	TaskUserPusherConf    kq.KqConf
+	TaskArticlePusherConf kq.KqConf
 }
