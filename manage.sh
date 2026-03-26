@@ -33,7 +33,7 @@ OTEL_ADDR="${OTEL_ADDR:-${INFRA_HOST}:34317}"
 # 只保留当前 compose 里真实存在的 infra 服务
 INFRA_SERVICES=(etcd postgres redis kafka minio)
 
-ALL_SERVICES=(article comment like task user admin hot points security)
+ALL_SERVICES=(article comment like follow message task user admin hot points security)
 
 BUILD_PROGRESS="${BUILD_PROGRESS:-plain}"
 START_WAIT_SECONDS="${START_WAIT_SECONDS:-20}"
@@ -452,10 +452,12 @@ resolve_build_paths() {
     article)  echo "./service/article/api|./service/article/rpc" ;;
     comment)  echo "./service/comment/api|./service/comment/rpc" ;;
     like)     echo "./service/like/api|./service/like/rpc" ;;
+    follow)   echo "./service/follow/api|./service/follow/rpc" ;;
+    message)  echo "./service/message/api|./service/message/rpc" ;;
     task)     echo "./service/task/api|./service/task/rpc" ;;
     user)     echo "./service/user/user/api|./service/user/user/rpc" ;;
     admin)    echo "./service/user/admin/api|./service/user/admin/rpc" ;;
-    hot)      echo "|./service/hot/rpc" ;;
+    hot)      echo "./service/hot/api|./service/hot/rpc" ;;
     points)   echo "|./service/points/rpc" ;;
     security) echo "|./service/security/rpc" ;;
     *) die "unknown service: $service" ;;
@@ -665,6 +667,18 @@ start_one() {
         "etc/likecenter.yaml" "etc/like.yaml" \
         -p 18887:8887 -p 18082:8082
       ;;
+    follow)
+      run_container "follow" "${IMAGE_PREFIX}-follow:latest" "1" "1" \
+        "/app/service/follow/api" "/app/service/follow/rpc" \
+        "etc/followcenter.yaml" "etc/follow.yaml" \
+        -p 18891:8891 -p 18086:8082
+      ;;
+    message)
+      run_container "message" "${IMAGE_PREFIX}-message:latest" "1" "1" \
+        "/app/service/message/api" "/app/service/message/rpc" \
+        "etc/messagecenter.yaml" "etc/message.yaml" \
+        -p 18892:8892 -p 18087:8082
+      ;;
     task)
       run_container "task" "${IMAGE_PREFIX}-task:latest" "1" "1" \
         "/app/service/task/api" "/app/service/task/rpc" \
@@ -684,10 +698,10 @@ start_one() {
         -p 18884:8889 -p 18081:8081
       ;;
     hot)
-      run_container "hot" "${IMAGE_PREFIX}-hot:latest" "0" "1" \
-        "" "/app/service/hot/rpc" \
-        "" "etc/hot.yaml" \
-        -p 18083:8083
+      run_container "hot" "${IMAGE_PREFIX}-hot:latest" "1" "1" \
+        "/app/service/hot/api" "/app/service/hot/rpc" \
+        "etc/hotcenter.yaml" "etc/hot.yaml" \
+        -p 18893:8893 -p 18083:8083
       ;;
     points)
       run_container "points" "${IMAGE_PREFIX}-points:latest" "0" "1" \
