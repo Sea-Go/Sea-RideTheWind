@@ -3,13 +3,13 @@ package sink
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sea-try-go/service/task/rpc/internal/reward"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -64,7 +64,7 @@ type ArticleLikeSinkConsumer struct {
 
 type articleAgg struct {
 	UserID int64
-	delta  int64
+	total  int64
 }
 
 type articleVal struct {
@@ -102,18 +102,20 @@ func (c *ArticleLikeSinkConsumer) Consume(ctx context.Context, key string, value
 		return nil
 	}
 	c.mu.Lock()
-	//cur := c.delta[key]
 	cur, exits := c.delta[articleID]
 	if exits == false {
 		c.delta[articleID] = articleAgg{
 			UserID: userID,
-			delta:  d,
+			total:  d,
 		}
 		c.mu.Unlock()
 		return nil
 	}
-	cur.delta += d
-	c.delta[articleID] = cur
+	if d > cur.total {
+		cur.total = d
+		cur.UserID = userID
+		c.delta[articleID] = cur
+	}
 	c.mu.Unlock()
 	return nil
 }
@@ -163,7 +165,7 @@ func (c *ArticleLikeSinkConsumer) flushOnce(ctx context.Context) error {
 	/*	_ = c.markReconCandidates(ctx, batch) //对账器*/
 
 	if err := c.FlushRedis(ctx, batch); err != nil {
-		fmt.Println(err)
+		logx.WithContext(ctx).Errorf("flush redis failed: %v", err)
 		return err
 	}
 
@@ -327,7 +329,7 @@ func (c *ArticleLikeSinkConsumer) FlushRedis(ctx context.Context, batch map[int6
 	type cmdItem struct {
 		articleID int64
 		userID    int64
-		cmd       *redis.IntCmd
+		total     int64
 	}
 	items := make([]cmdItem, 0, min(len(batch), c.redisPipeMax+1))
 
@@ -343,13 +345,11 @@ func (c *ArticleLikeSinkConsumer) FlushRedis(ctx context.Context, batch map[int6
 			return err
 		}
 		for _, it := range items {
-			nowTotal, e := it.cmd.Result()
-			if e != nil {
+			if it.total >= articleTarget {
+				_ = c.completeArticleLike(ctx, it.userID, it.articleID, it.total)
 				continue
 			}
-			if nowTotal >= articleTarget {
-				_ = c.completeArticleLike(ctx, it.userID, it.articleID, nowTotal)
-			}
+			_ = c.updateDoingTaskProgress(ctx, it.userID, it.total)
 		}
 		pipe = c.rdb.Pipeline()
 		n = 0
@@ -357,15 +357,15 @@ func (c *ArticleLikeSinkConsumer) FlushRedis(ctx context.Context, batch map[int6
 		return nil
 	}
 	for articleID, ag := range batch {
-		if ag.UserID == 0 || ag.delta == 0 {
+		if ag.UserID == 0 || ag.total <= 0 {
 			continue
 		}
 		cntKey := "article:like:cnt:" + strconv.FormatInt(articleID, 10)
-		cmd := pipe.IncrBy(ctx, cntKey, ag.delta)
+		pipe.Set(ctx, cntKey, ag.total, articleDoneTTL)
 		items = append(items, cmdItem{
 			articleID: articleID,
 			userID:    ag.UserID,
-			cmd:       cmd,
+			total:     ag.total,
 		})
 		n++
 		if n >= c.redisPipeMax {
@@ -375,6 +375,46 @@ func (c *ArticleLikeSinkConsumer) FlushRedis(ctx context.Context, batch map[int6
 		}
 	}
 	return exec()
+}
+
+func (c *ArticleLikeSinkConsumer) updateDoingTaskProgress(ctx context.Context, userID, progress int64) error {
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > articleTarget {
+		progress = articleTarget
+	}
+
+	rec := ArticleLikeTaskProgress{
+		UserID:   userID,
+		TaskID:   articleTaskID,
+		Status:   "doing",
+		Progress: progress,
+		Target:   articleTarget,
+	}
+
+	if err := c.gdb.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "user_id"},
+			{Name: "task_id"},
+		},
+		DoUpdates: clause.Assignments(map[string]any{
+			"status": gorm.Expr(
+				"CASE WHEN task_progress.status = 'done' THEN task_progress.status ELSE EXCLUDED.status END",
+			),
+			"progress":   gorm.Expr("GREATEST(task_progress.progress, EXCLUDED.progress)"),
+			"target":     articleTarget,
+			"updated_at": gorm.Expr("now()"),
+		}),
+	}).Create(&rec).Error; err != nil {
+		return err
+	}
+
+	return c.invalidateTaskCache(ctx, userID)
+}
+
+func (c *ArticleLikeSinkConsumer) invalidateTaskCache(ctx context.Context, userID int64) error {
+	return c.rdb.Del(ctx, buildTaskCacheKey(userID)).Err()
 }
 
 func (c *ArticleLikeSinkConsumer) completeArticleLike(ctx context.Context, userID int64, articleID int64, total int64) error {
@@ -404,7 +444,10 @@ func (c *ArticleLikeSinkConsumer) completeArticleLike(ctx context.Context, userI
 		//需要补充如果失败后的异常处理
 		return err
 	}
-	return c.markTaskDoneInDB(userID, articleID, now, total)
+	if err := c.markTaskDoneInDB(userID, articleID, now, total); err != nil {
+		return err
+	}
+	return c.invalidateTaskCache(ctx, userID)
 }
 
 /*func (c *ArticleLikeSinkConsumer) FlushPostgres(ctx context.Context, batch map[string]articleVal) error {

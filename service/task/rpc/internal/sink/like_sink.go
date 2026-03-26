@@ -56,7 +56,7 @@ type LikeSinkConsumer struct {
 
 type row struct {
 	uid   int64
-	delta int64
+	total int64
 }
 
 func NewUserLikeSinkConsumer(rdb *redis.Client, gdb *gorm.DB) *LikeSinkConsumer {
@@ -85,18 +85,20 @@ func (c *LikeSinkConsumer) Consume(ctx context.Context, key string, val string) 
 		return nil
 	}
 
-	d := int64(1)
+	total := int64(1)
 	if val != "" {
 		if n, err := strconv.ParseInt(val, 10, 64); err == nil {
-			d = n
+			total = n
 		}
 	}
-	if d == 0 {
+	if total <= 0 {
 		return nil
 	}
 
 	c.mu.Lock()
-	c.delta[userID] += d
+	if current, ok := c.delta[userID]; !ok || total > current {
+		c.delta[userID] = total
+	}
 	c.mu.Unlock()
 	return nil
 }
@@ -231,9 +233,6 @@ func (c *LikeSinkConsumer) flushRedis(ctx context.Context, batch map[int64]int64
 	pipe := c.rdb.Pipeline()
 	n := 0
 
-	lens := min(len(batch), c.redisPipeMax+1)
-	cmds := make(map[int64]*redis.IntCmd, lens)
-
 	exec := func() error {
 		if n == 0 {
 			return nil
@@ -242,27 +241,23 @@ func (c *LikeSinkConsumer) flushRedis(ctx context.Context, batch map[int64]int64
 		if err != nil {
 			pipe = c.rdb.Pipeline()
 			n = 0
-			cmds = make(map[int64]*redis.IntCmd, lens)
 			return err
 		}
-		for uid, cmd := range cmds {
-			nowTotal, e := cmd.Result()
-			if e != nil {
+		for uid, total := range batch {
+			if total >= target {
+				_ = c.completeLikeGT5(ctx, uid, total)
 				continue
 			}
-			if nowTotal >= target {
-				_ = c.completeLikeGT5(ctx, uid, nowTotal)
-			}
+			_ = c.updateDoingTaskProgress(ctx, uid, total)
 		}
 
 		pipe = c.rdb.Pipeline()
 		n = 0
-		cmds = make(map[int64]*redis.IntCmd, lens)
 		return nil
 	}
 
-	for uid, d := range batch {
-		cmds[uid] = pipe.IncrBy(ctx, "like:total:"+strconv.FormatInt(uid, 10), d)
+	for uid, total := range batch {
+		pipe.Set(ctx, "like:total:"+strconv.FormatInt(uid, 10), total, 90*24*time.Hour)
 		n++
 		if n > c.redisPipeMax {
 			if err := exec(); err != nil {
@@ -271,6 +266,47 @@ func (c *LikeSinkConsumer) flushRedis(ctx context.Context, batch map[int64]int64
 		}
 	}
 	return exec()
+}
+
+func (c *LikeSinkConsumer) updateDoingTaskProgress(ctx context.Context, uid, progress int64) error {
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > target {
+		progress = target
+	}
+
+	rec := UserTaskProgress{
+		UserID:   uid,
+		TaskID:   taskID,
+		Status:   "doing",
+		Progress: progress,
+		Target:   target,
+	}
+
+	if err := c.gdb.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "user_id"}, {Name: "task_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"status": gorm.Expr(
+				"CASE WHEN task_progress.status = 'done' THEN task_progress.status ELSE EXCLUDED.status END",
+			),
+			"progress":   gorm.Expr("GREATEST(task_progress.progress, EXCLUDED.progress)"),
+			"target":     target,
+			"updated_at": gorm.Expr("now()"),
+		}),
+	}).Create(&rec).Error; err != nil {
+		return err
+	}
+
+	return c.invalidateTaskCache(ctx, uid)
+}
+
+func (c *LikeSinkConsumer) invalidateTaskCache(ctx context.Context, uid int64) error {
+	return c.rdb.Del(ctx, buildTaskCacheKey(uid)).Err()
+}
+
+func buildTaskCacheKey(uid int64) string {
+	return "task:progress:" + strconv.FormatInt(uid, 10)
 }
 
 func (c *LikeSinkConsumer) completeLikeGT5(ctx context.Context, _uid, total int64) error {
@@ -300,7 +336,7 @@ func (c *LikeSinkConsumer) completeLikeGT5(ctx context.Context, _uid, total int6
 		// 这里建议记录日志即可，不要让整个 sink 挂掉（看你容错策略）
 		return err
 	}
-	return nil
+	return c.invalidateTaskCache(ctx, _uid)
 }
 
 func (c *LikeSinkConsumer) markTaskDoneInDB(uid, progress int64) error {
@@ -327,8 +363,8 @@ func (c *LikeSinkConsumer) markTaskDoneInDB(uid, progress int64) error {
 func (c *LikeSinkConsumer) flushPostgres(ctx context.Context, batch map[int64]int64) error {
 
 	rows := make([]row, 0, len(batch))
-	for uid, d := range batch {
-		rows = append(rows, row{uid, d})
+	for uid, total := range batch {
+		rows = append(rows, row{uid, total})
 	}
 
 	for i := 0; i < len(rows); i++ {
@@ -348,7 +384,7 @@ func (c *LikeSinkConsumer) upsertChunk(rows []row) error {
 	for _, row := range rows {
 		records = append(records, UserLikeCount{
 			UserID:    strconv.FormatInt(row.uid, 10),
-			LikeCount: row.delta,
+			LikeCount: row.total,
 		})
 	}
 
@@ -356,7 +392,7 @@ func (c *LikeSinkConsumer) upsertChunk(rows []row) error {
 		Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "user_id"}},
 			DoUpdates: clause.Assignments(map[string]any{
-				"like_count": gorm.Expr("user_like_count.like_count + EXCLUDED.like_count"),
+				"like_count": gorm.Expr("GREATEST(user_like_count.like_count, EXCLUDED.like_count)"),
 				"updated_at": gorm.Expr("now()"),
 			}),
 		}).Create(&records).Error

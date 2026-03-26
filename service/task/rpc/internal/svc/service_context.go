@@ -2,6 +2,7 @@ package svc
 
 import (
 	//pointspb "sea-try-go/service/points/rpc/pb"
+	"sea-try-go/service/task/rpc/internal/Model"
 	"sea-try-go/service/task/rpc/internal/config"
 	//"github.com/zeromicro/go-zero/zrpc"
 	//userpb "sea-try-go/service/user/rpc/pb"
@@ -42,6 +43,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	sqlDB.SetMaxOpenConns(c.Postgres.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(c.Postgres.MaxIdleConns)
 	sqlDB.SetConnMaxLifetime(time.Duration(c.Postgres.ConnMaxLifetimeMinutes))
+
+	if err = gdb.AutoMigrate(&Model.TaskProgress{}, &Model.UserLikeCount{}); err != nil {
+		panic(err)
+	}
 
 	return &ServiceContext{
 		Config: c,

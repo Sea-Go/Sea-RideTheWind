@@ -4,6 +4,7 @@
 package task
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
@@ -15,7 +16,9 @@ import (
 func GetTaskHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.GetTaskReq
-		if err := httpx.Parse(r, &req); err != nil {
+		decoder := json.NewDecoder(r.Body)
+		decoder.UseNumber()
+		if err := decoder.Decode(&req); err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}

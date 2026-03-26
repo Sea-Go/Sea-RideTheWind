@@ -3,8 +3,54 @@
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"strconv"
+	"strings"
+)
+
+type UserIDParam string
+
+func (u *UserIDParam) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		*u = ""
+		return nil
+	}
+
+	var value string
+	if err := json.Unmarshal(trimmed, &value); err == nil {
+		*u = UserIDParam(strings.TrimSpace(value))
+		return nil
+	}
+
+	var numeric json.Number
+	if err := json.Unmarshal(trimmed, &numeric); err == nil {
+		*u = UserIDParam(numeric.String())
+		return nil
+	}
+
+	return errors.New("id must be a string or integer")
+}
+
+func (u UserIDParam) Int64() (int64, error) {
+	value := strings.TrimSpace(string(u))
+	if value == "" {
+		return 0, errors.New("user_id invalid")
+	}
+
+	uid, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || uid <= 0 {
+		return 0, errors.New("user_id invalid")
+	}
+
+	return uid, nil
+}
+
 type GetTaskReq struct {
-	Userid uint `json:"id"`
+	Userid UserIDParam `json:"id"`
 }
 
 type GetTaskResp struct {

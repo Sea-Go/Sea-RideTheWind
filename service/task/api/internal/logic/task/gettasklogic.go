@@ -5,7 +5,6 @@ package task
 
 import (
 	"context"
-	"fmt"
 	taskpb "sea-try-go/service/task/rpc/pb"
 
 	"sea-try-go/service/task/api/internal/svc"
@@ -29,11 +28,14 @@ func NewGetTaskLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetTaskLo
 }
 
 func (l *GetTaskLogic) GetTask(req *types.GetTaskReq) (resp *types.GetTaskResp, err error) {
+	uid, err := req.Userid.Int64()
+	if err != nil {
+		return nil, err
+	}
 
 	rpcResp, err := l.svcCtx.TaskCli.GetTask(l.ctx, &taskpb.GetTaskReq{
-		UserId: int64(req.Userid),
+		UserId: uid,
 	})
-	fmt.Println(rpcResp.Task)
 	if err != nil {
 		return nil, err
 	}
