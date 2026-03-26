@@ -5,7 +5,7 @@ package admin
 
 import (
 	"context"
-	"fmt"
+
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/user/admin/api/internal/svc"
 	"sea-try-go/service/user/admin/api/internal/types"
@@ -32,22 +32,23 @@ func NewCreateLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CreateLogi
 }
 
 func (l *CreateLogic) Create(req *types.CreateAdminReq) (resp *types.CreateAdminResp, code int) {
-
 	rpcReq := &pb.CreateAdminReq{
-		Username:  req.Username,
-		Password:  req.Password,
-		Email:     req.Email,
-		ExtraInfo: req.Extrainfo,
+		Username:   req.Username,
+		Password:   req.Password,
+		Email:      req.Email,
+		InviteCode: req.InviteCode,
+		ExtraInfo:  req.Extrainfo,
 	}
 
 	rpcResp, err := l.svcCtx.AdminRpc.CreateAdmin(l.ctx, rpcReq)
 	if err != nil {
-		fmt.Println(err)
 		logger.LogBusinessErr(l.ctx, errmsg.Error, err)
 		st, _ := status.FromError(err)
 		switch st.Code() {
 		case codes.AlreadyExists:
 			return nil, errmsg.ErrorUserExist
+		case codes.PermissionDenied:
+			return nil, errmsg.ErrorAdminInviteCodeWrong
 		case codes.Internal:
 			return nil, errmsg.ErrorServerCommon
 		default:

@@ -46,11 +46,19 @@ type CreateAdminReq {
 	Username  string            `json:"username"`
 	Password  string            `json:"password"`
 	Email     string            `json:"email,omitempty"`
+	InviteCode string           `json:"invite_code"`
 	Extrainfo map[string]string `json:"extra_info,omitempty"`
 }
 
 type CreateAdminResp {
 	Uid int64 `json:"uid,string"`
+}
+
+type CreateInviteReq {}
+
+type CreateInviteResp {
+	InviteCode string `json:"invite_code"`
+	ExpiresAt  int64  `json:"expires_at"`
 }
 
 type LoginReq {
@@ -173,6 +181,12 @@ service admincenter {
 	)
 	@handler logout
 	post /admin/logout (LogoutReq) returns (LogoutResp)
+	
+	@doc (
+		createinvite: "生成管理员邀请码"
+	)
+	@handler createinvite
+	post /admin/invite/create (CreateInviteReq) returns (CreateInviteResp)
 
 	@doc (
 		getuserlist: "获取指定用户列表"

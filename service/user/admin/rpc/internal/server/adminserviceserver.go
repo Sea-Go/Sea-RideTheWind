@@ -43,6 +43,11 @@ func (s *AdminServiceServer) CreateAdmin(ctx context.Context, in *pb.CreateAdmin
 	return l.CreateAdmin(in)
 }
 
+func (s *AdminServiceServer) CreateInviteCode(ctx context.Context, in *pb.CreateInviteCodeReq) (*pb.CreateInviteCodeResp, error) {
+	l := logic.NewCreateInviteCodeLogic(ctx, s.svcCtx)
+	return l.CreateInviteCode(in)
+}
+
 func (s *AdminServiceServer) Login(ctx context.Context, in *pb.LoginReq) (*pb.LoginResp, error) {
 	l := logic.NewLoginLogic(ctx, s.svcCtx)
 	return l.Login(in)

@@ -19,14 +19,23 @@ type BanUserResp struct {
 }
 
 type CreateAdminReq struct {
-	Username  string            `json:"username"`
-	Password  string            `json:"password"`
-	Email     string            `json:"email,omitempty"`
-	Extrainfo map[string]string `json:"extra_info,omitempty"`
+	Username   string            `json:"username"`
+	Password   string            `json:"password"`
+	Email      string            `json:"email,omitempty"`
+	InviteCode string            `json:"invite_code"`
+	Extrainfo  map[string]string `json:"extra_info,omitempty"`
 }
 
 type CreateAdminResp struct {
 	Uid int64 `json:"uid,string"`
+}
+
+type CreateInviteReq struct {
+}
+
+type CreateInviteResp struct {
+	InviteCode string `json:"invite_code"`
+	ExpiresAt  int64  `json:"expires_at"`
 }
 
 type DeleteUserReq struct {

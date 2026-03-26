@@ -44,6 +44,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Handler: admin.DeleteHandler(serverCtx),
 				},
 				{
+					Method:  http.MethodPost,
+					Path:    "/admin/invite/create",
+					Handler: admin.CreateinviteHandler(serverCtx),
+				},
+				{
 					Method:  http.MethodGet,
 					Path:    "/admin/getself",
 					Handler: admin.GetselfHandler(serverCtx),

@@ -19,6 +19,8 @@ type (
 	BanUserResp           = pb.BanUserResp
 	CreateAdminReq        = pb.CreateAdminReq
 	CreateAdminResp       = pb.CreateAdminResp
+	CreateInviteCodeReq   = pb.CreateInviteCodeReq
+	CreateInviteCodeResp  = pb.CreateInviteCodeResp
 	DeleteUserReq         = pb.DeleteUserReq
 	DeleteUserResp        = pb.DeleteUserResp
 	GetSelfReq            = pb.GetSelfReq
@@ -46,6 +48,7 @@ type (
 		GetUserList(ctx context.Context, in *GetUserListReq, opts ...grpc.CallOption) (*GetUserListResp, error)
 		GetSelf(ctx context.Context, in *GetSelfReq, opts ...grpc.CallOption) (*GetSelfResp, error)
 		CreateAdmin(ctx context.Context, in *CreateAdminReq, opts ...grpc.CallOption) (*CreateAdminResp, error)
+		CreateInviteCode(ctx context.Context, in *CreateInviteCodeReq, opts ...grpc.CallOption) (*CreateInviteCodeResp, error)
 		Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginResp, error)
 		Logout(ctx context.Context, in *LogoutReq, opts ...grpc.CallOption) (*LogoutResp, error)
 		DeleteUser(ctx context.Context, in *DeleteUserReq, opts ...grpc.CallOption) (*DeleteUserResp, error)
@@ -85,6 +88,11 @@ func (m *defaultAdminService) GetSelf(ctx context.Context, in *GetSelfReq, opts 
 func (m *defaultAdminService) CreateAdmin(ctx context.Context, in *CreateAdminReq, opts ...grpc.CallOption) (*CreateAdminResp, error) {
 	client := pb.NewAdminServiceClient(m.cli.Conn())
 	return client.CreateAdmin(ctx, in, opts...)
+}
+
+func (m *defaultAdminService) CreateInviteCode(ctx context.Context, in *CreateInviteCodeReq, opts ...grpc.CallOption) (*CreateInviteCodeResp, error) {
+	client := pb.NewAdminServiceClient(m.cli.Conn())
+	return client.CreateInviteCode(ctx, in, opts...)
 }
 
 func (m *defaultAdminService) Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginResp, error) {

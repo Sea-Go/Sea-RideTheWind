@@ -3,6 +3,9 @@ package logic
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/common/snowflake"
 	"sea-try-go/service/user/admin/rpc/internal/model"
@@ -16,6 +19,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 type CreateAdminLogic struct {
@@ -36,48 +40,87 @@ func (l *CreateAdminLogic) CreateAdmin(in *pb.CreateAdminReq) (*pb.CreateAdminRe
 	tracer := otel.Tracer("admin-rpc")
 	ctx, span := tracer.Start(l.ctx, "Action-Admin-CreateAdmin")
 	defer span.End()
-	span.SetAttributes(
-		attribute.String("audit.admin_username", in.Username),
-	)
-	_, err := l.svcCtx.AdminModel.FindOneAdminByUsername(ctx, in.Username)
-	if err == nil {
-		logger.LogBusinessErr(ctx, errmsg.ErrorUserExist, fmt.Errorf("username has existed"))
-		return nil, status.Error(codes.AlreadyExists, "用户名已存在")
-	}
-	if err != model.ErrorNotFound {
-		span.RecordError(err)
-		logger.LogBusinessErr(ctx, errmsg.ErrorDbSelect, err)
-		return nil, status.Error(codes.Internal, "DB查询错误")
+
+	username := strings.TrimSpace(in.Username)
+	inviteCode := strings.TrimSpace(in.InviteCode)
+	span.SetAttributes(attribute.String("audit.admin_username", username))
+
+	if inviteCode == "" {
+		logger.LogBusinessErr(ctx, errmsg.ErrorAdminInviteCodeWrong, fmt.Errorf("invite code is empty"))
+		return nil, status.Error(codes.PermissionDenied, "绠＄悊鍛橀個璇风爜閿欒")
 	}
 
-	password, err := cryptx.PasswordEncrypt(in.Password)
-	if err != nil {
-		span.RecordError(err)
-		logger.LogBusinessErr(ctx, errmsg.ErrorServerCommon, err)
-		return nil, status.Error(codes.Internal, "密码加密失败")
+	var uid int64
+	err := l.svcCtx.AdminModel.Transaction(ctx, func(tx *gorm.DB) error {
+		invite, err := l.svcCtx.AdminModel.FindAdminInviteByCodeForUpdate(tx, inviteCode)
+		if err != nil {
+			if err == model.ErrorNotFound {
+				logger.LogBusinessErr(ctx, errmsg.ErrorAdminInviteCodeWrong, fmt.Errorf("invite code not found"))
+				return status.Error(codes.PermissionDenied, "绠＄悊鍛橀個璇风爜閿欒")
+			}
+			return err
+		}
 
-	}
-	uid, err := snowflake.GetID()
+		now := time.Now()
+		if invite.UsedAt != nil || !invite.ExpiresAt.After(now) {
+			logger.LogBusinessErr(ctx, errmsg.ErrorAdminInviteCodeWrong, fmt.Errorf("invite code expired or used"))
+			return status.Error(codes.PermissionDenied, "绠＄悊鍛橀個璇风爜閿欒")
+		}
+
+		_, err = l.svcCtx.AdminModel.FindOneAdminByUsernameTx(tx, username)
+		if err == nil {
+			logger.LogBusinessErr(ctx, errmsg.ErrorUserExist, fmt.Errorf("username has existed"))
+			return status.Error(codes.AlreadyExists, "鐢ㄦ埛鍚嶅凡瀛樺湪")
+		}
+		if err != model.ErrorNotFound {
+			return err
+		}
+
+		password, err := cryptx.PasswordEncrypt(in.Password)
+		if err != nil {
+			return err
+		}
+
+		uid, err = snowflake.GetID()
+		if err != nil {
+			return err
+		}
+
+		admin := &model.Admin{
+			Uid:       uid,
+			Username:  username,
+			Password:  password,
+			Email:     optionalString(in.Email),
+			ExtraInfo: in.ExtraInfo,
+		}
+		if err = l.svcCtx.AdminModel.InsertOneAdminTx(tx, admin); err != nil {
+			if model.IsUniqueViolation(err) {
+				logger.LogBusinessErr(ctx, errmsg.ErrorUserExist, err)
+				return status.Error(codes.AlreadyExists, "鐢ㄦ埛鍚嶅凡瀛樺湪")
+			}
+			return err
+		}
+
+		usedAt := time.Now()
+		if err = l.svcCtx.AdminModel.UpdateAdminInviteUsedTx(tx, invite.Id, uid, usedAt); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		span.RecordError(err)
-		logger.LogBusinessErr(ctx, errmsg.ErrorServerCommon, err)
-		return nil, status.Error(codes.Internal, "ID生成失败")
-	}
-	admin := &model.Admin{
-		Uid:       uid,
-		Username:  in.Username,
-		Password:  password,
-		Email:     in.Email,
-		ExtraInfo: in.ExtraInfo,
-	}
-	err = l.svcCtx.AdminModel.InsertOneAdmin(ctx, admin)
-	if err != nil {
-		span.RecordError(err)
+		if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.PermissionDenied, codes.AlreadyExists:
+				return nil, err
+			}
+		}
 		logger.LogBusinessErr(ctx, errmsg.ErrorDbUpdate, err)
-		return nil, status.Error(codes.Internal, "DB添加失败")
+		return nil, status.Error(codes.Internal, "DB娣诲姞澶辫触")
 	}
+
 	logger.LogInfo(ctx, fmt.Sprintf("add admin success,uid: %d", uid))
 	return &pb.CreateAdminResp{
-		Uid: admin.Uid,
+		Uid: uid,
 	}, nil
 }

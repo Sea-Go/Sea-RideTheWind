@@ -42,10 +42,20 @@ message CreateAdminReq {
   string password = 2;
   string email = 3;
   map<string,string> extra_info = 4;
+  string invite_code = 5;
 }
 
 message CreateAdminResp {
   int64 uid = 1;
+}
+
+message CreateInviteCodeReq {
+  int64 operator_id = 1;
+}
+
+message CreateInviteCodeResp {
+  string invite_code = 1;
+  int64 expires_at = 2;
 }
 
 message LoginReq{
@@ -147,6 +157,7 @@ service AdminService {
   rpc GetUserList(GetUserListReq) returns (GetUserListResp);
   rpc GetSelf(GetSelfReq) returns (GetSelfResp);
   rpc CreateAdmin(CreateAdminReq) returns (CreateAdminResp);
+  rpc CreateInviteCode(CreateInviteCodeReq) returns (CreateInviteCodeResp);
   rpc Login(LoginReq) returns (LoginResp);
   rpc Logout(LogoutReq) returns (LogoutResp);
   rpc DeleteUser(DeleteUserReq) returns (DeleteUserResp);
