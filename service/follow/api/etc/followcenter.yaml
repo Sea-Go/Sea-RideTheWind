@@ -1,0 +1,38 @@
+Name: followcenter
+Host: 0.0.0.0
+Port: 8891
+
+Log:
+  ServiceName: followcenter
+  Mode: file
+  Path: ../../../../log/follow-api
+
+UserAuth:
+  AccessSecret: ae0536f9-6450-4606-8e13-5a19ed505da0
+  AccessExpire: 31536000
+
+BizRedis:
+  Host: 127.0.0.1:36379
+  Type: node
+  Pass: ""
+
+Telemetry:
+  Name: follow-api
+  Endpoint: localhost:34317
+  Sampler: 1.0
+  Batcher: otlpgrpc
+
+DevServer:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 16064
+  MetricsPath: /metrics
+  HealthPath: /healthz
+  EnableMetrics: true
+  EnablePprof: true
+
+FollowRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: follow.rpc

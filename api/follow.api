@@ -1,0 +1,91 @@
+syntax = "v1"
+
+info (
+	title:   "Follow Center API"
+	desc:    "关注系统 HTTP 网关，对接 FollowService gRPC"
+	version: "1.0.0"
+)
+
+type RelationActionReq {
+	TargetId int64 `json:"target_id,string"`
+}
+
+type RelationActionResp {
+	Success bool `json:"success"`
+}
+
+type FollowListReq {
+	UserId int64 `json:"user_id,string,optional"`
+	Offset int32 `json:"offset,optional"`
+	Limit  int32 `json:"limit,optional"`
+}
+
+type FollowUserListResp {
+	UserIds []int64 `json:"user_ids"`
+}
+
+type RecommendUser {
+	TargetId    int64 `json:"target_id,string"`
+	MutualScore int32 `json:"mutual_score"`
+}
+
+type RecommendListResp {
+	Users []RecommendUser `json:"users"`
+}
+
+@server (
+	prefix:     "/follow/v1"
+	group:      "follow"
+	jwt:        UserAuth
+	middleware: CheckBlacklistMiddleware
+)
+service followcenter {
+	@doc (
+		Follow: "关注目标用户"
+	)
+	@handler Follow
+	post /follow (RelationActionReq) returns (RelationActionResp)
+
+	@doc (
+		Unfollow: "取消关注目标用户"
+	)
+	@handler Unfollow
+	post /unfollow (RelationActionReq) returns (RelationActionResp)
+
+	@doc (
+		Block: "拉黑目标用户"
+	)
+	@handler Block
+	post /block (RelationActionReq) returns (RelationActionResp)
+
+	@doc (
+		Unblock: "取消拉黑目标用户"
+	)
+	@handler Unblock
+	post /unblock (RelationActionReq) returns (RelationActionResp)
+
+	@doc (
+		GetFollowList: "获取关注列表"
+	)
+	@handler GetFollowList
+	post /follow/list (FollowListReq) returns (FollowUserListResp)
+
+	@doc (
+		GetBlockList: "获取黑名单列表"
+	)
+	@handler GetBlockList
+	post /block/list (FollowListReq) returns (FollowUserListResp)
+
+	@doc (
+		GetFollowerList: "获取粉丝列表"
+	)
+	@handler GetFollowerList
+	post /follower/list (FollowListReq) returns (FollowUserListResp)
+
+	@doc (
+		GetRecommendations: "获取推荐关注列表"
+	)
+	@handler GetRecommendations
+	post /recommendations (FollowListReq) returns (RecommendListResp)
+}
+

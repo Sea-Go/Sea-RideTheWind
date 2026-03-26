@@ -1,0 +1,51 @@
+Name: follow.rpc
+ListenOn: 0.0.0.0:8082
+
+Etcd:
+  Hosts:
+    - 127.0.0.1:32379
+  Key: follow.rpc
+
+Log:
+  ServiceName: follow-rpc
+  Mode: file
+  Path: ../../../../log/follow-rpc
+
+Telemetry:
+  Name: follow-rpc
+  Endpoint: localhost:34317
+  Sampler: 1.0
+  Batcher: otlpgrpc
+
+DevServer:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 16065
+  MetricsPath: /metrics
+  HealthPath: /healthz
+  EnableMetrics: true
+  EnablePprof: true
+
+Postgres:
+  Host: "127.0.0.1"
+  Port: "35432"
+  User: "admin"
+  Password: "Sea-TryGo"
+  DBName: "first_db"
+  Mode: "disable"
+
+UserRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:32379
+    Key: user.rpc
+
+List:
+  DefaultLimit: 20
+  MaxLimit: 100
+
+Recommend:
+  DefaultLimit: 20
+  MaxLimit: 50
+  MaxDepth: 3
+  MaxFanout: 50
