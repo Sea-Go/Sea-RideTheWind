@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -22,7 +23,7 @@ func InitRedis(Host string) *redis.Client {
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		_ = rdb.Close()
-		log.Fatalln("redis ping failed, host=%s: %w", Host, err)
+		log.Fatalln(fmt.Errorf("redis ping failed, host=%s: %w", Host, err))
 	}
 	return rdb
 }

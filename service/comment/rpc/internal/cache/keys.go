@@ -3,7 +3,7 @@ package cache
 import "fmt"
 
 func SubjectKey(subjectID string) string {
-	return fmt.Sprintf("comment:subject:%d", subjectID)
+	return fmt.Sprintf("comment:subject:%s", subjectID)
 }
 
 func ReplyContentKey(commentID int64) string {
