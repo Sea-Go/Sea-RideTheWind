@@ -33,7 +33,7 @@ OTEL_ADDR="${OTEL_ADDR:-${INFRA_HOST}:34317}"
 # 只保留当前 compose 里真实存在的 infra 服务
 INFRA_SERVICES=(etcd postgres redis kafka minio)
 
-ALL_SERVICES=(article comment like follow message task user admin hot points security)
+ALL_SERVICES=(article comment like follow favorite message task user admin hot points security)
 
 BUILD_PROGRESS="${BUILD_PROGRESS:-plain}"
 START_WAIT_SECONDS="${START_WAIT_SECONDS:-20}"
@@ -453,6 +453,7 @@ resolve_build_paths() {
     comment)  echo "./service/comment/api|./service/comment/rpc" ;;
     like)     echo "./service/like/api|./service/like/rpc" ;;
     follow)   echo "./service/follow/api|./service/follow/rpc" ;;
+    favorite) echo "./service/favorite/api|./service/favorite/rpc" ;;
     message)  echo "./service/message/api|./service/message/rpc" ;;
     task)     echo "./service/task/api|./service/task/rpc" ;;
     user)     echo "./service/user/user/api|./service/user/user/rpc" ;;
@@ -672,6 +673,12 @@ start_one() {
         "/app/service/follow/api" "/app/service/follow/rpc" \
         "etc/followcenter.yaml" "etc/follow.yaml" \
         -p 18891:8891 -p 18086:8082
+      ;;
+    favorite)
+      run_container "favorite" "${IMAGE_PREFIX}-favorite:latest" "1" "1" \
+        "/app/service/favorite/api" "/app/service/favorite/rpc" \
+        "etc/favorite.yaml" "etc/favorite.yaml" \
+        -p 18890:8890 -p 18088:8082
       ;;
     message)
       run_container "message" "${IMAGE_PREFIX}-message:latest" "1" "1" \
