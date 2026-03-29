@@ -2,13 +2,13 @@ package model
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"sea-try-go/service/article/rpc/internal/config"
-	"time"
 )
 
 type ArticleRepo struct {
@@ -21,13 +21,12 @@ func NewArticleRepo(c config.Config) *ArticleRepo {
 		logx.Errorf("init db error:%v", err)
 		panic(err)
 	}
+
 	logx.Infof("init db success")
-	return &ArticleRepo{
-		Db: db,
-	}
+	return &ArticleRepo{Db: db}
 }
 
-func InitDB(c config.Config) (db *gorm.DB, err error) {
+func InitDB(c config.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable TimeZone=Asia/Shanghai",
 		c.Postgres.Host,
@@ -36,37 +35,36 @@ func InitDB(c config.Config) (db *gorm.DB, err error) {
 		c.Postgres.Password,
 		c.Postgres.Dbname,
 	)
-	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		SkipDefaultTransaction:                   true,
 		DisableForeignKeyConstraintWhenMigrating: true,
 		NamingStrategy: schema.NamingStrategy{
-			SingularTable: true, //禁用复数表名
+			SingularTable: true,
 		},
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}
 
-	// 获取底层 *sql.DB 以设置连接池
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
 	}
 
-	// 自动迁移模型
-	err = db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&Article{},
 		&ArticleSyncOutboxEvent{},
-	)
-	if err != nil {
+	); err != nil {
 		return nil, fmt.Errorf("failed to auto migrate models: %w", err)
 	}
 
-	// 设置连接池
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetConnMaxLifetime(10 * time.Second)
+	// Keep the local pool conservative so the outbox poller does not exhaust
+	// the shared Postgres instance.
+	sqlDB.SetMaxOpenConns(20)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
 
 	return db, nil
 }
