@@ -13,6 +13,8 @@ import (
 	"github.com/zeromicro/go-zero/rest"
 )
 
+const uploadImageMaxBytes int64 = 10 * 1024 * 1024
+
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
@@ -49,6 +51,12 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/articles",
 				Handler: article.ListArticlesHandler(serverCtx),
 			},
+		},
+		rest.WithPrefix("/v1"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
 			{
 				Method:  http.MethodPost,
 				Path:    "/upload",
@@ -56,5 +64,6 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 		},
 		rest.WithPrefix("/v1"),
+		rest.WithMaxBytes(uploadImageMaxBytes),
 	)
 }
