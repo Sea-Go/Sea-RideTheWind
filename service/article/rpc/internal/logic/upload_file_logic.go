@@ -66,7 +66,10 @@ func (l *UploadFileLogic) UploadFile(in *__.UploadFileRequest) (*__.UploadFileRe
 	span.AddEvent("start upload to minio")
 	_, err = l.svcCtx.MinioClient.PutObject(ctx, l.svcCtx.Config.MinIO.BucketName, objectName,
 		bytes.NewReader(in.Content), int64(len(in.Content)),
-		minio.PutObjectOptions{ContentType: contentType})
+		minio.PutObjectOptions{
+			CacheControl: "public, max-age=31536000, immutable",
+			ContentType:  contentType,
+		})
 	timer.ObserveDuration()
 
 	if err != nil {
