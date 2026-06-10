@@ -46,10 +46,10 @@ type LogoutResp struct {
 }
 
 type UpdateUserReq struct {
-	Username  string            `json:"username,omitempty"`
-	Password  string            `json:"password,omitempty"`
-	Email     string            `json:"email,omitempty"`
-	Extrainfo map[string]string `json:"extra_info,omitempty"`
+	Username  string            `json:"username,optional"`
+	Password  string            `json:"password,optional"`
+	Email     string            `json:"email,optional"`
+	Extrainfo map[string]string `json:"extra_info,optional"`
 }
 
 type UpdateUserResp struct {
