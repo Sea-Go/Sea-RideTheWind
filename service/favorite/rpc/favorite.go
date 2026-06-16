@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/favorite/rpc/internal/config"
 	"sea-try-go/service/favorite/rpc/internal/metrics"
 	"sea-try-go/service/favorite/rpc/internal/server"
@@ -30,6 +31,7 @@ func main() {
 	ctx := svc.NewServiceContext(c)
 	logger.Init(c.Name)
 	metrics.InitMetrics(&c)
+	rpcTimeout := observability.DisableNativeRpcTimeout(&c.RpcServerConf)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		favoritepb.RegisterFavoriteServiceServer(grpcServer, server.NewFavoriteServiceServer(ctx))
@@ -38,6 +40,7 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	s.AddUnaryInterceptors(observability.NewUnaryServerInterceptor(rpcTimeout, observability.SlowThreshold()))
 	defer s.Stop()
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)

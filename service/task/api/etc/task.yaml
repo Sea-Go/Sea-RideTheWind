@@ -9,3 +9,9 @@ TaskRpc:
 Auth:
   AccessSecret: "replace-with-a-long-random-secret"
   AccessExpire: 1800
+
+Telemetry:
+  Name: task-api
+  Endpoint: jaeger:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc

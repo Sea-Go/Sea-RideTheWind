@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/security/rpc/internal/config"
 	contentsecurityserviceServer "sea-try-go/service/security/rpc/internal/server/contentsecurityservice"
 	imagesecurityserviceServer "sea-try-go/service/security/rpc/internal/server/imagesecurityservice"
@@ -26,6 +27,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	rpcTimeout := observability.DisableNativeRpcTimeout(&c.RpcServerConf)
 	ctx := svc.NewServiceContext(c)
 
 	logger.Init("security-rpc")
@@ -38,6 +40,7 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	s.AddUnaryInterceptors(observability.NewUnaryServerInterceptor(rpcTimeout, observability.SlowThreshold()))
 	defer s.Stop()
 
 	logger.LogInfo(context.Background(), "Starting rpc server at "+c.ListenOn)

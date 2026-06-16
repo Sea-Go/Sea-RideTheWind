@@ -14,6 +14,7 @@ import (
 	"sea-try-go/service/article/rpc/internal/svc"
 	"sea-try-go/service/article/rpc/pb"
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
@@ -32,6 +33,7 @@ func main() {
 
 	logx.MustSetup(c.Log)
 	logger.Init(c.Name)
+	rpcTimeout := observability.DisableNativeRpcTimeout(&c.RpcServerConf)
 
 	serviceGroup := service.NewServiceGroup()
 	defer serviceGroup.Stop()
@@ -46,6 +48,7 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	s.AddUnaryInterceptors(observability.NewUnaryServerInterceptor(rpcTimeout, observability.SlowThreshold()))
 	defer s.Stop()
 
 	serviceGroup.Add(s)

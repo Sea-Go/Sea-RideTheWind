@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/user/user/api/internal/config"
 	"sea-try-go/service/user/user/api/internal/handler"
 	"sea-try-go/service/user/user/api/internal/metrics"
@@ -31,7 +32,9 @@ func main() {
 	logx.MustSetup(c.Log)
 	logger.Init(c.Name)
 
+	httpTimeout := observability.DisableNativeRestTimeout(&c.RestConf)
 	server := rest.MustNewServer(c.RestConf)
+	server.Use(observability.NewHTTPMiddleware(c.Name, httpTimeout, observability.SlowThreshold()))
 	defer server.Stop()
 
 	ctx := svc.NewServiceContext(c)

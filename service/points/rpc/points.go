@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/points/rpc/internal/config"
 	"sea-try-go/service/points/rpc/internal/metrics"
 	"sea-try-go/service/points/rpc/internal/mqs"
@@ -25,6 +26,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	rpcTimeout := observability.DisableNativeRpcTimeout(&c.RpcServerConf)
 	ctx := svc.NewServiceContext(c)
 	logger.Init("points-rpc")
 	metrics.InitMetrics(&c)
@@ -36,6 +38,7 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	s.AddUnaryInterceptors(observability.NewUnaryServerInterceptor(rpcTimeout, observability.SlowThreshold()))
 	serviceGroup.Add(s)
 
 	consumer := kq.MustNewQueue(c.KqConsumerConf, mqs.NewPointsHandler(ctx))

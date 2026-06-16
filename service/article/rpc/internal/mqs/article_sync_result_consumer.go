@@ -12,6 +12,7 @@ import (
 	"sea-try-go/service/article/rpc/internal/svc"
 	pb "sea-try-go/service/article/rpc/pb"
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 	messagepb "sea-try-go/service/message/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -33,34 +34,36 @@ func NewArticleSyncResultConsumer(ctx context.Context, svcCtx *svc.ServiceContex
 }
 
 func (l *ArticleSyncResultConsumer) Consume(ctx context.Context, key, val string) error {
-	var result ArticleSyncResult
-	if err := json.Unmarshal([]byte(val), &result); err != nil {
-		logger.LogBusinessErr(ctx, errmsg.ErrorServerCommon, fmt.Errorf("unmarshal article sync result failed: %w", err))
-		return nil
-	}
-	if strings.TrimSpace(result.ArticleID) == "" {
-		return nil
-	}
-
-	article, err := l.svcCtx.ArticleRepo.FindOneUnscoped(ctx, result.ArticleID)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			logger.LogInfo(ctx, "article sync result ignored for missing article", logger.WithArticleID(result.ArticleID))
+	return observability.TraceConsumer(ctx, "article-rpc", "ArticleSyncResultConsumer.Consume", articleMessageAttrs("article_sync_result", key), func(ctx context.Context) error {
+		var result ArticleSyncResult
+		if err := json.Unmarshal([]byte(val), &result); err != nil {
+			logger.LogBusinessErr(ctx, errmsg.ErrorServerCommon, fmt.Errorf("unmarshal article sync result failed: %w", err))
 			return nil
 		}
-		logger.LogBusinessErr(ctx, errmsg.ErrorDbSelect, fmt.Errorf("find article for sync result failed: %w", err), logger.WithArticleID(result.ArticleID))
-		return err
-	}
+		if strings.TrimSpace(result.ArticleID) == "" {
+			return nil
+		}
 
-	switch result.Op {
-	case ArticleSyncOpUpsert:
-		return l.handleUpsertResult(ctx, article, result)
-	case ArticleSyncOpDelete:
-		return l.handleDeleteResult(ctx, article, result)
-	default:
-		logger.LogInfo(ctx, "unknown article sync result op ignored", logger.WithArticleID(result.ArticleID))
-		return nil
-	}
+		article, err := l.svcCtx.ArticleRepo.FindOneUnscoped(ctx, result.ArticleID)
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				logger.LogInfo(ctx, "article sync result ignored for missing article", logger.WithArticleID(result.ArticleID))
+				return nil
+			}
+			logger.LogBusinessErr(ctx, errmsg.ErrorDbSelect, fmt.Errorf("find article for sync result failed: %w", err), logger.WithArticleID(result.ArticleID))
+			return err
+		}
+
+		switch result.Op {
+		case ArticleSyncOpUpsert:
+			return l.handleUpsertResult(ctx, article, result)
+		case ArticleSyncOpDelete:
+			return l.handleDeleteResult(ctx, article, result)
+		default:
+			logger.LogInfo(ctx, "unknown article sync result op ignored", logger.WithArticleID(result.ArticleID))
+			return nil
+		}
+	})
 }
 
 func (l *ArticleSyncResultConsumer) handleUpsertResult(ctx context.Context, article *model.Article, result ArticleSyncResult) error {

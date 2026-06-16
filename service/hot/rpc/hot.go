@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/hot/rpc/internal/config"
 	"sea-try-go/service/hot/rpc/internal/mqs"
 	"sea-try-go/service/hot/rpc/internal/server"
@@ -28,6 +29,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	rpcTimeout := observability.DisableNativeRpcTimeout(&c.RpcServerConf)
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
@@ -37,6 +39,7 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	s.AddUnaryInterceptors(observability.NewUnaryServerInterceptor(rpcTimeout, observability.SlowThreshold()))
 
 	serviceGroup := service.NewServiceGroup()
 	serviceGroup.Add(s)

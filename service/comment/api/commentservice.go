@@ -14,6 +14,7 @@ import (
 	"sea-try-go/service/comment/api/internal/svc"
 	"sea-try-go/service/comment/common/errmsg"
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/common/response"
 
 	"github.com/zeromicro/go-zero/core/conf"
@@ -30,7 +31,9 @@ func main() {
 	conf.MustLoad(*configFile, &c)
 	logger.Init(c.Name)
 
+	httpTimeout := observability.DisableNativeRestTimeout(&c.RestConf)
 	server := rest.MustNewServer(c.RestConf)
+	server.Use(observability.NewHTTPMiddleware(c.Name, httpTimeout, observability.SlowThreshold()))
 	defer server.Stop()
 
 	httpx.SetOkHandler(func(ctx context.Context, v interface{}) interface{} {

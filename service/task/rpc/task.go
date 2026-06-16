@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/task/rpc/internal/Init"
 
 	"sea-try-go/service/task/rpc/internal/config"
@@ -24,6 +25,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	rpcTimeout := observability.DisableNativeRpcTimeout(&c.RpcServerConf)
 	ctx := svc.NewServiceContext(c)
 
 	go Init.StartTaskKafkaRaw(ctx)
@@ -39,6 +41,7 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	s.AddUnaryInterceptors(observability.NewUnaryServerInterceptor(rpcTimeout, observability.SlowThreshold()))
 	defer s.Stop()
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)

@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/hot/heavykeeper"
 	"sea-try-go/service/hot/rpc/internal/svc"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/metric"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -77,7 +79,6 @@ func NewHotHandler(svcCtx *svc.ServiceContext, syncEvery int64, hotTTL time.Dura
 	return h
 }
 
-
 // sarama.ConsumerGroupHandler 接口实现
 func (h *HotHandler) Setup(sess sarama.ConsumerGroupSession) error {
 	for topic, partitions := range sess.Claims() {
@@ -99,7 +100,11 @@ func (h *HotHandler) Cleanup(sess sarama.ConsumerGroupSession) error {
 
 func (h *HotHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
-		h.consumeMessage(sess.Context(), int(msg.Partition), string(msg.Key), string(msg.Value))
+		partitionID := int(msg.Partition)
+		key := string(msg.Key)
+		_ = observability.TraceConsumer(sess.Context(), "hot-rpc", "HotHandler.Consume", hotMessageAttrs(h.topic, partitionID, key), func(ctx context.Context) error {
+			return h.consumeMessage(ctx, partitionID, key, string(msg.Value))
+		})
 		sess.MarkMessage(msg, "")
 	}
 	return nil
@@ -134,7 +139,7 @@ func (h *HotHandler) OnPartitionsRevoked(partitions []int32) {
 	}
 }
 
-func (h *HotHandler) consumeMessage(ctx context.Context, partitionID int, key, value string) {
+func (h *HotHandler) consumeMessage(ctx context.Context, partitionID int, key, value string) error {
 	start := time.Now()
 	defer func() {
 		cost := time.Since(start)
@@ -146,18 +151,18 @@ func (h *HotHandler) consumeMessage(ctx context.Context, partitionID int, key, v
 	var event ArticleHotEvent
 	if err := json.Unmarshal([]byte(value), &event); err != nil {
 		logx.Errorf("[HotHandler] unmarshal event failed: %v, value: %s", err, value)
-		return
+		return err
 	}
 
 	if event.ArticleID == "" {
 		logx.Errorf("[HotHandler] invalid event: %+v", event)
-		return
+		return fmt.Errorf("invalid hot event: missing article id")
 	}
 
 	weight, ok := h.weights[event.Type]
 	if !ok || weight <= 0 {
 		logx.Errorf("[HotHandler] unknown or zero-weight type: %s, event: %+v", event.Type, event)
-		return
+		return fmt.Errorf("unknown or zero-weight hot event type: %s", event.Type)
 	}
 
 	eventConsumeTotal.Inc(event.Type)
@@ -166,7 +171,7 @@ func (h *HotHandler) consumeMessage(ctx context.Context, partitionID int, key, v
 	hk, exists := h.hkMap[partitionID]
 	h.hkMu.RUnlock()
 	if !exists {
-		return
+		return nil
 	}
 
 	hk.Add(event.ArticleID, uint32(weight))
@@ -174,8 +179,18 @@ func (h *HotHandler) consumeMessage(ctx context.Context, partitionID int, key, v
 	if h.counter.Add(1)%h.syncEvery == 0 {
 		go h.syncToRedis(context.Background(), partitionID)
 	}
+	return nil
 }
 
+func hotMessageAttrs(topic string, partitionID int, key string) []attribute.KeyValue {
+	return []attribute.KeyValue{
+		attribute.String("messaging.system", "kafka"),
+		attribute.String("messaging.destination", topic),
+		attribute.String("messaging.operation", "consume"),
+		attribute.Int("messaging.kafka.partition", partitionID),
+		attribute.String("messaging.message.key", key),
+	}
+}
 
 func (h *HotHandler) syncToRedis(ctx context.Context, partitionID int) {
 	h.hkMu.RLock()
@@ -225,7 +240,6 @@ func (h *HotHandler) syncToRedis(ctx context.Context, partitionID int) {
 		redisSyncTotal.Inc("success")
 	}
 }
-
 
 func (h *HotHandler) periodicSync(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
@@ -399,4 +413,3 @@ func (h *HotHandler) mergePartitions(ctx context.Context) {
 		logx.Errorf("[Merge] lock lost, abort")
 	}
 }
-

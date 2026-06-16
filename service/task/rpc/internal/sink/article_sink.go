@@ -3,6 +3,7 @@ package sink
 import (
 	"context"
 	"encoding/json"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/task/rpc/internal/reward"
 	"strconv"
 	"sync"
@@ -90,34 +91,36 @@ func (c *ArticleLikeSinkConsumer) Start(ctx context.Context) {
 }
 
 func (c *ArticleLikeSinkConsumer) Consume(ctx context.Context, key string, value string) error {
-	if key == "" {
-		return nil
-	}
-	articleID, err := strconv.ParseInt(key, 10, 64)
-	if err != nil || articleID == 0 {
-		return err
-	}
-	userID, d, ok := parseVal(value)
-	if !ok || userID == 0 || d == 0 {
-		return nil
-	}
-	c.mu.Lock()
-	cur, exits := c.delta[articleID]
-	if exits == false {
-		c.delta[articleID] = articleAgg{
-			UserID: userID,
-			total:  d,
+	return observability.TraceConsumer(ctx, "task-rpc", "ArticleLikeSinkConsumer.Consume", taskMessageAttrs("article_like_sink", key), func(ctx context.Context) error {
+		if key == "" {
+			return nil
+		}
+		articleID, err := strconv.ParseInt(key, 10, 64)
+		if err != nil || articleID == 0 {
+			return err
+		}
+		userID, d, ok := parseVal(value)
+		if !ok || userID == 0 || d == 0 {
+			return nil
+		}
+		c.mu.Lock()
+		cur, exits := c.delta[articleID]
+		if exits == false {
+			c.delta[articleID] = articleAgg{
+				UserID: userID,
+				total:  d,
+			}
+			c.mu.Unlock()
+			return nil
+		}
+		if d > cur.total {
+			cur.total = d
+			cur.UserID = userID
+			c.delta[articleID] = cur
 		}
 		c.mu.Unlock()
 		return nil
-	}
-	if d > cur.total {
-		cur.total = d
-		cur.UserID = userID
-		c.delta[articleID] = cur
-	}
-	c.mu.Unlock()
-	return nil
+	})
 }
 
 func parseVal(val string) (int64, int64, bool) {
@@ -157,22 +160,24 @@ func (c *ArticleLikeSinkConsumer) flushOnce(ctx context.Context) error {
 	if len(batch) == 0 {
 		return nil
 	}
+	return observability.TraceConsumer(ctx, "task-rpc", "ArticleLikeSinkConsumer.Flush", taskFlushAttrs("article_like_sink", len(batch)), func(ctx context.Context) error {
 
-	if err := c.lazyInitTaskIfNeeded(ctx, batch); err != nil {
-		return err
-	}
+		if err := c.lazyInitTaskIfNeeded(ctx, batch); err != nil {
+			return err
+		}
 
-	/*	_ = c.markReconCandidates(ctx, batch) //对账器*/
+		/*	_ = c.markReconCandidates(ctx, batch) //对账器*/
 
-	if err := c.FlushRedis(ctx, batch); err != nil {
-		logx.WithContext(ctx).Errorf("flush redis failed: %v", err)
-		return err
-	}
+		if err := c.FlushRedis(ctx, batch); err != nil {
+			logx.WithContext(ctx).Errorf("flush redis failed: %v", err)
+			return err
+		}
 
-	/*if err := c.FlushPostgres(ctx, batch); err != nil {
-		return err
-	}*/
-	return nil
+		/*if err := c.FlushPostgres(ctx, batch); err != nil {
+			return err
+		}*/
+		return nil
+	})
 }
 
 func (c *ArticleLikeSinkConsumer) swap() map[int64]articleAgg {

@@ -2,12 +2,14 @@ package sink
 
 import (
 	"context"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/task/rpc/internal/reward"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/attribute"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -77,30 +79,32 @@ func (c *LikeSinkConsumer) Start(ctx context.Context) {
 }
 
 func (c *LikeSinkConsumer) Consume(ctx context.Context, key string, val string) error {
-	userID, err := strconv.ParseInt(key, 10, 63)
-	if err != nil {
-		return err
-	}
-	if userID <= 0 {
-		return nil
-	}
-
-	total := int64(1)
-	if val != "" {
-		if n, err := strconv.ParseInt(val, 10, 64); err == nil {
-			total = n
+	return observability.TraceConsumer(ctx, "task-rpc", "LikeSinkConsumer.Consume", taskMessageAttrs("user_like_sink", key), func(ctx context.Context) error {
+		userID, err := strconv.ParseInt(key, 10, 63)
+		if err != nil {
+			return err
 		}
-	}
-	if total <= 0 {
-		return nil
-	}
+		if userID <= 0 {
+			return nil
+		}
 
-	c.mu.Lock()
-	if current, ok := c.delta[userID]; !ok || total > current {
-		c.delta[userID] = total
-	}
-	c.mu.Unlock()
-	return nil
+		total := int64(1)
+		if val != "" {
+			if n, err := strconv.ParseInt(val, 10, 64); err == nil {
+				total = n
+			}
+		}
+		if total <= 0 {
+			return nil
+		}
+
+		c.mu.Lock()
+		if current, ok := c.delta[userID]; !ok || total > current {
+			c.delta[userID] = total
+		}
+		c.mu.Unlock()
+		return nil
+	})
 }
 
 func (c *LikeSinkConsumer) loop(ctx context.Context) {
@@ -126,16 +130,36 @@ func (c *LikeSinkConsumer) flushOnce(ctx context.Context) error {
 	if len(batch) == 0 {
 		return nil
 	}
-	if err := c.lazyInitTaskIfNeeded(ctx, batch); err != nil {
-		return err
+	return observability.TraceConsumer(ctx, "task-rpc", "LikeSinkConsumer.Flush", taskFlushAttrs("user_like_sink", len(batch)), func(ctx context.Context) error {
+		if err := c.lazyInitTaskIfNeeded(ctx, batch); err != nil {
+			return err
+		}
+		if err := c.flushRedis(ctx, batch); err != nil {
+			return err
+		}
+		if err := c.flushPostgres(ctx, batch); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func taskMessageAttrs(topic, key string) []attribute.KeyValue {
+	return []attribute.KeyValue{
+		attribute.String("messaging.system", "kafka"),
+		attribute.String("messaging.destination", topic),
+		attribute.String("messaging.operation", "consume"),
+		attribute.String("messaging.message.key", key),
 	}
-	if err := c.flushRedis(ctx, batch); err != nil {
-		return err
+}
+
+func taskFlushAttrs(topic string, batchSize int) []attribute.KeyValue {
+	return []attribute.KeyValue{
+		attribute.String("messaging.system", "kafka"),
+		attribute.String("messaging.destination", topic),
+		attribute.String("messaging.operation", "flush"),
+		attribute.Int("batch.size", batchSize),
 	}
-	if err := c.flushPostgres(ctx, batch); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (c *LikeSinkConsumer) lazyInitTaskIfNeeded(ctx context.Context, batch map[int64]int64) error {

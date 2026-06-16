@@ -54,6 +54,12 @@ Log:
   Mode: file
   Path: ../../../log/points
 
+Telemetry:
+  Name: points-rpc
+  Endpoint: jaeger:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc
+
 DevServer:
   Enabled: true
   Host: 0.0.0.0

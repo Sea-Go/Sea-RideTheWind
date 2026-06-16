@@ -16,12 +16,14 @@ import (
 	"sea-try-go/service/article/rpc/internal/svc"
 	pb "sea-try-go/service/article/rpc/pb"
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/common/snowflake"
 	imagesecurity "sea-try-go/service/security/rpc/client/imagesecurityservice"
 	security "sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/zeromicro/go-zero/core/logx"
+	"go.opentelemetry.io/otel/attribute"
 	"gorm.io/gorm"
 )
 
@@ -40,90 +42,101 @@ func NewArticleConsumer(ctx context.Context, svcCtx *svc.ServiceContext) *Articl
 }
 
 func (l *ArticleConsumer) Consume(ctx context.Context, key, val string) error {
-	logger.LogInfo(ctx, "article review consumer received message")
+	return observability.TraceConsumer(ctx, "article-rpc", "ArticleConsumer.Consume", articleMessageAttrs("article_review", key), func(ctx context.Context) error {
+		logger.LogInfo(ctx, "article review consumer received message")
 
-	var msg ArticleReviewMessage
-	if err := json.Unmarshal([]byte(val), &msg); err != nil {
-		logger.LogBusinessErr(ctx, errmsg.ErrorServerCommon, fmt.Errorf("unmarshal review message failed: %w", err))
-		return nil
-	}
+		var msg ArticleReviewMessage
+		if err := json.Unmarshal([]byte(val), &msg); err != nil {
+			logger.LogBusinessErr(ctx, errmsg.ErrorServerCommon, fmt.Errorf("unmarshal review message failed: %w", err))
+			return nil
+		}
 
-	object, err := l.svcCtx.MinioClient.GetObject(ctx, l.svcCtx.Config.MinIO.BucketName, msg.ContentPath, minio.GetObjectOptions{})
-	if err != nil {
-		logger.LogBusinessErr(ctx, errmsg.ErrorMinioDownload, fmt.Errorf("failed to get content from minio: %w", err), logger.WithArticleID(msg.ArticleID))
-		return err
-	}
-	defer object.Close()
-
-	contentBytes, err := io.ReadAll(object)
-	if err != nil {
-		logger.LogBusinessErr(ctx, errmsg.ErrorMinioDownload, fmt.Errorf("failed to read minio content: %w", err), logger.WithArticleID(msg.ArticleID))
-		return err
-	}
-	articleContent := string(contentBytes)
-
-	article, err := l.svcCtx.ArticleRepo.FindOne(ctx, msg.ArticleID)
-	if err != nil {
-		logger.LogBusinessErr(ctx, errmsg.ErrorDbSelect, fmt.Errorf("failed to find article %s: %w", msg.ArticleID, err), logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
-		return err
-	}
-	if article == nil {
-		return nil
-	}
-	if article.Status != int32(pb.ArticleStatus_REVIEWING) {
-		logger.LogInfo(ctx, "article review skipped because status changed", logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
-		return nil
-	}
-
-	EnsureExtInfo(article)
-	SetSyncState(article, "security_checking", "pending_review", article.ExtInfo[ExtPendingSyncReason], "", article.UpdatedAt.UnixMilli(), "")
-	if err := l.svcCtx.ArticleRepo.Update(ctx, article); err != nil {
-		logger.LogBusinessErr(ctx, errmsg.ErrorDbUpdate, fmt.Errorf("failed to persist publish stage: %w", err), logger.WithArticleID(msg.ArticleID))
-		return err
-	}
-
-	if err := l.auditArticle(ctx, article, articleContent, msg.AuthorID); err != nil {
-		return err
-	}
-	if article.Status == int32(pb.ArticleStatus_REJECTED) {
-		logger.LogInfo(ctx, "article rejected by security check", logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
-		return nil
-	}
-
-	syncReason := strings.TrimSpace(article.ExtInfo[ExtPendingSyncReason])
-	if syncReason == "" {
-		syncReason = ArticleSyncReasonCreate
-	}
-
-	eventID, err := l.newSyncEventID()
-	if err != nil {
-		logger.LogBusinessErr(ctx, errmsg.ErrorServerCommon, fmt.Errorf("generate article sync event id failed: %w", err), logger.WithArticleID(msg.ArticleID))
-		return err
-	}
-	versionMs := time.Now().UnixMilli()
-	event := NewArticleSyncEvent(article, articleContent, ArticleSyncOpUpsert, syncReason, eventID, versionMs)
-	outbox := &model.ArticleSyncOutboxEvent{
-		EventID:     event.EventID,
-		EventKey:    ArticleSyncEventKey(event.ArticleID, event.Op, event.EventID),
-		EventType:   "article_sync",
-		AggregateID: event.ArticleID,
-		Payload:     MustMarshalSyncEvent(event),
-		Status:      model.ArticleSyncOutboxStatusPending,
-	}
-
-	SetSyncState(article, "reco_queued", "pending", syncReason, eventID, versionMs, "")
-	if err := l.svcCtx.ArticleRepo.RunInTx(ctx, func(tx *gorm.DB) error {
-		if err := l.svcCtx.ArticleRepo.UpdateTx(ctx, tx, article); err != nil {
+		object, err := l.svcCtx.MinioClient.GetObject(ctx, l.svcCtx.Config.MinIO.BucketName, msg.ContentPath, minio.GetObjectOptions{})
+		if err != nil {
+			logger.LogBusinessErr(ctx, errmsg.ErrorMinioDownload, fmt.Errorf("failed to get content from minio: %w", err), logger.WithArticleID(msg.ArticleID))
 			return err
 		}
-		return l.svcCtx.ArticleSyncOutbox.CreateTx(ctx, tx, outbox)
-	}); err != nil {
-		logger.LogBusinessErr(ctx, errmsg.ErrorDbUpdate, fmt.Errorf("persist article sync outbox failed: %w", err), logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
-		return err
-	}
+		defer object.Close()
 
-	logger.LogInfo(ctx, "article sync event queued", logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
-	return nil
+		contentBytes, err := io.ReadAll(object)
+		if err != nil {
+			logger.LogBusinessErr(ctx, errmsg.ErrorMinioDownload, fmt.Errorf("failed to read minio content: %w", err), logger.WithArticleID(msg.ArticleID))
+			return err
+		}
+		articleContent := string(contentBytes)
+
+		article, err := l.svcCtx.ArticleRepo.FindOne(ctx, msg.ArticleID)
+		if err != nil {
+			logger.LogBusinessErr(ctx, errmsg.ErrorDbSelect, fmt.Errorf("failed to find article %s: %w", msg.ArticleID, err), logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
+			return err
+		}
+		if article == nil {
+			return nil
+		}
+		if article.Status != int32(pb.ArticleStatus_REVIEWING) {
+			logger.LogInfo(ctx, "article review skipped because status changed", logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
+			return nil
+		}
+
+		EnsureExtInfo(article)
+		SetSyncState(article, "security_checking", "pending_review", article.ExtInfo[ExtPendingSyncReason], "", article.UpdatedAt.UnixMilli(), "")
+		if err := l.svcCtx.ArticleRepo.Update(ctx, article); err != nil {
+			logger.LogBusinessErr(ctx, errmsg.ErrorDbUpdate, fmt.Errorf("failed to persist publish stage: %w", err), logger.WithArticleID(msg.ArticleID))
+			return err
+		}
+
+		if err := l.auditArticle(ctx, article, articleContent, msg.AuthorID); err != nil {
+			return err
+		}
+		if article.Status == int32(pb.ArticleStatus_REJECTED) {
+			logger.LogInfo(ctx, "article rejected by security check", logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
+			return nil
+		}
+
+		syncReason := strings.TrimSpace(article.ExtInfo[ExtPendingSyncReason])
+		if syncReason == "" {
+			syncReason = ArticleSyncReasonCreate
+		}
+
+		eventID, err := l.newSyncEventID()
+		if err != nil {
+			logger.LogBusinessErr(ctx, errmsg.ErrorServerCommon, fmt.Errorf("generate article sync event id failed: %w", err), logger.WithArticleID(msg.ArticleID))
+			return err
+		}
+		versionMs := time.Now().UnixMilli()
+		event := NewArticleSyncEvent(article, articleContent, ArticleSyncOpUpsert, syncReason, eventID, versionMs)
+		outbox := &model.ArticleSyncOutboxEvent{
+			EventID:     event.EventID,
+			EventKey:    ArticleSyncEventKey(event.ArticleID, event.Op, event.EventID),
+			EventType:   "article_sync",
+			AggregateID: event.ArticleID,
+			Payload:     MustMarshalSyncEvent(event),
+			Status:      model.ArticleSyncOutboxStatusPending,
+		}
+
+		SetSyncState(article, "reco_queued", "pending", syncReason, eventID, versionMs, "")
+		if err := l.svcCtx.ArticleRepo.RunInTx(ctx, func(tx *gorm.DB) error {
+			if err := l.svcCtx.ArticleRepo.UpdateTx(ctx, tx, article); err != nil {
+				return err
+			}
+			return l.svcCtx.ArticleSyncOutbox.CreateTx(ctx, tx, outbox)
+		}); err != nil {
+			logger.LogBusinessErr(ctx, errmsg.ErrorDbUpdate, fmt.Errorf("persist article sync outbox failed: %w", err), logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
+			return err
+		}
+
+		logger.LogInfo(ctx, "article sync event queued", logger.WithArticleID(msg.ArticleID), logger.WithUserID(msg.AuthorID))
+		return nil
+	})
+}
+
+func articleMessageAttrs(topic, key string) []attribute.KeyValue {
+	return []attribute.KeyValue{
+		attribute.String("messaging.system", "kafka"),
+		attribute.String("messaging.destination", topic),
+		attribute.String("messaging.operation", "consume"),
+		attribute.String("messaging.message.key", key),
+	}
 }
 
 func (l *ArticleConsumer) auditArticle(ctx context.Context, article *model.Article, content string, authorID string) error {

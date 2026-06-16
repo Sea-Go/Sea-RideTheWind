@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/task/api/internal/config"
 	"sea-try-go/service/task/api/internal/handler"
 	"sea-try-go/service/task/api/internal/svc"
@@ -23,7 +24,9 @@ func main() {
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
 
+	httpTimeout := observability.DisableNativeRestTimeout(&c.RestConf)
 	server := rest.MustNewServer(c.RestConf)
+	server.Use(observability.NewHTTPMiddleware(c.Name, httpTimeout, observability.SlowThreshold()))
 	defer server.Stop()
 
 	ctx := svc.NewServiceContext(c)

@@ -5,6 +5,12 @@ Etcd:
   - etcd:2379
   Key: task.rpc
 
+Telemetry:
+  Name: task-rpc
+  Endpoint: jaeger:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc
+
 Kafka:
   Brokers:
     - kafka:9092

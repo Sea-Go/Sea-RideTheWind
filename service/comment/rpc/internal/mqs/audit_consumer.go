@@ -9,9 +9,11 @@ import (
 
 	kqtypes "sea-try-go/service/comment/rpc/common/types"
 	"sea-try-go/service/comment/rpc/internal/svc"
+	"sea-try-go/service/common/observability"
 	messagepb "sea-try-go/service/message/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type AuditConsumer struct {
@@ -29,38 +31,49 @@ func NewAuditConsumer(ctx context.Context, svcCtx *svc.ServiceContext) *AuditCon
 }
 
 func (l *AuditConsumer) Consume(ctx context.Context, key, val string) error {
-	var msg kqtypes.CommentKafkaMsg
-	if err := json.Unmarshal([]byte(val), &msg); err != nil {
-		l.Errorf("parse comment kafka message failed: %v", err)
-		return nil
-	}
-
-	isSensitive, hitWord := l.svcCtx.SensitiveFilter.Match(msg.Content)
-	status := 0
-	if isSensitive {
-		l.Infof("comment %d matched sensitive word %q", msg.CommentId, hitWord)
-		status = 1
-	}
-
-	if err := l.svcCtx.CommentModel.InsertCommentTx(ctx, msg, status); err != nil {
-		l.Errorf("persist comment %d failed: %v", msg.CommentId, err)
-		return err
-	}
-	if err := l.svcCtx.CommentCache.InvalidateTargetCaches(ctx, msg.TargetType, msg.TargetId); err != nil {
-		l.Errorf("invalidate comment target cache failed, comment %d: %v", msg.CommentId, err)
-	}
-	if msg.ParentId != 0 {
-		if err := l.svcCtx.CommentCache.DeleteCommentIndexCache(ctx, msg.ParentId); err != nil {
-			l.Errorf("invalidate parent comment cache failed, parent %d: %v", msg.ParentId, err)
+	return observability.TraceConsumer(ctx, "comment-rpc", "AuditConsumer.Consume", commentMessageAttrs("comment_audit", key), func(ctx context.Context) error {
+		var msg kqtypes.CommentKafkaMsg
+		if err := json.Unmarshal([]byte(val), &msg); err != nil {
+			l.Errorf("parse comment kafka message failed: %v", err)
+			return nil
 		}
-	}
 
-	if status == 0 {
-		l.notifyComment(ctx, msg)
-	}
+		isSensitive, hitWord := l.svcCtx.SensitiveFilter.Match(msg.Content)
+		status := 0
+		if isSensitive {
+			l.Infof("comment %d matched sensitive word %q", msg.CommentId, hitWord)
+			status = 1
+		}
 
-	l.Infof("comment pipeline finished, id=%d, status=%d", msg.CommentId, status)
-	return nil
+		if err := l.svcCtx.CommentModel.InsertCommentTx(ctx, msg, status); err != nil {
+			l.Errorf("persist comment %d failed: %v", msg.CommentId, err)
+			return err
+		}
+		if err := l.svcCtx.CommentCache.InvalidateTargetCaches(ctx, msg.TargetType, msg.TargetId); err != nil {
+			l.Errorf("invalidate comment target cache failed, comment %d: %v", msg.CommentId, err)
+		}
+		if msg.ParentId != 0 {
+			if err := l.svcCtx.CommentCache.DeleteCommentIndexCache(ctx, msg.ParentId); err != nil {
+				l.Errorf("invalidate parent comment cache failed, parent %d: %v", msg.ParentId, err)
+			}
+		}
+
+		if status == 0 {
+			l.notifyComment(ctx, msg)
+		}
+
+		l.Infof("comment pipeline finished, id=%d, status=%d", msg.CommentId, status)
+		return nil
+	})
+}
+
+func commentMessageAttrs(topic, key string) []attribute.KeyValue {
+	return []attribute.KeyValue{
+		attribute.String("messaging.system", "kafka"),
+		attribute.String("messaging.destination", topic),
+		attribute.String("messaging.operation", "consume"),
+		attribute.String("messaging.message.key", key),
+	}
 }
 
 func (l *AuditConsumer) notifyComment(ctx context.Context, msg kqtypes.CommentKafkaMsg) {

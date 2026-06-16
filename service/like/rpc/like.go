@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/like/rpc/internal/config"
 	"sea-try-go/service/like/rpc/internal/model"
 	"sea-try-go/service/like/rpc/internal/server"
@@ -26,6 +27,7 @@ func main() {
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
 	logger.Init(c.Name)
+	rpcTimeout := observability.DisableNativeRpcTimeout(&c.RpcServerConf)
 	model.InitDB(c.Storage.Postgres.DataSource)
 	ctx := svc.NewServiceContext(c)
 
@@ -36,6 +38,7 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	s.AddUnaryInterceptors(observability.NewUnaryServerInterceptor(rpcTimeout, observability.SlowThreshold()))
 	defer s.Stop()
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)

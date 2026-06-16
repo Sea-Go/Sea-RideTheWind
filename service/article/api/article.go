@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/zeromicro/go-zero/core/logx"
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 
 	"sea-try-go/service/article/api/internal/config"
 	"sea-try-go/service/article/api/internal/handler"
@@ -28,7 +29,9 @@ func main() {
 	logx.MustSetup(c.Log)
 	logger.Init(c.Name)
 
+	httpTimeout := observability.DisableNativeRestTimeout(&c.RestConf)
 	server := rest.MustNewServer(c.RestConf, rest.WithCors())
+	server.Use(observability.NewHTTPMiddleware(c.Name, httpTimeout, observability.SlowThreshold()))
 	defer server.Stop()
 
 	ctx := svc.NewServiceContext(c)

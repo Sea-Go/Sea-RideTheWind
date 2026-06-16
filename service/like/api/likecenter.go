@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 	"sea-try-go/service/common/response"
 	"sea-try-go/service/like/api/internal/config"
 	"sea-try-go/service/like/api/internal/handler"
@@ -32,7 +33,9 @@ func main() {
 
 	logger.Init(c.Name)
 
+	httpTimeout := observability.DisableNativeRestTimeout(&c.RestConf)
 	server := rest.MustNewServer(c.RestConf)
+	server.Use(observability.NewHTTPMiddleware(c.Name, httpTimeout, observability.SlowThreshold()))
 	defer server.Stop()
 
 	httpx.SetOkHandler(func(ctx context.Context, v interface{}) interface{} {

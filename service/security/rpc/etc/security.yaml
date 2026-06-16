@@ -6,6 +6,12 @@ Etcd:
   - etcd:2379
   Key: security.rpc
 
+Telemetry:
+  Name: security-rpc
+  Endpoint: jaeger:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc
+
 
 AdDetection:
   ApiEndpoint: "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"

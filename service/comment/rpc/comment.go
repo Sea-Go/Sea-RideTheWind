@@ -5,14 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"sea-try-go/service/common/logger"
 	"sea-try-go/service/comment/rpc/internal/config"
 	"sea-try-go/service/comment/rpc/internal/metrics"
 	"sea-try-go/service/comment/rpc/internal/mqs"
 	"sea-try-go/service/comment/rpc/internal/server"
 	"sea-try-go/service/comment/rpc/internal/svc"
-	"sea-try-go/service/comment/rpc/internal/trace"
 	"sea-try-go/service/comment/rpc/pb"
+	"sea-try-go/service/common/logger"
+	"sea-try-go/service/common/observability"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zeromicro/go-queue/kq"
@@ -30,6 +30,7 @@ func main() {
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
 	logger.Init(c.Name)
+	rpcTimeout := observability.DisableNativeRpcTimeout(&c.RpcServerConf)
 	ctx := svc.NewServiceContext(c)
 	bgCtx := context.Background()
 	metrics.InitMetrics(&c)
@@ -43,12 +44,6 @@ func main() {
 	go queue.Start()
 	defer queue.Stop()
 
-	shutdown, err := trace.InitOTel("comment-rpc", "127.0.0.1:34317")
-	if err != nil {
-		panic(err)
-	}
-	defer shutdown(context.Background())
-
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		pb.RegisterCommentServiceServer(grpcServer, server.NewCommentServiceServer(ctx))
 
@@ -56,6 +51,7 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	s.AddUnaryInterceptors(observability.NewUnaryServerInterceptor(rpcTimeout, observability.SlowThreshold()))
 	defer s.Stop()
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
