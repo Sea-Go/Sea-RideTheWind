@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,26 +34,30 @@ func (s *userReaderStub) GetUser(_ context.Context, req *pb.GetUserReq, _ ...grp
 	return s.result, s.err
 }
 
-func TestResolveUserFromVerifiedGoZeroJWT(t *testing.T) {
+func TestResolveSubjectRefFromVerifiedGoZeroJWT(t *testing.T) {
 	const secret = "test-only-jwt-secret-with-enough-length"
 	issued, err := rtwjwt.GetToken(secret, time.Now().Unix(), 60, 9123)
 	if err != nil {
 		t.Fatal(err)
 	}
 	reader := &userReaderStub{want: 9123, result: &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123, Username: "member"}}}
-	var resolved *pb.UserInfo
+	var resolved SubjectRef
 	var resolveErr error
 	h := handler.Authorize(secret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resolved, resolveErr = ResolveUser(r.Context(), reader)
+		resolved, resolveErr = ResolveSubjectRef(r.Context(), reader)
 		w.WriteHeader(http.StatusNoContent)
 	}))
-	req := httptest.NewRequest(http.MethodGet, "/user/get", nil)
+	req := httptest.NewRequest(http.MethodPost, "/test/identity", strings.NewReader(`{"subject_ref":{"authority_id":"evil","tenant_id":"other","subject_id":"666"}}`))
 	req.Header.Set("Authorization", "Bearer "+issued)
-	req.Header.Set("X-User-ID", "666") // Client headers cannot override verified JWT.
+	req.Header.Set("X-User-ID", "666") // Neither header nor payload can override verified JWT.
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
-	if w.Code != http.StatusNoContent || resolveErr != nil || resolved == nil || resolved.Uid != 9123 || reader.called != 1 || reader.got != reader.want {
+	if w.Code != http.StatusNoContent || resolveErr != nil || resolved != (SubjectRef{"rtw.identity", "platform", "9123"}) || reader.called != 1 || reader.got != reader.want {
 		t.Fatalf("verified resolution: HTTP=%d user=%+v error=%v reader=%+v", w.Code, resolved, resolveErr, reader)
+	}
+	wire, err := json.Marshal(resolved)
+	if err != nil || string(wire) != `{"authority_id":"rtw.identity","tenant_id":"platform","subject_id":"9123"}` {
+		t.Fatalf("SubjectRef wire=%s error=%v", wire, err)
 	}
 
 	reader.called = 0
@@ -69,7 +75,8 @@ func TestResolveUserRejectsInvalidOrMismatchedIdentity(t *testing.T) {
 	for _, claim := range []any{nil, int64(9123), json.Number("0"), json.Number("-1"), json.Number("bad"), json.Number("9223372036854775808")} {
 		ctx := context.WithValue(context.Background(), "userId", claim)
 		stub := &userReaderStub{}
-		if _, err := ResolveUser(ctx, stub); !errors.Is(err, ErrInvalidClaim) || stub.called != 0 {
+		ref, err := ResolveSubjectRef(ctx, stub)
+		if !errors.Is(err, ErrInvalidClaim) || stub.called != 0 || ref != (SubjectRef{}) {
 			t.Fatalf("claim %v: error=%v RPC calls=%d", claim, err, stub.called)
 		}
 	}
@@ -87,14 +94,24 @@ func TestResolveUserRejectsInvalidOrMismatchedIdentity(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			stub := &userReaderStub{result: tc.resp, err: tc.err}
-			if _, err := ResolveUser(valid, stub); !errors.Is(err, tc.want) || stub.called != 1 || stub.got != 9123 {
+			ref, err := ResolveSubjectRef(valid, stub)
+			if !errors.Is(err, tc.want) || stub.called != 1 || stub.got != 9123 || ref != (SubjectRef{}) {
 				t.Fatalf("error=%v RPC calls=%d UID=%d", err, stub.called, stub.got)
 			}
 		})
 	}
 	upstream := status.Error(codes.Unavailable, "unavailable")
 	stub := &userReaderStub{err: upstream}
-	if _, err := ResolveUser(valid, stub); !errors.Is(err, upstream) {
+	if _, err := ResolveSubjectRef(valid, stub); !errors.Is(err, upstream) {
 		t.Fatalf("upstream error not preserved: %v", err)
+	}
+}
+
+func TestResolveSubjectRefKeepsDecimalUIDPrecision(t *testing.T) {
+	ctx := context.WithValue(context.Background(), "userId", json.Number("9223372036854775807"))
+	stub := &userReaderStub{result: &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: math.MaxInt64}}}
+	ref, err := ResolveSubjectRef(ctx, stub)
+	if err != nil || ref.SubjectID != "9223372036854775807" || ref.AuthorityID != AuthorityID || ref.TenantID != PlatformTenantID {
+		t.Fatalf("large UID resolution=%+v error=%v", ref, err)
 	}
 }
