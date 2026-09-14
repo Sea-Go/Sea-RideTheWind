@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	kqtypes "sea-try-go/service/comment/rpc/common/types"
-	"sea-try-go/service/comment/rpc/internal/metrics"
+	"strconv"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	kqtypes "sea-try-go/service/comment/rpc/common/types"
+	"sea-try-go/service/comment/rpc/internal/metrics"
 )
 
 type CommentModel struct {
@@ -24,17 +26,36 @@ func NewCommentModel(db *gorm.DB) *CommentModel {
 }
 
 func (m *CommentModel) InsertCommentTx(ctx context.Context, msg kqtypes.CommentKafkaMsg, status int) error {
+	subject, err := subjectRef(msg.UserId)
+	if err != nil {
+		return err
+	}
+	if msg.CommentId <= 0 || msg.TargetType == "" || msg.TargetId == "" {
+		return fmt.Errorf("invalid comment creation target or id")
+	}
 	return m.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 
-		// 1. 检查重复
-		var existCount int64
-		if err := tx.Model(&CommentIndex{}).Where("id = ?", msg.CommentId).Count(&existCount).Error; err != nil {
+		// Same Kafka message is idempotent; a reused ID with changed identity is not.
+		var existing CommentIndex
+		lookup := tx.Model(&CommentIndex{}).Where("id = ?", msg.CommentId).Limit(1).Find(&existing)
+		if lookup.Error != nil {
 			metrics.CommentPostgresErrorCounterMetric.
 				WithLabelValues("comment_postgres", "InsertCommentTx", "query").
 				Inc()
-			return err
+			return lookup.Error
 		}
-		if existCount > 0 {
+		if lookup.RowsAffected != 0 {
+			if existing.TargetType != msg.TargetType || existing.TargetId != msg.TargetId ||
+				existing.UserId != msg.UserId || existing.RootId != msg.RootId || existing.ParentId != msg.ParentId {
+				return fmt.Errorf("comment id %d reused with conflicting identity", msg.CommentId)
+			}
+			var content CommentContent
+			if err := tx.Where("comment_id = ?", msg.CommentId).First(&content).Error; err != nil {
+				return err
+			}
+			if content.Content != msg.Content {
+				return fmt.Errorf("comment id %d reused with conflicting content", msg.CommentId)
+			}
 			return nil
 		}
 
@@ -119,7 +140,17 @@ func (m *CommentModel) InsertCommentTx(ctx context.Context, msg kqtypes.CommentK
 			}
 		}
 
-		return nil
+		factID := "rtw.comment/" + strconv.FormatInt(msg.CommentId, 10) + "/created"
+		fact := commentFact{
+			EventID: factID, EventType: "community.comment.created", AggregateID: strconv.FormatInt(msg.CommentId, 10),
+			OperationID: factID, SubjectRef: subject, TargetType: msg.TargetType, TargetID: msg.TargetId,
+			Operation: "create", SourceRef: "rtw.comment/" + strconv.FormatInt(msg.CommentId, 10),
+			CommentID: strconv.FormatInt(msg.CommentId, 10), VisibilityState: int32(status), EventTime: createTime,
+		}
+		if msg.ParentId > 0 {
+			fact.ParentCommentID = strconv.FormatInt(msg.ParentId, 10)
+		}
+		return appendCommentFact(tx, fact)
 	})
 }
 
@@ -224,7 +255,7 @@ func (m *CommentModel) DeleteCommentTx(ctx context.Context, commentId, userId in
 
 		// 查评论
 		var comment CommentIndex
-		if err := tx.Where("id = ?", commentId).First(&comment).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", commentId).First(&comment).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return ErrorCommentNotFound
 			}
@@ -232,6 +263,9 @@ func (m *CommentModel) DeleteCommentTx(ctx context.Context, commentId, userId in
 				WithLabelValues("comment_postgres", "DeleteCommentTx", "query").
 				Inc()
 			return err
+		}
+		if comment.TargetType != targetType || comment.TargetId != targetId {
+			return ErrorCommentNotFound
 		}
 
 		// 查 Subject
@@ -244,6 +278,9 @@ func (m *CommentModel) DeleteCommentTx(ctx context.Context, commentId, userId in
 				WithLabelValues("comment_postgres", "DeleteCommentTx", "query").
 				Inc()
 			return err
+		}
+		if userId != comment.UserId && userId != sub.OwnerId {
+			return ErrorCommentForbidden
 		}
 
 		// 删除逻辑
@@ -265,24 +302,48 @@ func (m *CommentModel) DeleteCommentTx(ctx context.Context, commentId, userId in
 					Inc()
 				return err
 			}
-		}
 
-		// 更新父评论回复数
-		if comment.ParentId != 0 {
-			db := tx.Model(&CommentIndex{}).Where("id = ?", comment.ParentId).Update("reply_count", gorm.Expr("reply_count - 1"))
-			if db.Error != nil {
-				metrics.CommentPostgresErrorCounterMetric.
-					WithLabelValues("comment_postgres", "DeleteCommentTx", "update").
-					Inc()
-				return db.Error
+			// Only the first deletion changes counters and emits a retract fact.
+			if comment.ParentId != 0 {
+				db := tx.Model(&CommentIndex{}).Where("id = ?", comment.ParentId).Update("reply_count", gorm.Expr("reply_count - 1"))
+				if db.Error != nil {
+					metrics.CommentPostgresErrorCounterMetric.
+						WithLabelValues("comment_postgres", "DeleteCommentTx", "update").
+						Inc()
+					return db.Error
+				}
+				if db.RowsAffected == 0 {
+					return ErrorCommentNotFound
+				}
 			}
-			if db.RowsAffected == 0 {
-				return ErrorCommentNotFound
+			creatorRef, err := subjectRef(comment.UserId)
+			if err != nil {
+				return err
+			}
+			operatorRef, err := subjectRef(userId)
+			if err != nil {
+				return err
+			}
+			factID := "rtw.comment/" + strconv.FormatInt(commentId, 10) + "/deleted"
+			fact := commentFact{
+				EventID: factID, EventType: "community.comment.deleted", AggregateID: strconv.FormatInt(commentId, 10),
+				OperationID: factID, SubjectRef: creatorRef, OperatorRef: operatorRef,
+				TargetType: targetType, TargetID: targetId, Operation: "retract",
+				SourceRef: "rtw.comment/" + strconv.FormatInt(commentId, 10), CommentID: strconv.FormatInt(commentId, 10),
+				VisibilityState: 2, EventTime: time.Now().UTC(),
+			}
+			if comment.ParentId > 0 {
+				fact.ParentCommentID = strconv.FormatInt(comment.ParentId, 10)
+			}
+			if err := appendCommentFact(tx, fact); err != nil {
+				return err
 			}
 		}
 
 		// 返回剩余总数
-		tx.Where("target_type = ? AND target_id = ?", targetType, targetId).First(&sub)
+		if err := tx.Where("target_type = ? AND target_id = ?", targetType, targetId).First(&sub).Error; err != nil {
+			return err
+		}
 		remainCount = sub.TotalCount
 
 		return nil
@@ -409,28 +470,28 @@ func (m *CommentModel) BatchGetReplyContent(ctx context.Context, commentIDs []in
 }
 
 func (m *CommentModel) LikeCommentTx(ctx context.Context, userId, commentId int64, targetType, targetId string, actionType int32, ownerId int64) error {
+	actorRef, err := subjectRef(userId)
+	if err != nil {
+		return err
+	}
+	if commentId <= 0 || targetType == "" || targetId == "" {
+		return fmt.Errorf("invalid comment interaction target or id")
+	}
 	return m.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var likeRecord CommentLike
-		var needInsert bool
 
+		// A state-0 row is the lock anchor even for the first concurrent action.
+		seed := CommentLike{UserId: userId, CommentId: commentId, TargetType: targetType, TargetId: targetId, State: 0}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&seed).Error; err != nil {
+			return err
+		}
 		// 悲观锁查询
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND comment_id = ?", userId, commentId).First(&likeRecord).Error
 		if err != nil {
-			if err == gorm.ErrRecordNotFound {
-				needInsert = true
-				likeRecord = CommentLike{
-					UserId:     userId,
-					CommentId:  commentId,
-					TargetType: targetType,
-					TargetId:   targetId,
-					State:      0,
-				}
-			} else {
-				metrics.CommentPostgresErrorCounterMetric.
-					WithLabelValues("comment_postgres", "LikeCommentTx", "lock_query").
-					Inc()
-				return err
-			}
+			metrics.CommentPostgresErrorCounterMetric.
+				WithLabelValues("comment_postgres", "LikeCommentTx", "lock_query").
+				Inc()
+			return err
 		}
 
 		// 查评论
@@ -443,6 +504,9 @@ func (m *CommentModel) LikeCommentTx(ctx context.Context, userId, commentId int6
 				WithLabelValues("comment_postgres", "LikeCommentTx", "query").
 				Inc()
 			return err
+		}
+		if comment.TargetType != targetType || comment.TargetId != targetId || comment.State == 2 {
+			return ErrorCommentNotFound
 		}
 
 		// 计算状态差值
@@ -486,20 +550,11 @@ func (m *CommentModel) LikeCommentTx(ctx context.Context, userId, commentId int6
 
 		// 更新 likeRecord
 		likeRecord.State = newState
-		if needInsert {
-			if err := tx.Create(&likeRecord).Error; err != nil {
-				metrics.CommentPostgresErrorCounterMetric.
-					WithLabelValues("comment_postgres", "LikeCommentTx", "insert").
-					Inc()
-				return err
-			}
-		} else {
-			if err := tx.Model(&likeRecord).Update("state", newState).Error; err != nil {
-				metrics.CommentPostgresErrorCounterMetric.
-					WithLabelValues("comment_postgres", "LikeCommentTx", "update").
-					Inc()
-				return err
-			}
+		if err := tx.Model(&likeRecord).Update("state", newState).Error; err != nil {
+			metrics.CommentPostgresErrorCounterMetric.
+				WithLabelValues("comment_postgres", "LikeCommentTx", "update").
+				Inc()
+			return err
 		}
 
 		// 更新 CommentIndex
@@ -527,7 +582,18 @@ func (m *CommentModel) LikeCommentTx(ctx context.Context, userId, commentId int6
 			}
 		}
 
-		return nil
+		operation := map[int32]string{1: "like", 2: "unlike", 3: "dislike", 4: "undislike"}[actionType]
+		factID := newCommentInteractionID()
+		fact := commentFact{
+			EventID: factID, EventType: "community.comment.interaction", AggregateID: strconv.FormatInt(commentId, 10),
+			OperationID: factID, SubjectRef: actorRef, TargetType: targetType, TargetID: targetId,
+			Operation: operation, SourceRef: factID, CommentID: strconv.FormatInt(commentId, 10),
+			OldState: &oldState, NewState: &newState, VisibilityState: comment.State, EventTime: time.Now().UTC(),
+		}
+		if comment.ParentId > 0 {
+			fact.ParentCommentID = strconv.FormatInt(comment.ParentId, 10)
+		}
+		return appendCommentFact(tx, fact)
 	})
 }
 
