@@ -13,6 +13,11 @@ cd "$knowledge_repo"
 # goctl 1.9.2 emits trailing spaces in empty descriptions. Normalize generated text reproducibly.
 python3 - <<'PY'
 from pathlib import Path
+import json
+swagger=Path("service/knowledge/generated/knowledge.json")
+contract=json.loads(swagger.read_text())
+contract.pop("x-date",None)
+swagger.write_text(json.dumps(contract,ensure_ascii=False,indent=2)+"\n")
 paths=[Path('api/knowledge.api'),*Path('service/knowledge/generated').rglob('*.ts')]
 for path in paths:
     path.write_text('\n'.join(line.rstrip() for line in path.read_text().splitlines()).rstrip()+'\n')

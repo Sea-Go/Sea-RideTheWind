@@ -38,7 +38,7 @@ goctl api swagger --api api/knowledge.api --dir service/knowledge/generated --fi
 goctl api ts --api api/knowledge.api --dir service/knowledge/generated/typescript
 ```
 
-统一入口为 `service/knowledge/scripts/generate.sh`（可通过 KNOWLEDGE_GOCTL 指定生成器路径），包含生成器版本检查与生成文本空白规范化。本次生成器 goctl 1.9.2，运行 go-zero v1.10.2。成功 `code=200,msg,data` 已在 DSL 定义 envelope；错误使用真实 HTTP 400/401/403/404/409/410/499/504/500，业务未知错误不作为空成功。
+统一入口为 `service/knowledge/scripts/generate.sh`（可通过 KNOWLEDGE_GOCTL 指定生成器路径），包含生成器版本检查、生成文本空白规范化及去除 Swagger 生成时钟元数据。本次生成器 goctl 1.9.2，运行 go-zero v1.10.2。成功 `code=200,msg,data` 已在 DSL 定义 envelope；错误使用真实 HTTP 400/401/403/404/409/410/499/504/500，业务未知错误不作为空成功。
 
 - 公开 GET `/v1/knowledge/modules`、`/modules/{id}`、`/modules/{id}/published` 仅展示有效已发布内容；候选/管理员列表为 `/workbench/modules`。
 - 管理命令复用已验证 JWT 的 `userId`，并由部署配置 AdministratorIDs 指定首批管理员。统一身份中心的后续业务角色映射仍属 WS02-A；客户端自报身份不作为依据。
