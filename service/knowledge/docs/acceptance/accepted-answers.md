@@ -35,3 +35,9 @@
 工作区：`[W0]` 独立 RTW 工作树；`[W1]` `api/knowledge.api`、`service/knowledge/`、共享 `service/user/user/identity/` 和必要的旧内部转发文件；`[R1]` 用户中心 User RPC 实现、BTW/Docs；`[D1]` go-zero v1.10.2、gRPC、pgx；`[G1]` goctl 1.9.2 管理的 routes/types/OpenAPI/TypeScript；`[X1]` 临时 PG16 与本地测试 gRPC（允许测试写入，均自启停）；`[N1]` 原始脏树、其他服务与生产；`[T1]` 本任务 goctl 可执行文件和隔离 PG 目录。主职责 `[C1]` 产品 HTTP 与身份边界；跨 `[C2]` 读用例、`[C4]` 现有 PG 范围查询、`[C7]` User RPC/公开 API、`[C8]` 协议验收。
 
 2026-09-14 复现：`KNOWLEDGE_PG_BIN=/opt/homebrew/opt/postgresql@16/bin bash service/knowledge/scripts/acceptance.sh` 退出 0，运行全部知识包 race 测试、真实 go-zero HTTP 子进程、临时 PostgreSQL 16、真实 gRPC 协议上的受控 GetUser 实现和 `go vet ./service/knowledge/...`。`TestRealHTTPKnowledgeWorkflow` 证明管理员/worker 令牌不进入产品读路由、伪造主体参数无效、其他 UID 拿不到该答案、已删除/UID 错配拒绝、答案列表 1→2 顺序分页、越界 limit/cursor 拒绝、RPC 停止时返回 503。`go test -mod=readonly -race -count=1 ./service/user/user/api/internal/identity ./service/user/user/api/internal/logic/user ./service/user/user/api/internal/handler/user ./service/user/user/identity`、`go vet ./service/user/user/...`、`go test -mod=readonly ./service/user/user/...` 均退出 0。真实用户数据库、跨服务登出令牌撤销、网页/桌宠消费和线上密钥/服务发现配置尚未验证，因此该切片是本地协议/PG 验收，不是 H02 完整通过。
+
+## 产品引用当前可用性读面：后续局部验收
+
+产品新增 `GET /v1/knowledge/answer-sessions/:session_id/accepted-answers/:answer_id/citations`。它复用同一 UserAuth JWT→User RPC同UID→完整SubjectRef，先确认本用户/会话的AnswerID，再从不可变`knowledge_answer_citations`按citation_order取**该答案实际引用的证据ID**，以已提交search_id回查RTW引用表的固定release状态并只返回对应元数据。响应含`available/unavailable`、固定module/release/发布指针版本和quote_hash/定位，**不返回旧quote正文**；`insufficient`答案返回空引用。这个状态是查询时刻的判断，历史`turn_json`仍作为不可变产品记录保存，客户端不可把它当作当前来源。
+
+同一隔离PG16和真实go-zero HTTP测试通过：已登录UID可读当前可用引用，另一UID的同AnswerID为404，未认证401，已删除用户403、RPC停服503；撤回来源后同接口把已引用条目标为`unavailable`。模型测试另证明空证据不伪造引用、跨主体拒读，JSON投影不含quote文本；全知识服务race/vet和goctl 1.9.2二次生成hash一致。它仍没有真实用户数据库、网页/桌宠消费者、刷新通知或生产部署；H02/H07整体继续PARTIAL。
