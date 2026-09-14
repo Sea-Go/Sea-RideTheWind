@@ -6,6 +6,7 @@ package article
 import (
 	"context"
 	"sea-try-go/service/article/rpc/articleservice"
+	articlepb "sea-try-go/service/article/rpc/pb"
 
 	"sea-try-go/service/article/api/internal/svc"
 	"sea-try-go/service/article/api/internal/types"
@@ -33,8 +34,9 @@ func NewGetArticleLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetArt
 
 func (l *GetArticleLogic) GetArticle(req *types.GetArticleReq) (resp *types.GetArticleResp, code int) {
 	res, err := l.svcCtx.ArticleRpc.GetArticle(l.ctx, &articleservice.GetArticleRequest{
-		ArticleId: req.ArticleId,
-		IncrView:  req.IncrView,
+		ArticleId:  req.ArticleId,
+		IncrView:   req.IncrView,
+		PublicOnly: true,
 	})
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, errmsg.Error, err)
@@ -49,7 +51,7 @@ func (l *GetArticleLogic) GetArticle(req *types.GetArticleReq) (resp *types.GetA
 		}
 	}
 
-	if res.Article == nil {
+	if res == nil || res.Article == nil || res.Article.Status != articlepb.ArticleStatus_PUBLISHED {
 		return nil, errmsg.ErrorArticleNone
 	}
 

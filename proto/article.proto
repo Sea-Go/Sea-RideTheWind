@@ -54,6 +54,8 @@ message CreateArticleResponse {
 message GetArticleRequest {
   string article_id = 1;              // 文章ID
   bool incr_view = 2;                 // 是否增加阅读量（详情页传true，其他场景传false）
+  bool public_only = 3;               // 公开读取仅返回当前可读的已发布版本
+  string requester_id = 4;            // 作者读取时由认证 HTTP 层传入 UID；RPC 先核作者再取正文
 }
 
 // 获取文章详情响应
@@ -99,6 +101,7 @@ message ListArticlesRequest {
   int32 page_size = 6;                    // 每页数量
   string sort_by = 7;                     // 排序字段（create_time/like_count/comment_count）
   bool desc = 8;                          // 是否降序
+  bool public_only = 9;                   // 公开列表在查询/计数前限定发布资格
 }
 
 // 文章列表查询响应

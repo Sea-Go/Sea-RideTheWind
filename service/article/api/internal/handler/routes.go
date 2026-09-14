@@ -33,6 +33,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/article/:id",
 				Handler: article.DeleteArticleHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/me/article/:id",
+				Handler: article.GetAuthorArticleHandler(serverCtx),
+			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
 		rest.WithPrefix("/v1"),
