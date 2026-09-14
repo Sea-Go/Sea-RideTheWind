@@ -658,6 +658,49 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if productStatus.Status != "retryable_failure" {
 		t.Fatalf("failed held operation is not queryable: %+v", productStatus)
 	}
+	if btwRoot := os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT"); btwRoot != "" {
+		// Stage four is only a byte-preserving relay. The independent BTW test
+		// process verifies RTW's scope and commits through its real RootSessionBoundary.
+		endpoint := startRealBTWProductServer(t, dir, btwRoot, base, c.WorkerToken)
+		searchFixture.mu.Lock()
+		searchFixture.forwardURL = endpoint
+		searchFixture.mu.Unlock()
+		searchFixture.stage.Store(4)
+		realBody := map[string]any{"module_id": m.Id, "query": "What if this release has no matching evidence?",
+			"depth": "fast", "intelligence": "low", "idempotency_key": "product-search-real-btw-1"}
+		var realResult types.ProductSearchResult
+		request("POST", searchPath, productToken, realBody, &realResult, 200)
+		if realResult.Status != "insufficient" || realResult.SearchId == "" || realResult.AnswerId == "" ||
+			len(realResult.Citations) != 0 || searchFixture.calls.Load() != 5 {
+			t.Fatalf("real BTW signed root did not commit the product operation: %+v calls=%d",
+				realResult, searchFixture.calls.Load())
+		}
+		if testing.Verbose() {
+			t.Logf("RTW signed scope reached real BTW RootSessionBoundary: search=%s answer=%s status=%s",
+				realResult.SearchId, realResult.AnswerId, realResult.Status)
+		}
+		var committedCount, citationCount int
+		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_accepted_answers
+ WHERE answer_id=$1 AND search_id=$2 AND authority_id='rtw.identity' AND tenant_id='platform'
+ AND subject_id=$3 AND session_id='search-facade-session'`,
+			realResult.AnswerId, realResult.SearchId, fmt.Sprintf("%d", productUID)).Scan(&committedCount); err != nil || committedCount != 1 {
+			t.Fatalf("real BTW did not commit one RTW answer in PG: count=%d err=%v", committedCount, err)
+		}
+		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_search_citations WHERE search_id=$1`,
+			realResult.SearchId).Scan(&citationCount); err != nil || citationCount != 0 {
+			t.Fatalf("empty evidence product search fabricated citation: count=%d err=%v", citationCount, err)
+		}
+		var replayedReal types.ProductSearchResult
+		request("POST", searchPath, productToken, realBody, &replayedReal, 200)
+		if !reflect.DeepEqual(replayedReal, realResult) || searchFixture.calls.Load() != 5 {
+			t.Fatalf("real BTW committed operation replay changed answer: %+v calls=%d",
+				replayedReal, searchFixture.calls.Load())
+		}
+		request("GET", searchPath+"/"+realResult.SearchId, productToken, nil, &replayedReal, 200)
+		if !reflect.DeepEqual(replayedReal, realResult) {
+			t.Fatalf("real BTW answer and RTW operation GET differ: %+v", replayedReal)
+		}
+	}
 	productPath := "/v1/knowledge/answer-sessions/" + commitAnswer.SessionId + "/accepted-answers"
 	citationStatePath := productPath + "/" + answerID + "/citations"
 	var beforeUnauthorized int64

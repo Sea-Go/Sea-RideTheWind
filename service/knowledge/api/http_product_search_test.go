@@ -10,9 +10,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -37,14 +42,15 @@ type productFixtureScope struct {
 }
 
 type productSearchFixture struct {
-	server  *httptest.Server
-	stage   atomic.Int64 // 0: forged 200; 1: committed but lost reply; 2: committed 200; 3: blocked failure
-	calls   atomic.Int64
-	mu      sync.Mutex
-	scopes  []productFixtureScope
-	entered chan struct{}
-	release chan struct{}
-	once    sync.Once
+	server     *httptest.Server
+	stage      atomic.Int64 // 0: forged 200; 1: committed but lost reply; 2: committed 200; 3: blocked failure; 4: transparent real BTW relay
+	calls      atomic.Int64
+	mu         sync.Mutex
+	scopes     []productFixtureScope
+	forwardURL string
+	entered    chan struct{}
+	release    chan struct{}
+	once       sync.Once
 }
 
 func newProductSearchFixture(t *testing.T, rtwBase *string, workerToken string) *productSearchFixture {
@@ -95,7 +101,31 @@ func newProductSearchFixture(t *testing.T, rtwBase *string, workerToken string) 
 		}
 		f.mu.Lock()
 		f.scopes = append(f.scopes, scope)
+		forwardURL := f.forwardURL
 		f.mu.Unlock()
+		if f.stage.Load() == 4 {
+			forwarded, forwardErr := http.NewRequestWithContext(r.Context(), http.MethodPost,
+				forwardURL+"/v1/search/summary", bytes.NewReader(raw))
+			if forwardErr != nil || forwardURL == "" {
+				t.Error("real BTW forwarding endpoint unavailable")
+				http.Error(w, "real BTW unavailable", http.StatusBadGateway)
+				return
+			}
+			forwarded.Header = r.Header.Clone()
+			upstream, forwardErr := (&http.Client{Timeout: 30 * time.Second}).Do(forwarded)
+			if forwardErr != nil {
+				t.Errorf("real BTW request failed: %v", forwardErr)
+				http.Error(w, "real BTW unavailable", http.StatusBadGateway)
+				return
+			}
+			defer upstream.Body.Close()
+			w.Header().Set("Content-Type", upstream.Header.Get("Content-Type"))
+			w.WriteHeader(upstream.StatusCode)
+			if _, forwardErr = io.Copy(w, io.LimitReader(upstream.Body, 1<<20)); forwardErr != nil {
+				t.Errorf("copy real BTW terminal result: %v", forwardErr)
+			}
+			return
+		}
 		result := types.ProductSearchResult{SearchId: scope.SearchID, AnswerId: scope.AnswerID,
 			Status: "insufficient", Citations: []types.ProductSearchCitation{}}
 		if f.stage.Load() == 0 {
@@ -186,4 +216,77 @@ func decodeProductFixtureScope(t *testing.T, header string) (productFixtureScope
 		return scope, false
 	}
 	return scope, true
+}
+
+// startRealBTWProductServer starts an independently compiled BTW test process.
+// The existing fixture remains a byte-preserving relay, so its test stages
+// cannot fabricate an accepted turn for this path.
+func startRealBTWProductServer(t *testing.T, dir, btwRoot, rtwBase, workerToken string) string {
+	t.Helper()
+	readyPath := filepath.Join(dir, "btw-product-server-url")
+	fixturePath := filepath.Join(dir, "btw-product-server-fixture.json")
+	fixture, err := json.Marshal(map[string]string{"rtw_base": rtwBase, "worker_token": workerToken,
+		"scope_key": productFixtureScopeKey, "ready_path": readyPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixturePath, fixture, 0600); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(dir, "btw-product-server.log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(dir, "btw-product-server.test")
+	compile := exec.Command("go", "test", "-c", "-mod=readonly", "-race", "-o", binary,
+		"./internal/transport/http/search")
+	compile.Dir = btwRoot
+	if output, err := compile.CombinedOutput(); err != nil {
+		logFile.Close()
+		t.Fatalf("compile real BTW product server: %v\n%s", err, output)
+	}
+	cmd := exec.Command(binary, "-test.run=^TestRTWRealProductSearchServer$", "-test.v")
+	cmd.Dir = btwRoot
+	cmd.Env = append(os.Environ(), "SEA_RTW_PRODUCT_SERVER_FIXTURE="+fixturePath)
+	cmd.Stdout, cmd.Stderr = logFile, logFile
+	if err := cmd.Start(); err != nil {
+		logFile.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		exited := make(chan error, 1)
+		go func() { exited <- cmd.Wait() }()
+		select {
+		case err := <-exited:
+			if err != nil {
+				t.Errorf("BTW product server exited unsuccessfully: %v", err)
+			}
+		case <-time.After(15 * time.Second):
+			_ = cmd.Process.Kill()
+			<-exited
+			t.Error("BTW product server did not stop after SIGTERM")
+		}
+		logFile.Close()
+		if t.Failed() {
+			log, _ := os.ReadFile(logPath)
+			t.Logf("BTW product server log: %s", log)
+		}
+	})
+	for deadline := time.Now().Add(45 * time.Second); time.Now().Before(deadline); time.Sleep(25 * time.Millisecond) {
+		contents, err := os.ReadFile(readyPath)
+		if err != nil {
+			continue
+		}
+		endpoint := strings.TrimSpace(string(contents))
+		parsed, parseErr := url.Parse(endpoint)
+		if parseErr == nil && parsed.Scheme == "http" && parsed.Host != "" && parsed.Path == "" {
+			return endpoint
+		}
+		t.Fatalf("BTW ready file contained invalid endpoint: %q", endpoint)
+	}
+	log, _ := os.ReadFile(logPath)
+	t.Fatalf("BTW product server did not become ready: %s", log)
+	return ""
 }
