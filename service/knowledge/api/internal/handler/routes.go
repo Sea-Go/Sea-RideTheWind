@@ -132,6 +132,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				},
 				{
 					Method:  http.MethodPost,
+					Path:    "/modules/:module_id/search-judgments",
+					Handler: knowledge.RecordSearchJudgmentHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/modules/:module_id/search-judgments/withdrawals",
+					Handler: knowledge.WithdrawSearchJudgmentHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
 					Path:    "/modules/:module_id/sources",
 					Handler: knowledge.CreateSourceHandler(serverCtx),
 				},
@@ -296,6 +306,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodGet,
 					Path:    "/search-citations/:search_id",
 					Handler: worker.GetSearchCitationsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/search-judgments/events/:event_id",
+					Handler: worker.GetSearchJudgmentEventHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodPost,

@@ -189,33 +189,40 @@ func setOperation(ctx context.Context, tx pgx.Tx, operationID string) error {
 	return err
 }
 func emit(ctx context.Context, tx pgx.Tx, eventType, aggregate string, payload any) error {
+	_, _, err := emitWithReceipt(ctx, tx, eventType, aggregate, payload)
+	return err
+}
+
+// emitWithReceipt returns the exact bytes persisted in the outbox. Judgment
+// revisions retain those bytes separately for independent warehouse replay.
+func emitWithReceipt(ctx context.Context, tx pgx.Tx, eventType, aggregate string, payload any) (Event, []byte, error) {
 	var sequence int64
 	if err := tx.QueryRow(ctx, "UPDATE knowledge_modules SET event_sequence=event_sequence+1 WHERE id=$1 RETURNING event_sequence", aggregate).Scan(&sequence); err != nil {
-		return err
+		return Event{}, nil, err
 	}
 	var operationID string
 	if err := tx.QueryRow(ctx, "SELECT current_setting('knowledge.operation_id',true)").Scan(&operationID); err != nil {
-		return err
+		return Event{}, nil, err
 	}
 	if operationID == "" {
-		return invalid("event operation identity missing")
+		return Event{}, nil, invalid("event operation identity missing")
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return Event{}, nil, err
 	}
 	event := Event{EventID: id("evt"), EventType: eventType, SchemaVersion: 1, Producer: "ridethewind.knowledge", AggregateID: aggregate, AggregateVersion: sequence, OperationID: operationID, OccurredAt: now(), Payload: raw}
 	eventJSON, err := json.Marshal(event)
 	if err != nil {
-		return err
+		return Event{}, nil, err
 	}
 	correlation := telemetry.Capture(ctx)
 	encoded, err := json.Marshal(correlation)
 	if err != nil {
-		return err
+		return Event{}, nil, err
 	}
 	_, err = tx.Exec(ctx, "INSERT INTO knowledge_outbox(event_id,event_type,aggregate_id,payload,correlation) VALUES($1,$2,$3,$4,$5)", event.EventID, eventType, aggregate, eventJSON, encoded)
-	return err
+	return event, eventJSON, err
 }
 func (s *Store) CreateModule(ctx context.Context, actor string, req types.CreateModuleReq) (types.Module, error) {
 	return observe(ctx, s, "knowledge.module.create", operationID("module/create/"+actor, req.IdempotencyKey), req, func(ctx context.Context) (types.Module, error) {

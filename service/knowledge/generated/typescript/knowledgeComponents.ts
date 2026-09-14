@@ -509,6 +509,19 @@ export interface ReceiptEnvelope {
 	data: Receipt
 }
 
+export interface RecordSearchJudgmentReq {
+	search_id: string
+	content_revision_id: string
+	chunk_id: string
+	grade: string
+	rubric_version: string
+	reason: string
+	base_revision_id?: string
+	idempotency_key: string
+}
+export interface RecordSearchJudgmentReqParams {
+}
+
 export interface Release {
 	release_id: string
 	module_id: string
@@ -632,6 +645,39 @@ export interface SearchCitationReference {
 	locator: CitationLocation
 	quote_hash: string
 	state: string
+}
+
+export interface SearchJudgmentEventPath {
+}
+export interface SearchJudgmentEventPathParams {
+}
+
+export interface SearchJudgmentEventReceipt {
+	event_id: string
+	event_json: string
+	event_sha256: string
+}
+
+export interface SearchJudgmentEventReceiptEnvelope {
+	code: number
+	msg: string
+	data: SearchJudgmentEventReceipt
+}
+
+export interface SearchJudgmentReceipt {
+	judgment_id: string
+	revision_id: string
+	search_id: string
+	chunk_id: string
+	state: string
+	event_id: string
+	event_sha256: string
+}
+
+export interface SearchJudgmentReceiptEnvelope {
+	code: number
+	msg: string
+	data: SearchJudgmentReceipt
 }
 
 export interface SearchSnapshot {
@@ -777,4 +823,14 @@ export interface WithdrawReq {
 	idempotency_key: string
 }
 export interface WithdrawReqParams {
+}
+
+export interface WithdrawSearchJudgmentReq {
+	search_id: string
+	chunk_id: string
+	base_revision_id: string
+	reason: string
+	idempotency_key: string
+}
+export interface WithdrawSearchJudgmentReqParams {
 }

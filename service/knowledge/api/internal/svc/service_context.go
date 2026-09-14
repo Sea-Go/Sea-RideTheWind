@@ -120,6 +120,11 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 			return fail(err)
 		}
 	}
+	if c.SearchJudgments.Enabled {
+		if err = store.CheckSearchJudgmentSchema(ctx); err != nil {
+			return fail(err)
+		}
+	}
 	if c.SearchSummary.Endpoint != "" {
 		if err = store.CheckProductSearchSchema(ctx); err != nil {
 			return fail(err)

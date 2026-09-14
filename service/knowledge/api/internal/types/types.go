@@ -490,6 +490,18 @@ type ReceiptEnvelope struct {
 	Data Receipt `json:"data"`
 }
 
+type RecordSearchJudgmentReq struct {
+	ModuleId          string `path:"module_id"`
+	SearchId          string `json:"search_id"`
+	ContentRevisionId string `json:"content_revision_id"`
+	ChunkId           string `json:"chunk_id"`
+	Grade             string `json:"grade"`
+	RubricVersion     string `json:"rubric_version"`
+	Reason            string `json:"reason"`
+	BaseRevisionId    string `json:"base_revision_id,optional"`
+	IdempotencyKey    string `json:"idempotency_key"`
+}
+
 type Release struct {
 	ReleaseId         string             `json:"release_id"`
 	ModuleId          string             `json:"module_id"`
@@ -610,6 +622,38 @@ type SearchCitationReference struct {
 	Locator    CitationLocation `json:"locator"`
 	QuoteHash  string           `json:"quote_hash"`
 	State      string           `json:"state"`
+}
+
+type SearchJudgmentEventPath struct {
+	EventId string `path:"event_id"`
+}
+
+type SearchJudgmentEventReceipt struct {
+	EventId     string `json:"event_id"`
+	EventJson   string `json:"event_json"`
+	EventSha256 string `json:"event_sha256"`
+}
+
+type SearchJudgmentEventReceiptEnvelope struct {
+	Code int                        `json:"code"`
+	Msg  string                     `json:"msg"`
+	Data SearchJudgmentEventReceipt `json:"data"`
+}
+
+type SearchJudgmentReceipt struct {
+	JudgmentId  string `json:"judgment_id"`
+	RevisionId  string `json:"revision_id"`
+	SearchId    string `json:"search_id"`
+	ChunkId     string `json:"chunk_id"`
+	State       string `json:"state"`
+	EventId     string `json:"event_id"`
+	EventSha256 string `json:"event_sha256"`
+}
+
+type SearchJudgmentReceiptEnvelope struct {
+	Code int                   `json:"code"`
+	Msg  string                `json:"msg"`
+	Data SearchJudgmentReceipt `json:"data"`
 }
 
 type SearchSnapshot struct {
@@ -752,6 +796,15 @@ type WithdrawReq struct {
 	ModuleId       string `path:"module_id"`
 	TargetKind     string `json:"target_kind"`
 	TargetId       string `json:"target_id"`
+	Reason         string `json:"reason"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+type WithdrawSearchJudgmentReq struct {
+	ModuleId       string `path:"module_id"`
+	SearchId       string `json:"search_id"`
+	ChunkId        string `json:"chunk_id"`
+	BaseRevisionId string `json:"base_revision_id"`
 	Reason         string `json:"reason"`
 	IdempotencyKey string `json:"idempotency_key"`
 }
