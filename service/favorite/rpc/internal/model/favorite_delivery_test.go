@@ -490,6 +490,32 @@ func TestFavoriteDeliverySharedAuthorityFixture(t *testing.T) {
 			t.Fatalf("shared favorite handoff path must be new: %s", path)
 		}
 	}
+	if os.Getenv("FAVORITE_SHARED_FULL_CHAIN") == "1" {
+		// The existing BTW script starts this package's shared window. Route
+		// only the explicit test mode to the server-package fixture so its
+		// business event comes from real Article and Favorite network RPCs.
+		root, err := filepath.Abs("../../../../..")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+		defer cancel()
+		command := exec.CommandContext(ctx, "go", "test", "-mod=readonly", "-race", "-count=1", "-v",
+			"-run", "^TestFavoriteArticleWorkerSharedFixture$", "./service/favorite/rpc/internal/server")
+		command.Dir = root
+		command.Env = os.Environ()
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("full favorite shared fixture: %v\n%s", err, output)
+		}
+		for _, line := range strings.Split(string(output), "\n") {
+			if strings.Contains(line, "full favorite source ready:") ||
+				strings.Contains(line, "PASS: TestFavoriteArticleWorkerSharedFixture") {
+				t.Log(line)
+			}
+		}
+		return
+	}
 	store := favoriteFactStore(t)
 	authorityURL, authorityToken := startFavoriteAuthorityProcess(t, store)
 	const folderID, favoriteID int64 = 9007199254741991, 9007199254741993

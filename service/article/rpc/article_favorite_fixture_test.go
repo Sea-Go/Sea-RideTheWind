@@ -82,6 +82,7 @@ func TestFavoriteArticleFixture(t *testing.T) {
 	created := time.Unix(1700000000, 0).UTC()
 	for _, article := range []model.Article{
 		{ID: "article-live", Title: "source draft r2", Content: "source-r2.md", AuthorID: "1001", Status: int32(articlepb.ArticleStatus_REVIEWING), CreatedAt: created},
+		{ID: "article-shared-authority", Title: "source draft r2", Content: "source-r2.md", AuthorID: "1001", Status: int32(articlepb.ArticleStatus_REVIEWING), CreatedAt: created},
 		{ID: "article-draft", Title: "private draft", Content: "draft.md", AuthorID: "1001", Status: int32(articlepb.ArticleStatus_DRAFT), CreatedAt: created},
 		{ID: "article-withdrawn", Title: "withdrawn", Content: "withdrawn.md", AuthorID: "1001", Status: int32(articlepb.ArticleStatus_REVIEWING), CreatedAt: created},
 	} {
@@ -97,11 +98,13 @@ func TestFavoriteArticleFixture(t *testing.T) {
 			ContentSHA256: hex.EncodeToString(sum[:]), Title: title, Markdown: body, PublishedAt: created,
 			SyncEventID: articleID + "-sync-r" + strconv.Itoa(revision)}).Error
 	}
-	if err := seedRevision("article-live", 1, "published r1"); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Create(&model.ArticlePublication{ArticleID: "article-live", CurrentRevision: "article-live:r1", PointerVersion: 1, State: "published", LastEventID: "article-live-r1"}).Error; err != nil {
-		t.Fatal(err)
+	for _, id := range []string{"article-live", "article-shared-authority"} {
+		if err := seedRevision(id, 1, "published r1"); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Create(&model.ArticlePublication{ArticleID: id, CurrentRevision: id + ":r1", PointerVersion: 1, State: "published", LastEventID: id + "-r1"}).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := seedRevision("article-withdrawn", 1, "withdrawn r1"); err != nil {
 		t.Fatal(err)
@@ -124,13 +127,16 @@ func TestFavoriteArticleFixture(t *testing.T) {
 			http.Error(w, "method", http.StatusMethodNotAllowed)
 			return
 		}
-		if err := seedRevision("article-live", 2, "published r2"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if err := db.Model(&model.ArticlePublication{}).Where("article_id = ?", "article-live").Updates(map[string]any{"current_revision": "article-live:r2", "pointer_version": 2, "last_event_id": "article-live-r2"}).Error; err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		for _, id := range []string{"article-live", "article-shared-authority"} {
+			if err := seedRevision(id, 2, "published r2"); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if err := db.Model(&model.ArticlePublication{}).Where("article_id = ?", id).Updates(map[string]any{
+				"current_revision": id + ":r2", "pointer_version": 2, "last_event_id": id + "-r2"}).Error; err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
