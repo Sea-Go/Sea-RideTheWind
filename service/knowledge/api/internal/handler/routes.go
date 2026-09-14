@@ -183,6 +183,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/answer-sessions/:session_id/accepted-answers/:answer_id/citations",
 				Handler: product.GetProductAnswerCitationStatesHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/answer-sessions/:session_id/searches",
+				Handler: product.CreateProductSearchHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/answer-sessions/:session_id/searches/:search_id",
+				Handler: product.GetProductSearchHandler(serverCtx),
+			},
 		},
 		rest.WithJwt(serverCtx.Config.UserAuth.AccessSecret),
 		rest.WithPrefix("/v1/knowledge"),

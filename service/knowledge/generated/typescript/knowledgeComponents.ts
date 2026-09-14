@@ -437,6 +437,47 @@ export interface ProductAnswerCitationStatesEnvelope {
 	data: ProductAnswerCitationStates
 }
 
+export interface ProductSearchCitation {
+	evidence_id: string
+	source_kind: string
+	content_id: string
+	revision_id: string
+	locator: CitationLocation
+	original: CitationObject
+	quote: string
+	quote_hash: string
+}
+
+export interface ProductSearchEnvelope {
+	code: number
+	msg: string
+	data: ProductSearchResult
+}
+
+export interface ProductSearchPath {
+}
+export interface ProductSearchPathParams {
+}
+
+export interface ProductSearchReq {
+	module_id: string
+	query: string
+	depth: string
+	intelligence: string
+	idempotency_key: string
+}
+export interface ProductSearchReqParams {
+}
+
+export interface ProductSearchResult {
+	search_id: string
+	answer_id: string
+	status: string
+	answer?: string
+	citations: Array<ProductSearchCitation>
+	citation_receipt_ref?: string
+}
+
 export interface PublishedRevisionPath {
 }
 export interface PublishedRevisionPathParams {

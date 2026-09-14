@@ -418,6 +418,46 @@ type ProductAnswerCitationStatesEnvelope struct {
 	Data ProductAnswerCitationStates `json:"data"`
 }
 
+type ProductSearchCitation struct {
+	EvidenceId string           `json:"evidence_id"`
+	SourceKind string           `json:"source_kind"`
+	ContentId  string           `json:"content_id"`
+	RevisionId string           `json:"revision_id"`
+	Locator    CitationLocation `json:"locator"`
+	Original   CitationObject   `json:"original"`
+	Quote      string           `json:"quote"`
+	QuoteHash  string           `json:"quote_hash"`
+}
+
+type ProductSearchEnvelope struct {
+	Code int                 `json:"code"`
+	Msg  string              `json:"msg"`
+	Data ProductSearchResult `json:"data"`
+}
+
+type ProductSearchPath struct {
+	SessionId string `path:"session_id"`
+	SearchId  string `path:"search_id"`
+}
+
+type ProductSearchReq struct {
+	SessionId      string `path:"session_id"`
+	ModuleId       string `json:"module_id"`
+	Query          string `json:"query"`
+	Depth          string `json:"depth"`
+	Intelligence   string `json:"intelligence"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+type ProductSearchResult struct {
+	SearchId           string                  `json:"search_id"`
+	AnswerId           string                  `json:"answer_id"`
+	Status             string                  `json:"status"`
+	Answer             string                  `json:"answer,optional,omitempty"`
+	Citations          []ProductSearchCitation `json:"citations"`
+	CitationReceiptRef string                  `json:"citation_receipt_ref,optional,omitempty"`
+}
+
 type PublishedRevisionPath struct {
 	ModuleId   string `path:"module_id"`
 	ReleaseId  string `path:"release_id"`

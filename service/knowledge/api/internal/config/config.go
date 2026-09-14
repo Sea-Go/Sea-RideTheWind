@@ -22,7 +22,15 @@ type Config struct {
 	UserAuth struct {
 		AccessSecret string
 	}
-	UserRpc          zrpc.RpcClientConf
+	UserRpc       zrpc.RpcClientConf
+	SearchSummary struct {
+		Endpoint               string `json:",optional"`
+		ScopeKey               string `json:",optional"`
+		FastTimeoutMillis      int    `json:",default=30000"`
+		DetailedTimeoutMillis  int    `json:",default=90000"`
+		AllowPartial           bool   `json:",default=false"`
+		AllowLowerIntelligence bool   `json:",default=false"`
+	}
 	AdministratorIDs []string
 	WorkerToken      string
 	Postgres         struct {

@@ -2,7 +2,7 @@ Name: knowledge-api
 Host: 127.0.0.1
 Port: 8186
 Mode: dev
-Timeout: 15000
+Timeout: 120000
 MaxBytes: 16777216
 Log:
   Mode: console
@@ -23,6 +23,13 @@ UserRpc:
     Hosts:
       - ${USER_RPC_ETCD_HOST}
     Key: user.rpc
+SearchSummary:
+  Endpoint: ${BTW_SEARCH_SUMMARY_ENDPOINT}
+  ScopeKey: ${BTW_SEARCH_SCOPE_KEY}
+  FastTimeoutMillis: 30000
+  DetailedTimeoutMillis: 90000
+  AllowPartial: false
+  AllowLowerIntelligence: false
 AdministratorIDs:
   - ${KNOWLEDGE_ADMIN_ID}
 WorkerToken: ${KNOWLEDGE_WORKER_TOKEN}

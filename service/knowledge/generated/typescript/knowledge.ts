@@ -253,6 +253,23 @@ export function getProductAnswerCitationStates(params: components.ProductAccepte
 
 /**
  * @description
+ * @param params
+ * @param req
+ */
+export function createProductSearch(params: components.ProductSearchReqParams, req: components.ProductSearchReq, session_id: string) {
+	return webapi.post<components.ProductSearchEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/searches`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getProductSearch(params: components.ProductSearchPathParams, session_id: string, search_id: string) {
+	return webapi.get<components.ProductSearchEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/searches/${search_id}`, params)
+}
+
+/**
+ * @description
  * @param req
  */
 export function commitAcceptedAnswer(req: components.CommitAcceptedAnswerReq) {

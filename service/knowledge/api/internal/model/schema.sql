@@ -98,6 +98,22 @@ CREATE TABLE IF NOT EXISTS knowledge_accepted_answers (
 );
 CREATE INDEX IF NOT EXISTS knowledge_accepted_answers_session_order ON knowledge_accepted_answers
  (authority_id,tenant_id,subject_id,session_id,accepted_ordinal);
+-- A public product key binds one canonical request and the manually published
+-- snapshot before any BTW call. A lease is only dispatch ownership; an accepted
+-- answer is the authoritative completion and can recover after a lost reply.
+CREATE TABLE IF NOT EXISTS knowledge_product_search_operations (
+ authority_id text NOT NULL, tenant_id text NOT NULL, subject_id text NOT NULL,
+ session_id text NOT NULL, operation_key text NOT NULL, request_hash text NOT NULL,
+ request_json jsonb NOT NULL, snapshot jsonb NOT NULL,
+ search_id text NOT NULL UNIQUE, answer_id text NOT NULL UNIQUE,
+ status text NOT NULL CHECK(status IN ('pending','running','failed','committed')),
+ attempt bigint NOT NULL DEFAULT 0, lease_token text, lease_until timestamptz,
+ last_error_code text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(authority_id,tenant_id,subject_id,session_id,operation_key)
+);
+CREATE INDEX IF NOT EXISTS knowledge_product_search_session ON knowledge_product_search_operations
+ (authority_id,tenant_id,subject_id,session_id,created_at);
 CREATE TABLE IF NOT EXISTS knowledge_answer_citations (
  answer_id text NOT NULL REFERENCES knowledge_accepted_answers(answer_id),
  search_id text NOT NULL REFERENCES knowledge_search_citations(search_id),
