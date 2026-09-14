@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"sea-try-go/service/article/rpc/articleservice"
+	articlepb "sea-try-go/service/article/rpc/pb"
 	"sea-try-go/service/common/logger"
 	favoritecommon "sea-try-go/service/favorite/common"
 	"sea-try-go/service/favorite/rpc/internal/metrics"
@@ -39,8 +40,9 @@ const (
 )
 
 type articleSnapshot struct {
-	Title string
-	Cover string
+	Title      string
+	Cover      string
+	RevisionID string // empty only for a legacy PUBLISHED row without a publication pointer
 }
 
 func userLogOption(userID int64) logger.LogOption {
@@ -129,8 +131,9 @@ func resolveArticleSnapshot(ctx context.Context, svcCtx *svc.ServiceContext, tar
 	span.SetAttributes(attribute.String("biz.article_id", normalizedTargetID))
 
 	resp, err := svcCtx.ArticleRpc.GetArticle(depCtx, &articleservice.GetArticleRequest{
-		ArticleId: normalizedTargetID,
-		IncrView:  false,
+		ArticleId:  normalizedTargetID,
+		IncrView:   false,
+		PublicOnly: true,
 	})
 	if err != nil {
 		span.RecordError(err)
@@ -146,11 +149,31 @@ func resolveArticleSnapshot(ctx context.Context, svcCtx *svc.ServiceContext, tar
 		metrics.ObserveOp("dependency", "article_get", resultFail)
 		return articleSnapshot{}, favoritecommon.GRPCError(codes.NotFound, favoritecommon.ErrorNotFound)
 	}
+	article := resp.Article
+	if article.Id != normalizedTargetID || article.Status != articlepb.ArticleStatus_PUBLISHED {
+		metrics.ObserveOp("dependency", "article_get", resultFail)
+		return articleSnapshot{}, favoritecommon.GRPCError(codes.Unavailable, favoritecommon.ErrorServerCommon)
+	}
+	metadata := article.GetExtInfo()
+	revisionID := strings.TrimSpace(metadata["published_revision_id"])
+	if revisionID != "" {
+		prefix := normalizedTargetID + ":r"
+		number, parseErr := strconv.ParseUint(strings.TrimPrefix(revisionID, prefix), 10, 64)
+		if !strings.HasPrefix(revisionID, prefix) || parseErr != nil || number == 0 ||
+			metadata["publication_gap"] != "" {
+			metrics.ObserveOp("dependency", "article_get", resultFail)
+			return articleSnapshot{}, favoritecommon.GRPCError(codes.Unavailable, favoritecommon.ErrorServerCommon)
+		}
+	} else if metadata["publication_gap"] != "legacy_revision_missing" {
+		metrics.ObserveOp("dependency", "article_get", resultFail)
+		return articleSnapshot{}, favoritecommon.GRPCError(codes.Unavailable, favoritecommon.ErrorServerCommon)
+	}
 
 	metrics.ObserveOp("dependency", "article_get", resultSuccess)
 	return articleSnapshot{
-		Title: strings.TrimSpace(resp.Article.Title),
-		Cover: articleCover(resp.Article),
+		Title:      strings.TrimSpace(article.Title),
+		Cover:      articleCover(article),
+		RevisionID: revisionID,
 	}, nil
 }
 
