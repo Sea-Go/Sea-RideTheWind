@@ -201,7 +201,7 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 		dcRuntime, baseline.Built, baseline.Quote)
 	oldResult := signed(oldAPI.URL, baseline.Quote, "h06-baseline-before", baseline.Quote,
 		baseline.Source.RevisionId, baseline.Source.EntityId)
-	oldAPI.AssertServed(t)
+	oldAPI.AssertSignedSearch(t, oldResult.SearchId, oldResult.AnswerId)
 
 	var activated types.ReleaseState
 	request("PUT", "/v1/knowledge/modules/"+moduleID+"/activation", adminToken,
@@ -216,7 +216,7 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 	newAPI := startRealBTWSearchAPIProcess(t, dir, btwRoot, rtwBase, workerToken, dcRuntime, builtNew, "south")
 	newResult := signed(newAPI.URL, "south", "h06-new-release-south", "south",
 		newSource.RevisionId, newSource.EntityId)
-	newAPI.AssertServed(t)
+	newAPI.AssertSignedSearch(t, newResult.SearchId, newResult.AnswerId)
 	var history types.AcceptedAnswersPage
 	request("GET", historyPath+"?limit=20", productToken, nil, &history, 200)
 	foundOld, foundNew := false, false
@@ -253,7 +253,7 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 		dcRuntime, baseline.Built, baseline.Quote)
 	rollbackResult := signed(rollbackAPI.URL, baseline.Quote, "h06-baseline-after", baseline.Quote,
 		baseline.Source.RevisionId, baseline.Source.EntityId)
-	rollbackAPI.AssertServed(t)
+	rollbackAPI.AssertSignedSearch(t, rollbackResult.SearchId, rollbackResult.AnswerId)
 	request("GET", historyPath+"?limit=20", productToken, nil, &history, 200)
 	foundOld, foundNew, foundRollback := false, false, false
 	for _, item := range history.Items {
@@ -297,6 +297,9 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 		"new_quote":                newResult.Citations[0].Quote,
 		"old_after_quote":          rollbackResult.Citations[0].Quote,
 		"new_answer_revision_only": true, "history_old_new_rollback_present": true,
+		"old_before_api_log": oldAPI.LogEvidencePath,
+		"new_api_log":        newAPI.LogEvidencePath,
+		"old_after_api_log":  rollbackAPI.LogEvidencePath,
 	})
 	if err != nil {
 		t.Fatal(err)
