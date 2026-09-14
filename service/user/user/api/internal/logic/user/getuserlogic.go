@@ -42,6 +42,12 @@ func (l *GetuserLogic) Getuser(req *types.GetUserReq) (resp *types.GetUserResp, 
 		if errors.Is(err, identity.ErrUserNotFound) {
 			return nil, errmsg.ErrorUserNotExist
 		}
+		if errors.Is(err, identity.ErrUserInactive) {
+			return nil, errmsg.ErrorUserBanned
+		}
+		if errors.Is(err, identity.ErrStatusUnavailable) {
+			return nil, errmsg.CodeServerBusy
+		}
 		if errors.Is(err, identity.ErrIdentityMismatch) {
 			return nil, errmsg.ErrorServerCommon
 		}

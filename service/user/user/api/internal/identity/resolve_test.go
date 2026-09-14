@@ -18,7 +18,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
+
+func statusPointer(status int64) *int64 { return &status }
 
 type userReaderStub struct {
 	called int
@@ -40,7 +43,7 @@ func TestResolveSubjectRefFromVerifiedGoZeroJWT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := &userReaderStub{want: 9123, result: &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123, Username: "member"}}}
+	reader := &userReaderStub{want: 9123, result: &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123, Username: "member", Status: statusPointer(0)}}}
 	var resolved SubjectRef
 	var resolveErr error
 	h := handler.Authorize(secret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -91,6 +94,9 @@ func TestResolveUserRejectsInvalidOrMismatchedIdentity(t *testing.T) {
 		{"nil-response", nil, nil, ErrUserNotFound},
 		{"nil-user", &pb.GetUserResp{Found: true}, nil, ErrUserNotFound},
 		{"mismatched-uid", &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 7777}}, nil, ErrIdentityMismatch},
+		{"old-rpc-missing-status", &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123}}, nil, ErrStatusUnavailable},
+		{"banned", &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123, Status: statusPointer(1)}}, nil, ErrUserInactive},
+		{"unknown-nonzero-status", &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123, Status: statusPointer(2)}}, nil, ErrUserInactive},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			stub := &userReaderStub{result: tc.resp, err: tc.err}
@@ -109,9 +115,35 @@ func TestResolveUserRejectsInvalidOrMismatchedIdentity(t *testing.T) {
 
 func TestResolveSubjectRefKeepsDecimalUIDPrecision(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "userId", json.Number("9223372036854775807"))
-	stub := &userReaderStub{result: &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: math.MaxInt64}}}
+	stub := &userReaderStub{result: &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: math.MaxInt64, Status: statusPointer(0)}}}
 	ref, err := ResolveSubjectRef(ctx, stub)
 	if err != nil || ref.SubjectID != "9223372036854775807" || ref.AuthorityID != AuthorityID || ref.TenantID != PlatformTenantID {
 		t.Fatalf("large UID resolution=%+v error=%v", ref, err)
+	}
+}
+
+func TestUserStatusProto3Presence(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   *pb.UserInfo
+		want *int64
+	}{
+		{"old-provider", &pb.UserInfo{Uid: 9123}, nil},
+		{"active", &pb.UserInfo{Uid: 9123, Status: statusPointer(0)}, statusPointer(0)},
+		{"banned", &pb.UserInfo{Uid: 9123, Status: statusPointer(1)}, statusPointer(1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wire, err := proto.Marshal(tc.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got pb.UserInfo
+			if err := proto.Unmarshal(wire, &got); err != nil {
+				t.Fatal(err)
+			}
+			if (got.Status == nil) != (tc.want == nil) || got.GetStatus() != tc.in.GetStatus() {
+				t.Fatalf("wire status presence changed: in=%v out=%v", tc.in.Status, got.Status)
+			}
+		})
 	}
 }

@@ -43,4 +43,8 @@ if [[ "${KNOWLEDGE_REAL_USER_GATE:-0}" == 1 ]]; then
 fi
 go test -race ./service/knowledge/... -count=1 -v | tee "$knowledge_tmp/test.log"
 go vet ./service/knowledge/...
+if [[ "${KNOWLEDGE_REAL_USER_GATE:-0}" == 1 ]]; then
+  go test -race ./service/user/user/... -count=1 -v | tee "$knowledge_tmp/user-test.log"
+  go vet ./service/user/user/...
+fi
 git diff --check
