@@ -294,3 +294,27 @@ export function getRelease(params: components.ReleasePathParams, release_id: str
 export function getRevision(params: components.RevisionPathParams, revision_id: string) {
 	return webapi.get<components.RevisionEnvelope>(`/internal/v1/knowledge/revisions/${revision_id}`, params)
 }
+
+/**
+ * @description
+ * @param req
+ */
+export function acceptSearchCitations(req: components.AcceptSearchCitationsReq) {
+	return webapi.post<components.SearchCitationReceiptEnvelope>(`/internal/v1/knowledge/search-citations`, req)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getSearchCitations(params: components.SearchCitationPathParams, search_id: string) {
+	return webapi.get<components.SearchCitationRecordEnvelope>(`/internal/v1/knowledge/search-citations/${search_id}`, params)
+}
+
+/**
+ * @description
+ * @param req
+ */
+export function readSearchSource(req: components.ReadSearchSourceReq) {
+	return webapi.post<components.CitationChunkEnvelope>(`/internal/v1/knowledge/search-sources/read`, req)
+}

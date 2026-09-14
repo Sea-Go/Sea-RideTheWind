@@ -36,7 +36,8 @@ var operations = map[string]bool{
 	"knowledge.build.create": true, "knowledge.build.claim": true, "knowledge.build.accept": true, "knowledge.build.cancel": true,
 	"knowledge.compile.create": true, "knowledge.compile.claim": true, "knowledge.compile.accept": true, "knowledge.compile.cancel": true,
 	"knowledge.release.activate": true, "knowledge.content.withdraw": true, "knowledge.outbox.deliver": true,
-	"knowledge.outbox.poll": true,
+	"knowledge.outbox.poll":        true,
+	"knowledge.search.source.read": true, "knowledge.search.citations.accept": true, "knowledge.search.citations.get": true,
 }
 
 func (r *Runtime) PollFailure(ctx context.Context, err error) {

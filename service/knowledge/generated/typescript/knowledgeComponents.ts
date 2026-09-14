@@ -31,6 +31,12 @@ export interface AcceptCompileReq {
 export interface AcceptCompileReqParams {
 }
 
+export interface AcceptSearchCitationsReq {
+	search_id: string
+	pack_json: string
+	pack_hash: string
+}
+
 export interface ActivateReq {
 	release_id: string
 	build_id: string
@@ -80,6 +86,41 @@ export interface CancelCompileReq {
 	idempotency_key: string
 }
 export interface CancelCompileReqParams {
+}
+
+export interface CitationChunk {
+	chunk_id: string
+	revision_id: string
+	content_id: string
+	source_kind: string
+	original: CitationObject
+	location: CitationLocation
+	text: string
+	text_hash: string
+	encoding_key: string
+	duplicate_of?: string
+	previous_id?: string
+	next_id?: string
+	required: boolean
+}
+
+export interface CitationChunkEnvelope {
+	code: number
+	msg: string
+	data: CitationChunk
+}
+
+export interface CitationLocation {
+	locator: string
+	original_byte_start: number
+	original_byte_end: number
+	normalized_rune_start: number
+	normalized_rune_end: number
+}
+
+export interface CitationObject {
+	key: string
+	sha256: string
 }
 
 export interface ClaimBuildReq {
@@ -318,6 +359,15 @@ export interface PublishedRevisionsReqParams {
 	cursor?: string
 }
 
+export interface ReadSearchSourceReq {
+	module_id: string
+	release_id: string
+	generation: number
+	publication_revision: string
+	revision_id: string
+	chunk_id: string
+}
+
 export interface Receipt {
 	accepted: boolean
 }
@@ -405,6 +455,52 @@ export interface RevisionEnvelope {
 export interface RevisionPath {
 }
 export interface RevisionPathParams {
+}
+
+export interface SearchCitationPath {
+}
+export interface SearchCitationPathParams {
+}
+
+export interface SearchCitationReceipt {
+	search_id: string
+	pack_hash: string
+	durable_ref: string
+}
+
+export interface SearchCitationReceiptEnvelope {
+	code: number
+	msg: string
+	data: SearchCitationReceipt
+}
+
+export interface SearchCitationRecord {
+	search_id: string
+	pack_hash: string
+	durable_ref: string
+	module_id: string
+	release_id: string
+	generation: number
+	publication_revision: string
+	evidence: Array<SearchCitationReference>
+}
+
+export interface SearchCitationRecordEnvelope {
+	code: number
+	msg: string
+	data: SearchCitationRecord
+}
+
+export interface SearchCitationReference {
+	evidence_id: string
+	source_kind: string
+	content_id: string
+	revision_id: string
+	chunk_id: string
+	original: CitationObject
+	locator: CitationLocation
+	quote_hash: string
+	state: string
 }
 
 export interface SourceRef {

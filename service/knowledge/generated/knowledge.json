@@ -1062,6 +1062,397 @@
         }
       }
     },
+    "/internal/v1/knowledge/search-citations": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "AcceptSearchCitations",
+        "operationId": "workerAcceptSearchCitations",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "search_id",
+                "pack_json",
+                "pack_hash"
+              ],
+              "properties": {
+                "pack_hash": {
+                  "type": "string"
+                },
+                "pack_json": {
+                  "type": "string"
+                },
+                "search_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "search_id",
+                    "pack_hash",
+                    "durable_ref"
+                  ],
+                  "properties": {
+                    "durable_ref": {
+                      "type": "string"
+                    },
+                    "pack_hash": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/search-citations/{search_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetSearchCitations",
+        "operationId": "workerGetSearchCitations",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "search_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "search_id",
+                    "pack_hash",
+                    "durable_ref",
+                    "module_id",
+                    "release_id",
+                    "generation",
+                    "publication_revision",
+                    "evidence"
+                  ],
+                  "properties": {
+                    "durable_ref": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "evidence_id",
+                          "source_kind",
+                          "content_id",
+                          "revision_id",
+                          "chunk_id",
+                          "original",
+                          "locator",
+                          "quote_hash",
+                          "state"
+                        ],
+                        "properties": {
+                          "chunk_id": {
+                            "type": "string"
+                          },
+                          "content_id": {
+                            "type": "string"
+                          },
+                          "evidence_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "object",
+                            "required": [
+                              "locator",
+                              "original_byte_start",
+                              "original_byte_end",
+                              "normalized_rune_start",
+                              "normalized_rune_end"
+                            ],
+                            "properties": {
+                              "locator": {
+                                "type": "string"
+                              },
+                              "normalized_rune_end": {
+                                "type": "integer"
+                              },
+                              "normalized_rune_start": {
+                                "type": "integer"
+                              },
+                              "original_byte_end": {
+                                "type": "integer"
+                              },
+                              "original_byte_start": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "original": {
+                            "type": "object",
+                            "required": [
+                              "key",
+                              "sha256"
+                            ],
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "quote_hash": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          },
+                          "source_kind": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "pack_hash": {
+                      "type": "string"
+                    },
+                    "publication_revision": {
+                      "type": "string"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/search-sources/read": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ReadSearchSource",
+        "operationId": "workerReadSearchSource",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "module_id",
+                "release_id",
+                "generation",
+                "publication_revision",
+                "revision_id",
+                "chunk_id"
+              ],
+              "properties": {
+                "chunk_id": {
+                  "type": "string"
+                },
+                "generation": {
+                  "type": "integer"
+                },
+                "module_id": {
+                  "type": "string"
+                },
+                "publication_revision": {
+                  "type": "string"
+                },
+                "release_id": {
+                  "type": "string"
+                },
+                "revision_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "chunk_id",
+                    "revision_id",
+                    "content_id",
+                    "source_kind",
+                    "original",
+                    "location",
+                    "text",
+                    "text_hash",
+                    "encoding_key",
+                    "required"
+                  ],
+                  "properties": {
+                    "chunk_id": {
+                      "type": "string"
+                    },
+                    "content_id": {
+                      "type": "string"
+                    },
+                    "duplicate_of": {
+                      "type": "string"
+                    },
+                    "encoding_key": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "locator",
+                        "original_byte_start",
+                        "original_byte_end",
+                        "normalized_rune_start",
+                        "normalized_rune_end"
+                      ],
+                      "properties": {
+                        "locator": {
+                          "type": "string"
+                        },
+                        "normalized_rune_end": {
+                          "type": "integer"
+                        },
+                        "normalized_rune_start": {
+                          "type": "integer"
+                        },
+                        "original_byte_end": {
+                          "type": "integer"
+                        },
+                        "original_byte_start": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "next_id": {
+                      "type": "string"
+                    },
+                    "original": {
+                      "type": "object",
+                      "required": [
+                        "key",
+                        "sha256"
+                      ],
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "sha256": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "previous_id": {
+                      "type": "string"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "source_kind": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "text_hash": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/knowledge/builds/{build_id}/cancel": {
       "post": {
         "consumes": [
