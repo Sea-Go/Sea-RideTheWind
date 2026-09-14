@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
-	"sea-try-go/service/knowledge/api/internal/telemetry"
 	"strings"
+	"time"
 
+	"sea-try-go/service/knowledge/api/internal/telemetry"
 	"sea-try-go/service/knowledge/api/internal/types"
 
 	"github.com/jackc/pgx/v5"
@@ -165,22 +167,40 @@ func sameFence(b types.Build, generation, cancel int64, hash string) bool {
 }
 func (s *Store) ClaimBuild(ctx context.Context, req types.ClaimBuildReq) (types.Build, error) {
 	return observe(ctx, s, "knowledge.build.claim", "result:"+req.BuildId, req, func(ctx context.Context) (types.Build, error) {
-		if req.AttemptId == "" || req.LeaseEpoch <= 0 {
-			return types.Build{}, invalid("attempt and positive lease_epoch required")
+		if req.AttemptId == "" || req.LeaseEpoch < 0 {
+			return types.Build{}, invalid("attempt and nonnegative requested lease_epoch required")
 		}
 		return s.mutateBuild(ctx, req.BuildId, func(tx pgx.Tx, b *types.Build) error {
 			if b.State != "BUILDING" || !sameFence(*b, req.Generation, req.CancelVersion, req.ManifestHash) {
 				return conflict("build is terminal, superseded or cancelled")
 			}
-			if req.LeaseEpoch < b.LeaseEpoch || (req.LeaseEpoch == b.LeaseEpoch && req.AttemptId != b.AttemptId) {
-				return conflictCode("FENCE_CONFLICT", "stale attempt lease")
-			}
 			if !leaseValid(req.LeaseExpiresAt) {
 				return invalid("lease expiry must be a future RFC3339 timestamp")
 			}
+			if req.AttemptId == b.AttemptId {
+				// Same-attempt lease renewal preserves the RTW fence. A lost
+				// renewal reply replays at the same expiry; neither an earlier
+				// expiry nor an expired old lease can revive execution authority.
+				currentExpiry, parseErr := time.Parse(time.RFC3339Nano, b.LeaseExpiresAt)
+				requestedExpiry, _ := time.Parse(time.RFC3339Nano, req.LeaseExpiresAt)
+				if b.LeaseEpoch < 1 || !leaseValid(b.LeaseExpiresAt) ||
+					parseErr != nil || requestedExpiry.Before(currentExpiry) ||
+					(req.LeaseEpoch != 0 && req.LeaseEpoch != b.LeaseEpoch) {
+					return conflictCode("FENCE_CONFLICT", "claim replay differs or expired")
+				}
+			} else {
+				// RTW can preempt a live old attempt when DC dispatched a newer
+				// technical claim. The old result is fenced at AcceptBuild; a
+				// Prepare->Index job handoff need not burn attempts waiting for the
+				// former technical lease to expire.
+				if b.LeaseEpoch == math.MaxInt64 ||
+					(req.LeaseEpoch != 0 && req.LeaseEpoch != b.LeaseEpoch+1) {
+					return conflictCode("FENCE_CONFLICT", "new attempt must use RTW next build fence")
+				}
+				b.LeaseEpoch++
+			}
 			b.LeaseExpiresAt = req.LeaseExpiresAt
 			b.AttemptId = req.AttemptId
-			b.LeaseEpoch = req.LeaseEpoch
 			return nil
 		})
 
