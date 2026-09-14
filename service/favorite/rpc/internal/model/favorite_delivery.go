@@ -98,7 +98,16 @@ func validFavoriteDelivery(row FavoriteFactOutbox, event FavoriteWireEvent) bool
 		return false
 	}
 	_, err := time.Parse(time.RFC3339Nano, event.OccurredAt)
-	return err == nil
+	if err != nil {
+		return false
+	}
+	var payload authorityPayload
+	if strictFavoriteJSON(event.Payload, &payload) != nil {
+		return false
+	}
+	favoriteID, favoriteOK := parseAuthorityID(payload.FavoriteID)
+	_, folderOK := parseAuthorityID(payload.FolderID)
+	return favoriteOK && folderOK && favoriteID == row.FavoriteID
 }
 
 func validFavoriteReceipt(event FavoriteWireEvent, receipt FavoriteTechnicalReceipt) (time.Time, bool) {
