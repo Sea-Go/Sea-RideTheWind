@@ -22,11 +22,23 @@ import (
 )
 
 type formalSearchAPI struct {
-	URL         string
-	MetricsURL  string
-	modelCalls  *atomic.Int64
-	liveGateway bool
-	served      atomic.Bool
+	URL              string
+	MetricsURL       string
+	LogEvidencePath  string
+	modelCalls       *atomic.Int64
+	liveGateway      bool
+	served           atomic.Bool
+	expectedSearchID string
+	expectedAnswerID string
+}
+
+func (p *formalSearchAPI) AssertSignedSearch(t *testing.T, searchID, answerID string) {
+	t.Helper()
+	if searchID == "" || answerID == "" {
+		t.Fatal("formal cmd/api signed search identity is incomplete")
+	}
+	p.expectedSearchID, p.expectedAnswerID = searchID, answerID
+	p.AssertServed(t)
 }
 
 // AssertServed runs only after RTW has received a cited answer through this
@@ -61,6 +73,10 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 	if len(built.APIIndexSettings) == 0 || len(built.Indexes) != 3 || expectedQuote == "" {
 		t.Fatal("formal cmd/api requires actual three-lane index settings and expected quote")
 	}
+	// Each independently running API owns its executable, configuration and
+	// JSONL file. A shared O_TRUNC path lets live file descriptors overwrite
+	// each other's offsets and splice two otherwise valid log records together.
+	instanceDir := t.TempDir()
 	runtimeRaw, err := os.ReadFile(dcRuntimePath)
 	if err != nil {
 		t.Fatal(err)
@@ -72,11 +88,11 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 	if err = json.Unmarshal(runtimeRaw, &dc); err != nil || dc.Endpoint == "" || dc.Token == "" {
 		t.Fatal("disposable DataCenter BGE runtime lacks endpoint or token")
 	}
-	indexFile := filepath.Join(dir, "btw-search-api-index.json")
+	indexFile := filepath.Join(instanceDir, "btw-search-api-index.json")
 	if err = os.WriteFile(indexFile, built.APIIndexSettings, 0600); err != nil {
 		t.Fatal(err)
 	}
-	policyFile := filepath.Join(dir, "btw-search-api-policy.json")
+	policyFile := filepath.Join(instanceDir, "btw-search-api-policy.json")
 	policy := `{"version":"real-bge-three-lane-fast-low-v1","fast_low":{"max_batches":1,"max_subqueries":1,"top_k_per_lane":2,"max_evidence":1,"wall_time":"25s"}}`
 	if err = os.WriteFile(policyFile, []byte(policy), 0600); err != nil {
 		t.Fatal(err)
@@ -199,7 +215,7 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(otlp.Close)
-	binary := filepath.Join(dir, "btw-formal-search-api")
+	binary := filepath.Join(instanceDir, "btw-formal-search-api")
 	compile := exec.Command("go", "build", "-race", "-o", binary, "./cmd/api")
 	compile.Dir = btwRoot
 	if output, err := compile.CombinedOutput(); err != nil {
@@ -213,7 +229,11 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 	metricsAddr := freeSearchSocket(t)
 	process := &formalSearchAPI{URL: "http://" + apiAddr, MetricsURL: "http://" + metricsAddr,
 		modelCalls: &modelCalls, liveGateway: liveGateway}
-	logPath := filepath.Join(dir, "btw-formal-search-api.jsonl")
+	if evidence := os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"); evidence != "" {
+		process.LogEvidencePath = filepath.Join(evidence,
+			"formal-search-api-"+strings.ReplaceAll(apiAddr, ":", "-")+".jsonl")
+	}
+	logPath := filepath.Join(instanceDir, "btw-formal-search-api.jsonl")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		t.Fatal(err)
@@ -255,19 +275,17 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 		}
 		logFile.Close()
 		logs, _ := os.ReadFile(logPath)
+		validateFormalSearchJSONL(t, logs, apiAddr, process.expectedSearchID, process.expectedAnswerID)
 		for _, secret := range []string{workerToken, dc.Token, modelKey} {
 			if secret != "" && bytes.Contains(logs, []byte(secret)) {
 				t.Error("formal cmd/api log contains a configured credential")
 			}
 		}
-		if process.served.Load() {
-			if evidence := os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"); evidence != "" {
-				if err := os.MkdirAll(evidence, 0700); err != nil {
-					t.Error(err)
-				} else if err := os.WriteFile(filepath.Join(evidence,
-					"formal-search-api-"+strings.ReplaceAll(apiAddr, ":", "-")+".jsonl"), logs, 0600); err != nil {
-					t.Error(err)
-				}
+		if process.served.Load() && process.LogEvidencePath != "" {
+			if err := os.MkdirAll(filepath.Dir(process.LogEvidencePath), 0700); err != nil {
+				t.Error(err)
+			} else if err := os.WriteFile(process.LogEvidencePath, logs, 0600); err != nil {
+				t.Error(err)
 			}
 		}
 		if !bytes.Contains(logs, []byte(`"event":"search.api.started"`)) ||
@@ -335,6 +353,73 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 		t.Fatalf("formal cmd/api metrics socket invalid: status=%d err=%v", metrics.StatusCode, err)
 	}
 	return process
+}
+
+func validateFormalSearchJSONL(t *testing.T, raw []byte, apiAddr, searchID, answerID string) {
+	t.Helper()
+	lines := bytes.Split(bytes.TrimSpace(raw), []byte{'\n'})
+	if len(lines) == 0 || len(lines[0]) == 0 {
+		t.Fatal("formal cmd/api wrote no structured logs")
+	}
+	started, stopped, summaries, runs := 0, 0, 0, 0
+	var summaryTrace, runtimeTrace string
+	for number, line := range lines {
+		var record map[string]any
+		if err := json.Unmarshal(line, &record); err != nil {
+			t.Errorf("formal cmd/api JSONL line %d is invalid: %v", number+1, err)
+			continue
+		}
+		for _, key := range []string{"timestamp", "level", "message", "event", "service",
+			"environment", "service_version", "instance_id", "component", "log_source"} {
+			if value, ok := record[key].(string); !ok || value == "" {
+				t.Errorf("formal cmd/api JSONL line %d lacks %s", number+1, key)
+			}
+		}
+		if record["service"] != "sea-btw-search-api" || record["environment"] != "test" {
+			t.Errorf("formal cmd/api JSONL line %d belongs to another service/environment", number+1)
+		}
+		event, _ := record["event"].(string)
+		if strings.HasSuffix(event, ".finished") || strings.HasSuffix(event, ".stopped") {
+			if outcome, ok := record["outcome"].(string); !ok || outcome == "" {
+				t.Errorf("formal cmd/api terminal JSONL line %d lacks outcome", number+1)
+			}
+		}
+		switch event {
+		case "search.api.started":
+			started++
+			if record["api_addr"] != apiAddr {
+				t.Errorf("formal cmd/api JSONL belongs to wrong socket: got=%v want=%s", record["api_addr"], apiAddr)
+			}
+		case "search.api.stopped":
+			stopped++
+			if record["outcome"] != "succeeded" {
+				t.Error("formal cmd/api did not stop cleanly")
+			}
+		case "search.http.summary.finished":
+			if searchID != "" && record["outcome"] == "succeeded" {
+				summaries++
+				if record["search_id"] != searchID || record["operation_id"] != answerID ||
+					record["http_status"] != float64(http.StatusOK) {
+					t.Errorf("formal cmd/api terminal scope mismatch: search=%v answer=%v status=%v",
+						record["search_id"], record["operation_id"], record["http_status"])
+				}
+				summaryTrace, _ = record["trace_id"].(string)
+			}
+		case "runtime.run.finished":
+			if answerID != "" && record["outcome"] == "succeeded" && record["request_id"] == answerID {
+				runs++
+				runtimeTrace, _ = record["trace_id"].(string)
+			}
+		}
+	}
+	if started != 1 || stopped != 1 {
+		t.Errorf("formal cmd/api lifecycle JSONL counts started=%d stopped=%d", started, stopped)
+	}
+	if searchID != "" && (summaries != 1 || runs != 1 || len(summaryTrace) != 32 ||
+		summaryTrace != runtimeTrace) {
+		t.Errorf("formal cmd/api signed search trace mismatch: summaries=%d runs=%d summary_trace=%s runtime_trace=%s",
+			summaries, runs, summaryTrace, runtimeTrace)
+	}
 }
 
 func freeSearchSocket(t *testing.T) string {
