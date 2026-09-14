@@ -565,6 +565,21 @@ export interface SearchCitationReference {
 	state: string
 }
 
+export interface SearchSnapshot {
+	module_id: string
+	release_id: string
+	generation: number
+	publication_revision: string
+	indexes: { [key: string]: CitationObject }
+	valid_revision_ids: Array<string>
+}
+
+export interface SearchSnapshotEnvelope {
+	code: number
+	msg: string
+	data: SearchSnapshot
+}
+
 export interface SourceRef {
 	revision_id: string
 	locator: string

@@ -307,6 +307,14 @@ export function acceptCompile(params: components.AcceptCompileReqParams, req: co
  * @description
  * @param params
  */
+export function getCurrentSearchSnapshot(params: components.ModulePathParams, module_id: string) {
+	return webapi.get<components.SearchSnapshotEnvelope>(`/internal/v1/knowledge/modules/${module_id}/search-snapshot`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
 export function getRelease(params: components.ReleasePathParams, release_id: string) {
 	return webapi.get<components.ReleaseEnvelope>(`/internal/v1/knowledge/releases/${release_id}`, params)
 }

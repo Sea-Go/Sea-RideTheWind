@@ -261,6 +261,9 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	result := types.AcceptBuildReq{Generation: build.Generation, AttemptId: build.AttemptId, LeaseEpoch: build.LeaseEpoch, ManifestHash: build.ManifestHash, State: "READY", IndexManifestRef: ref.Key, IndexManifestHash: ref.SHA256}
 	request("POST", "/internal/v1/knowledge/builds/"+build.BuildId+"/results", c.WorkerToken, result, &build, 200)
 	request("GET", "/v1/knowledge/modules/"+m.Id+"/published", "", nil, nil, 404)
+	snapshotPath := "/internal/v1/knowledge/modules/" + m.Id + "/search-snapshot"
+	request("GET", snapshotPath, "", nil, nil, 401)
+	request("GET", snapshotPath, c.WorkerToken, nil, nil, 404)
 	request("GET", "/v1/knowledge/modules/"+m.Id+"/releases/current", token, nil, &state, 200)
 	if state.BuildState != "READY" || state.ActiveReleaseId != "" {
 		t.Fatal(state)
@@ -269,6 +272,19 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	request("PUT", "/v1/knowledge/modules/"+m.Id+"/activation", token, activation, &state, 200)
 	if state.PointerRevision != 1 || state.ActiveReleaseId != r.ReleaseId {
 		t.Fatal(state)
+	}
+	var searchSnapshot types.SearchSnapshot
+	request("GET", snapshotPath, c.WorkerToken, nil, &searchSnapshot, 200)
+	if searchSnapshot.ModuleId != m.Id || searchSnapshot.ReleaseId != r.ReleaseId ||
+		searchSnapshot.Generation != build.Generation || searchSnapshot.PublicationRevision != "1" ||
+		!reflect.DeepEqual(searchSnapshot.ValidRevisionIds, []string{a.RevisionId, w.RevisionId}) || len(searchSnapshot.Indexes) != 3 {
+		t.Fatalf("HTTP current search snapshot differs from manual publication: %+v", searchSnapshot)
+	}
+	for _, lane := range index.Lanes {
+		got := searchSnapshot.Indexes[lane.Profile.Lane]
+		if got.Key != lane.Artifact.Key || got.Sha256 != lane.Artifact.SHA256 {
+			t.Fatalf("HTTP %s index ref differs from accepted build", lane.Profile.Lane)
+		}
 	}
 	request("PUT", "/v1/knowledge/modules/"+m.Id+"/activation", token, activation, &state, 200)
 	activation.Reason = "different command"
@@ -470,7 +486,7 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if err = s.DB.QueryRow(context.Background(), "SELECT correlation->>'traceparent',correlation->>'request_id' FROM knowledge_outbox WHERE event_type='knowledge.release.activated.v1'").Scan(&traceparent, &originRequestID); err != nil || !strings.HasPrefix(traceparent, "00-") || originRequestID == "" {
 		t.Fatalf("durable outbox correlation missing: traceparent=%q request_id=%q err=%v", traceparent, originRequestID, err)
 	}
-	verifyProductReaders(t, s, request, token, filepath.Join(dir, "objects"), m, a, w, r, build)
+	verifyProductReaders(t, s, request, token, c.WorkerToken, filepath.Join(dir, "objects"), m, a, w, r, build)
 	request("GET", "/internal/v1/knowledge/search-citations/"+searchID, c.WorkerToken, nil, &citations, 200)
 	if len(citations.Evidence) != 1 || citations.Evidence[0].State != "unavailable" {
 		t.Fatalf("withdrawal did not invalidate historical citation: %+v", citations)
@@ -580,7 +596,7 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if !seenUnmatchedPost {
 		t.Fatal("unmatched POST lost its bounded actual HTTP method")
 	}
-	for _, event := range []string{"knowledge.service.starting", "knowledge.service.started", "knowledge.module.create.succeeded", "knowledge.release.activate.rejected", "knowledge.search.source.read.succeeded", "knowledge.search.citations.accept.succeeded", "knowledge.search.citations.accept.replayed", "knowledge.search.citations.get.succeeded", "http.request.completed"} {
+	for _, event := range []string{"knowledge.service.starting", "knowledge.service.started", "knowledge.module.create.succeeded", "knowledge.release.activate.rejected", "knowledge.search.snapshot.current.succeeded", "knowledge.search.source.read.succeeded", "knowledge.search.citations.accept.succeeded", "knowledge.search.citations.accept.replayed", "knowledge.search.citations.get.succeeded", "http.request.completed"} {
 		if !seen[event] {
 			t.Fatalf("missing runtime event %s in %d records", event, len(records))
 		}
