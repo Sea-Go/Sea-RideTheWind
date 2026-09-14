@@ -30,13 +30,8 @@ type favoriteArticleFixture struct {
 	ControlURL     string `json:"control_url"`
 }
 
-// TestFavoriteArticleLiveChain starts Article in a separate test process and
-// crosses Article network gRPC -> Favorite network gRPC -> isolated PG.
-func TestFavoriteArticleLiveChain(t *testing.T) {
-	dsn := os.Getenv("FAVORITE_TEST_DSN")
-	if dsn == "" {
-		t.Skip("set FAVORITE_TEST_DSN with isolated PostgreSQL 16")
-	}
+func startFavoriteArticleFixture(t *testing.T, dsn string) favoriteArticleFixture {
+	t.Helper()
 	root := filepath.Clean("../../../../..")
 	readyPath := filepath.Join(t.TempDir(), "article-ready.json")
 	releasePath := filepath.Join(filepath.Dir(readyPath), "article-release")
@@ -101,6 +96,17 @@ func TestFavoriteArticleLiveChain(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+	return fixture
+}
+
+// TestFavoriteArticleLiveChain starts Article in a separate test process and
+// crosses Article network gRPC -> Favorite network gRPC -> isolated PG.
+func TestFavoriteArticleLiveChain(t *testing.T) {
+	dsn := os.Getenv("FAVORITE_TEST_DSN")
+	if dsn == "" {
+		t.Skip("set FAVORITE_TEST_DSN with isolated PostgreSQL 16")
+	}
+	fixture := startFavoriteArticleFixture(t, dsn)
 	articleClient, err := zrpc.NewClient(zrpc.NewDirectClientConf([]string{fixture.ArticleAddress}, "", ""))
 	if err != nil {
 		t.Fatal(err)
