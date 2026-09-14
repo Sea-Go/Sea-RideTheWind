@@ -311,6 +311,10 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		if os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT") == "" {
 			t.Fatal("actual DC BGE acceptance requires the independent BTW product consumer")
 		}
+		if formal := os.Getenv("SEA_BTW_SEARCH_API_SOCKET_ROOT"); formal != "" &&
+			formal != os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT") {
+			t.Fatal("formal cmd/api and real-index builder must use the same BTW worktree")
+		}
 		retrievalProfiles = realBGEProfiles(t, realBGE)
 	}
 	var r types.Release
@@ -368,7 +372,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	chunkManifestRef := testenv.Put(t, s, chunkManifest)
 	var index model.IndexManifest
 	var ref model.ArtifactRef
+	var builtIndex realIndexResult
 	var realSearchEndpoint string
+	var formalAPI *formalSearchAPI
 	if realBGE == "" {
 		index = testenv.Index(t, s, build, r)
 		index.ChunkManifest = chunkManifestRef
@@ -378,24 +384,29 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			ChunkManifest: chunkManifestRef, BuildID: build.BuildId, ReleaseID: r.ReleaseId,
 			Generation: build.Generation, ResultPath: filepath.Join(dir, "btw-real-index-result.json"),
 			ExpectedQuote: quote, ExpectedChunkID: chunk.ChunkId}
-		realSearchEndpoint = startRealBTWProductServer(t, dir, os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT"),
-			base, c.WorkerToken, m.Id, &chunk, setup)
+		if os.Getenv("SEA_BTW_SEARCH_API_SOCKET_ROOT") != "" {
+			buildRealBTWIndexesOnly(t, dir, os.Getenv("SEA_BTW_SEARCH_API_SOCKET_ROOT"),
+				base, c.WorkerToken, m.Id, setup)
+		} else {
+			realSearchEndpoint = startRealBTWProductServer(t, dir, os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT"),
+				base, c.WorkerToken, m.Id, &chunk, setup)
+		}
 		resultRaw, readErr := os.ReadFile(setup.ResultPath)
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
-		var result realIndexResult
-		if err := json.Unmarshal(resultRaw, &result); err != nil || result.ChunkCount != 2 || len(result.Indexes) != 3 {
+		if err := json.Unmarshal(resultRaw, &builtIndex); err != nil || builtIndex.ChunkCount != 2 || len(builtIndex.Indexes) != 3 ||
+			(os.Getenv("SEA_BTW_SEARCH_API_SOCKET_ROOT") != "" && len(builtIndex.APIIndexSettings) == 0) {
 			t.Fatal("BTW actual BGE three-lane result incomplete")
 		}
-		ref = result.IndexManifest
+		ref = builtIndex.IndexManifest
 		indexRaw, getErr := s.Objects.Get(context.Background(), ref.Key, ref.SHA256)
 		if getErr != nil || json.Unmarshal(indexRaw, &index) != nil || index.ChunkManifest != chunkManifestRef ||
 			index.ChunkCount != 2 || len(index.Lanes) != 3 {
 			t.Fatal("RTW cannot read BTW actual three-lane index manifest")
 		}
 		for _, lane := range index.Lanes {
-			if result.Indexes[lane.Profile.Lane] != lane.Artifact {
+			if builtIndex.Indexes[lane.Profile.Lane] != lane.Artifact {
 				t.Fatal("BTW reported lane reference differs from immutable index manifest")
 			}
 		}
@@ -427,6 +438,14 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		if got.Key != lane.Artifact.Key || got.Sha256 != lane.Artifact.SHA256 {
 			t.Fatalf("HTTP %s index ref differs from accepted build", lane.Profile.Lane)
 		}
+	}
+	if socketRoot := os.Getenv("SEA_BTW_SEARCH_API_SOCKET_ROOT"); socketRoot != "" {
+		if realBGE == "" {
+			t.Fatal("formal cmd/api real-socket gate requires actual DC BGE runtime")
+		}
+		formalAPI = startRealBTWSearchAPIProcess(t, dir, socketRoot, base, c.WorkerToken,
+			realBGE, builtIndex, quote)
+		realSearchEndpoint = formalAPI.URL
 	}
 	request("PUT", "/v1/knowledge/modules/"+m.Id+"/activation", token, activation, &state, 200)
 	activation.Reason = "different command"
@@ -978,6 +997,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			cited.CitationReceiptRef == "" || searchFixture.calls.Load() != callsBeforeCited+1 {
 			t.Fatalf("real BTW cited product result is not RTW accepted evidence: %+v calls=%d",
 				cited, searchFixture.calls.Load())
+		}
+		if formalAPI != nil {
+			formalAPI.AssertServed(t)
 		}
 		if testing.Verbose() {
 			t.Logf("RTW signed cited search accepted by real BTW root: search=%s answer=%s receipt=%s evidence=%s",

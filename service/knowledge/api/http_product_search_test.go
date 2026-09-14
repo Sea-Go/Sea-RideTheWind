@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -42,9 +43,44 @@ type realIndexSetup struct {
 }
 
 type realIndexResult struct {
-	IndexManifest model.ArtifactRef            `json:"index_manifest"`
-	Indexes       map[string]model.ArtifactRef `json:"indexes"`
-	ChunkCount    int                          `json:"chunk_count"`
+	IndexManifest    model.ArtifactRef            `json:"index_manifest"`
+	Indexes          map[string]model.ArtifactRef `json:"indexes"`
+	ChunkCount       int                          `json:"chunk_count"`
+	APIIndexSettings json.RawMessage              `json:"api_index_settings"`
+}
+
+// The builder child produces actual local-exact BGE-M3 artifacts and exits.
+// Search later runs only in the independently launched formal cmd/api binary.
+func buildRealBTWIndexesOnly(t *testing.T, dir, btwRoot, rtwBase, workerToken, moduleID string,
+	setup *realIndexSetup) {
+	t.Helper()
+	fixturePath := filepath.Join(dir, "btw-formal-index-fixture.json")
+	readyPath := filepath.Join(dir, "btw-formal-index-unused-ready")
+	fixture, err := json.Marshal(map[string]any{"build_only": true, "rtw_base": rtwBase,
+		"worker_token": workerToken, "scope_key": productFixtureScopeKey,
+		"ready_path": readyPath, "module_id": moduleID, "real_index": setup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(fixturePath, fixture, 0600); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(dir, "btw-formal-index-builder.test")
+	compile := exec.Command("go", "test", "-c", "-mod=readonly", "-race", "-o", binary,
+		"./internal/transport/http/search")
+	compile.Dir = btwRoot
+	if output, err := compile.CombinedOutput(); err != nil {
+		t.Fatalf("compile BTW real-index builder: %v\n%s", err, output)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binary, "-test.run=^TestRTWRealProductSearchServer$", "-test.v")
+	cmd.Dir = btwRoot
+	cmd.Env = append(os.Environ(), "SEA_RTW_PRODUCT_SERVER_FIXTURE="+fixturePath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("BTW real three-lane index builder failed: %v\n%s", err,
+			strings.ReplaceAll(string(output), workerToken, "[REDACTED]"))
+	}
 }
 
 func realBGEProfiles(t *testing.T, runtimePath string) []types.RetrievalProfile {
