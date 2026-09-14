@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"sea-try-go/service/article/rpc/articleservice"
+	articlepb "sea-try-go/service/article/rpc/pb"
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/favorite/rpc/internal/model"
 	"sea-try-go/service/favorite/rpc/internal/server"
@@ -38,11 +39,15 @@ func (activeUsers) GetUser(_ context.Context, req *userservice.GetUserReq, _ ...
 type publishedArticles struct{ articleservice.ArticleService }
 
 func (publishedArticles) GetArticle(_ context.Context, req *articleservice.GetArticleRequest, _ ...grpc.CallOption) (*articleservice.GetArticleResponse, error) {
+	if !req.PublicOnly || req.IncrView || req.RequesterId != "" {
+		return nil, status.Error(codes.Internal, "favorite bypassed public article projection")
+	}
 	if req.ArticleId != "article-77" {
 		return nil, status.Error(codes.NotFound, "article missing")
 	}
 	return &articleservice.GetArticleResponse{Article: &articleservice.Article{
-		Id: "article-77", Title: "Published article"}}, nil
+		Id: "article-77", Status: articlepb.ArticleStatus_PUBLISHED, Title: "Published r1",
+		CoverImageUrl: "r1-cover", ExtInfo: map[string]string{"published_revision_id": "article-77:r1"}}}, nil
 }
 
 var favoriteRPCLoggerOnce sync.Once
@@ -126,9 +131,20 @@ func TestFavoriteGRPCPreservesIDsAndCommitsOutbox(t *testing.T) {
 		t.Fatalf("existing folder RPC: %+v %v", folder, err)
 	}
 	saved, err := client.CreateFavorite(ctx, &pb.CreateFavoriteReq{UserId: 1001, FolderId: folder.FolderId,
-		TargetType: "article", TargetId: "article-77"})
+		TargetType: "article", TargetId: "article-77", Title: "Private r2", Cover: "r2-cover"})
 	if err != nil || saved.FavoriteId <= 0 {
 		t.Fatalf("existing favorite RPC: %+v %v", saved, err)
+	}
+	item, err := store.FindFavoriteByFolderTarget(ctx, folder.FolderId, "article-77", "article")
+	if err != nil || item.Title != "Published r1" || item.Cover != "r1-cover" {
+		t.Fatalf("favorite cached client or draft metadata: %+v %v", item, err)
+	}
+	if _, err := client.CreateFavorite(ctx, &pb.CreateFavoriteReq{UserId: 1001, FolderId: folder.FolderId,
+		TargetType: "article", TargetId: "draft", Title: "Private draft"}); status.Code(err) != codes.NotFound {
+		t.Fatalf("draft or withdrawn article became a favorite: %v", err)
+	}
+	if _, err := store.FindFavoriteByFolderTarget(ctx, folder.FolderId, "draft", "article"); err != model.ErrorNotFound {
+		t.Fatalf("private article metadata was cached: %v", err)
 	}
 	var outbox []model.FavoriteFactOutbox
 	if err := db.Order("aggregate_version").Find(&outbox).Error; err != nil ||

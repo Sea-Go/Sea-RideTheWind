@@ -109,12 +109,9 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 			logger.LogBusinessErr(ctx, favoritecommon.BizCodeFromError(depErr), depErr, userLogOption(in.GetUserId()), articleLogOption(targetID))
 			return nil, depErr
 		}
-		if title == "" {
-			title = snapshot.Title
-		}
-		if cover == "" {
-			cover = snapshot.Cover
-		}
+		// Article metadata comes only from the published projection. Request
+		// fields must not replace a frozen revision with a draft/client value.
+		title, cover = snapshot.Title, snapshot.Cover
 	}
 
 	if _, dbErr = l.svcCtx.FavoriteModel.FindFavoriteByFolderTarget(ctx, in.GetFolderId(), targetID, targetType); dbErr == nil {
