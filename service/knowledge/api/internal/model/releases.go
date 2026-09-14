@@ -38,8 +38,10 @@ func validateProfiles(profiles []types.RetrievalProfile) error {
 				return invalid("token mask and aggregation belong to multivector")
 			}
 		case "multivector":
-			if p.Mask == "" || p.Aggregation != "maxsim" {
-				return invalid("multivector mask and maxsim aggregation required")
+			// maxsim is retained for the original structural fixtures; real
+			// representations bind an explicit sum_maxsim or mean_maxsim profile.
+			if p.Mask == "" || (p.Aggregation != "maxsim" && p.Aggregation != "sum_maxsim" && p.Aggregation != "mean_maxsim") {
+				return invalid("multivector mask and explicit maxsim aggregation required")
 			}
 		default:
 			return invalid("unknown retrieval lane")

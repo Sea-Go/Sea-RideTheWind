@@ -133,3 +133,7 @@ Delivery.Enabled 默认 false。DC 接入后配置独立 `/v1/events` 接收地�
 新增 `api/http_schema_test.go` 使用仓内已锁定的 kube-openapi Draft 4 校验器，将真实 go-zero HTTP 的成功响应逐条对照生成 Swagger，并检查实际缺省 query 参数不被 schema 强制要求。覆盖管理员四类列表及公开修订列表的首页、中间页、末页、不传 limit 和元数据无正文；七类列表静态检查 required/default 语义。`testdata/h02-optional-fields.ts` 验证生成客户端可以构造缺省请求、空末页及无 content 的修订元数据类型。
 
 2026-09-14 聚焦验证：在新建的随机端口 PostgreSQL 16 实例运行 `go test -race ./service/knowledge/api -run '^(TestGeneratedReaderOptionality|TestRealHTTPKnowledgeWorkflow)$' -count=1 -v`，两项通过；对应 `go vet`、TS 严格类型检查及重复 codegen hash 一致。新增语义测试在更正前会失败，不能以“重复生成一致”替代 HTTP/schema 语义一致。此项没有重复执行不受影响的其余模型状态机验收。
+
+### 多向量聚合语义
+
+真实H06检索profile可明确保存 `sum_maxsim`（查询token最大相似度求和）或 `mean_maxsim`（除以有效查询token数，BGE-M3采用此口径）。两种值进入冻结清单与profile等值核验，不自动互换；Dense/Sparse仍禁止aggregation。旧 `maxsim` 只保留原结构fixture兼容，不赋予隐含sum/mean含义；实际模型与索引必须携带明确聚合才能配对。字段形态不变，无需改写历史不可变清单。

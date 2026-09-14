@@ -1,11 +1,46 @@
 package model
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	"sea-try-go/service/knowledge/api/internal/types"
 )
+
+func TestMaxSimAggregationIsExplicitAndPreserved(t *testing.T) {
+	base := []types.RetrievalProfile{
+		{Lane: "dense", Encoder: "dense", Tokenizer: "tokens", Space: "dense-v1", Dimensions: 2},
+		{Lane: "sparse", Encoder: "sparse", Tokenizer: "tokens", Space: "sparse-v1", Dimensions: 100},
+		{Lane: "multivector", Encoder: "multi", Tokenizer: "tokens", Space: "multi-v1", Dimensions: 2, Mask: "attention"},
+	}
+	for _, aggregation := range []string{"sum_maxsim", "mean_maxsim", "maxsim"} {
+		profiles := append([]types.RetrievalProfile(nil), base...)
+		profiles[2].Aggregation = aggregation
+		before := append([]types.RetrievalProfile(nil), profiles...)
+		if err := validateProfiles(profiles); err != nil {
+			t.Fatalf("%s: %v", aggregation, err)
+		}
+		if !reflect.DeepEqual(profiles, before) {
+			t.Fatal("aggregation was silently normalized")
+		}
+	}
+	for _, aggregation := range []string{"", "sum", "mean", "unknown"} {
+		profiles := append([]types.RetrievalProfile(nil), base...)
+		profiles[2].Aggregation = aggregation
+		if err := validateProfiles(profiles); err == nil {
+			t.Fatalf("unknown aggregation accepted: %q", aggregation)
+		}
+	}
+	base[2].Aggregation = "mean_maxsim"
+	for _, i := range []int{0, 1} {
+		profiles := append([]types.RetrievalProfile(nil), base...)
+		profiles[i].Aggregation = "mean_maxsim"
+		if err := validateProfiles(profiles); err == nil {
+			t.Fatal("non-token aggregation accepted")
+		}
+	}
+}
 
 func TestTextAndLocatorValidation(t *testing.T) {
 	for _, in := range []revisionInput{
