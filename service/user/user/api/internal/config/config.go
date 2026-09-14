@@ -15,6 +15,11 @@ type Config struct {
 		AccessSecret string
 		AccessExpire int64
 	}
+	AccountLink struct {
+		Enabled         bool   `json:",default=false"`
+		PostgresDSN     string `json:",optional"`
+		DataCenterMeURL string `json:",optional"`
+	}
 	UserRpc  zrpc.RpcClientConf
 	BizRedis redis.RedisConf
 }

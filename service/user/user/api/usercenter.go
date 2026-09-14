@@ -37,8 +37,11 @@ func main() {
 	server.Use(observability.NewHTTPMiddleware(c.Name, httpTimeout, observability.SlowThreshold()))
 	defer server.Stop()
 
-	ctx := svc.NewServiceContext(c)
+	ctx, err := svc.NewServiceContext(c)
+	logx.Must(err)
+	defer ctx.Close()
 	handler.RegisterHandlers(server, ctx)
+	handler.RegisterAccountLinkHandlers(server, ctx)
 
 	fmt.Printf("Starting server at %s:%d...\n", c.Host, c.Port)
 
