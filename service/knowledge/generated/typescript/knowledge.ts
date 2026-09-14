@@ -229,6 +229,22 @@ export function getDraftModule(params: components.ModulePathParams, module_id: s
 
 /**
  * @description
+ * @param params
+ */
+export function listProductAcceptedAnswers(params: components.ProductAcceptedAnswersReqParams, session_id: string) {
+	return webapi.get<components.AcceptedAnswersPageEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/accepted-answers`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getProductAcceptedAnswer(params: components.ProductAcceptedAnswerReqParams, session_id: string, answer_id: string) {
+	return webapi.get<components.AcceptedAnswerEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/accepted-answers/${answer_id}`, params)
+}
+
+/**
+ * @description
  * @param req
  */
 export function commitAcceptedAnswer(req: components.CommitAcceptedAnswerReq) {

@@ -16,6 +16,13 @@ Observability:
 Auth:
   AccessSecret: ${KNOWLEDGE_AUTH_SECRET}
   AccessExpire: 3600
+UserAuth:
+  AccessSecret: ${USER_AUTH_SECRET}
+UserRpc:
+  Etcd:
+    Hosts:
+      - ${USER_RPC_ETCD_HOST}
+    Key: user.rpc
 AdministratorIDs:
   - ${KNOWLEDGE_ADMIN_ID}
 WorkerToken: ${KNOWLEDGE_WORKER_TOKEN}

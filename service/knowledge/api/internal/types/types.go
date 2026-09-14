@@ -391,6 +391,17 @@ type ModuleRevisionPath struct {
 	RevisionId string `path:"revision_id"`
 }
 
+type ProductAcceptedAnswerReq struct {
+	SessionId string `path:"session_id"`
+	AnswerId  string `path:"answer_id"`
+}
+
+type ProductAcceptedAnswersReq struct {
+	SessionId    string `path:"session_id"`
+	AfterOrdinal int64  `form:"after_ordinal,optional"`
+	Limit        int    `form:"limit,optional,default=50"`
+}
+
 type PublishedRevisionPath struct {
 	ModuleId   string `path:"module_id"`
 	ReleaseId  string `path:"release_id"`

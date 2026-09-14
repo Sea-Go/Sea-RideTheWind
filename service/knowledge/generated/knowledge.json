@@ -1923,6 +1923,221 @@
         }
       }
     },
+    "/v1/knowledge/answer-sessions/{session_id}/accepted-answers": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ListProductAcceptedAnswers",
+        "operationId": "productListProductAcceptedAnswers",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "name": "after_ordinal",
+            "in": "query",
+            "allowEmptyValue": true
+          },
+          {
+            "type": "integer",
+            "default": 50,
+            "name": "limit",
+            "in": "query",
+            "allowEmptyValue": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "answer_id",
+                          "search_id",
+                          "subject",
+                          "session_id",
+                          "status",
+                          "accepted_ordinal",
+                          "accepted_at",
+                          "turn_json"
+                        ],
+                        "properties": {
+                          "accepted_at": {
+                            "type": "string"
+                          },
+                          "accepted_ordinal": {
+                            "type": "integer"
+                          },
+                          "answer_id": {
+                            "type": "string"
+                          },
+                          "search_id": {
+                            "type": "string"
+                          },
+                          "session_id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "subject": {
+                            "type": "object",
+                            "required": [
+                              "authority_id",
+                              "tenant_id",
+                              "subject_id"
+                            ],
+                            "properties": {
+                              "authority_id": {
+                                "type": "string"
+                              },
+                              "subject_id": {
+                                "type": "string"
+                              },
+                              "tenant_id": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "turn_json": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "next_ordinal": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/answer-sessions/{session_id}/accepted-answers/{answer_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetProductAcceptedAnswer",
+        "operationId": "productGetProductAcceptedAnswer",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "answer_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "answer_id",
+                    "search_id",
+                    "subject",
+                    "session_id",
+                    "status",
+                    "accepted_ordinal",
+                    "accepted_at",
+                    "turn_json"
+                  ],
+                  "properties": {
+                    "accepted_at": {
+                      "type": "string"
+                    },
+                    "accepted_ordinal": {
+                      "type": "integer"
+                    },
+                    "answer_id": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "object",
+                      "required": [
+                        "authority_id",
+                        "tenant_id",
+                        "subject_id"
+                      ],
+                      "properties": {
+                        "authority_id": {
+                          "type": "string"
+                        },
+                        "subject_id": {
+                          "type": "string"
+                        },
+                        "tenant_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "turn_json": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/knowledge/builds/{build_id}/cancel": {
       "post": {
         "consumes": [

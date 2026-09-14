@@ -8,8 +8,11 @@ import (
 	"sea-try-go/service/common/response"
 	"sea-try-go/service/knowledge/api/internal/model"
 	"sea-try-go/service/knowledge/api/internal/telemetry"
+	"sea-try-go/service/user/user/identity"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 // ConfigureResponses configures go-zero's shared envelope once during process startup.
@@ -18,6 +21,14 @@ func ConfigureResponses() {
 		status := http.StatusInternalServerError
 		msg := "knowledge service unavailable"
 		switch {
+		case errors.Is(err, identity.ErrInvalidClaim):
+			status = http.StatusUnauthorized
+			msg = "authenticated user required"
+		case errors.Is(err, identity.ErrUserNotFound), errors.Is(err, identity.ErrIdentityMismatch):
+			status = http.StatusForbidden
+			msg = "authenticated user unavailable"
+		case grpcstatus.Code(err) == codes.Unavailable:
+			status = http.StatusServiceUnavailable
 		case errors.Is(err, model.ErrInvalid):
 			status = 400
 			msg = err.Error()

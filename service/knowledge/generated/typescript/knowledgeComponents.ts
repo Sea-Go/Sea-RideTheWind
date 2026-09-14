@@ -409,6 +409,18 @@ export interface ModuleRevisionPath {
 export interface ModuleRevisionPathParams {
 }
 
+export interface ProductAcceptedAnswerReq {
+}
+export interface ProductAcceptedAnswerReqParams {
+}
+
+export interface ProductAcceptedAnswersReq {
+}
+export interface ProductAcceptedAnswersReqParams {
+	after_ordinal?: number
+	limit?: number
+}
+
 export interface PublishedRevisionPath {
 }
 export interface PublishedRevisionPathParams {
