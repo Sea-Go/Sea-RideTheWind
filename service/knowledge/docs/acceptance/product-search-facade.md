@@ -24,4 +24,10 @@ RTW 用固定 Go JSON 字段顺序 `module_id,query,depth,intelligence` 的 SHA2
 
 本分支验收实测：上述完整命令以 `-race` 运行通过；`TestRealHTTPKnowledgeWorkflowWithUserCenter`、普通 go-zero/PG HTTP 流程、`TestProductSearchOperationFixedSnapshotLeaseAndReplay`、`TestProductSearchMigrationProbeAndBadKeys` 与 `TestProductSearchProjectsOnlyMatchingCommittedCitationAnswer` 均 PASS，脚本内 `go vet ./service/knowledge/...` 和 User Center race/vet 也通过。成功、202 与 503 均按真实 HTTP 状态断言；测试在 BTW fixture 返回伪 200 而未 Commit 时得到 503、历史为空，在 BTW 通过真实 RTW 私有 HTTP Commit 后故意返回 502 时仍按 AnswerID 恢复 200。直接 PG 测试另验证 `succeeded` 必须有同一快照原文、引用收据与已接纳答案，异查询/异发布不能复用答案。操作表迁移脚本在旧结构（缺表）隔离 schema 上实跑并通过启动前探测。正式 BTW 进程、真实三路索引、模型总结、网页/桌宠和 Collector 下钻尚未在本分支验收。
 
-下一交接由 BTW 私有 HTTP 入口在真 Runner/同代三路索引中消费 RTW 签发的 scope，并同一隔离 RTW PG 完成原文、引用、答案 Commit；RTW 再用本入口发布。网页与 WhaleHall 桌宠只需传产品请求字段，处理 202/503 同键重试、展示 200 已验证答案与固定引用，并验证两端 EOF、会话历史一致。SSE、Tool 形式及在线观测下钻属于后续切片。
+下一交接由 BTW 私有 HTTP 入口连接同代三路真实索引及模型，在现有真 Runner 上消费 RTW 签发的 scope。网页与 WhaleHall 桌宠只需传产品请求字段，处理 202/503 同键重试、展示 200 已验证答案与固定引用，并验证两端 EOF、会话历史一致。SSE、Tool 形式及在线观测下钻属于后续切片。
+
+## 真实 BTW 进程的有证据子链验收
+
+在隔离 PostgreSQL、真实 RTW go-zero HTTP 与独立 BTW HTTP 子进程中，RTW 用已人工发布的 release/index manifest 固定快照；父测试只把其中 chunk 的 `revision_id/chunk_id/quote_hash` 交给 BTW 子进程，不传答案或伪造引用。BTW 使用 RTW Worker API 重新读取当前快照、同版原文，在现有 `Delivery` 中再次核对定位和哈希、持久接纳引用，收到 RTW receipt 后通过原生 tRPC-Agent-Go Graph/LLMAgent/Runner 运行固定模型替身并提交产品轮次。RTW façade 从自己的 PG 验证 `knowledge_search_citations`、`knowledge_answer_citations`、`knowledge_accepted_answers` 后返回含真实 quote、evidence ID 与 receipt 的 200 `succeeded`；同键 POST、GET 完全一致，他人 GET 为 404。该子链也保留原来的 `insufficient` 空证据分支。
+
+命令：`KNOWLEDGE_KEEP_EVIDENCE=1 KNOWLEDGE_REAL_USER_GATE=1 SEA_BTW_PRODUCT_SEARCH_ROOT=<BTW 独立 worktree 绝对路径> bash service/knowledge/scripts/acceptance.sh`，包含知识与 User Center 模块 race 全测、vet，实测退出码 0；`TestRealHTTPKnowledgeWorkflowWithUserCenter` 与 gRPC 替身版本均 PASS。此候选由**隔离测试中真实发布的 chunk 确定性注入**，并未测试三路真实检索的召回；模型是固定响应替身，未验证线上模型质量。可将“RTW 签发 → BTW 有证据成功 → RTW 接纳后公开”的子链记为 `INTEGRATED`，H02/H07 全量仍为 `PARTIAL`。
