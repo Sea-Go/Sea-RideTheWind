@@ -1213,6 +1213,10 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			{Lane: "multivector", Encoder: "fixture_model", Tokenizer: "tokens_v1", Space: "multi_space",
 				Dimensions: 2, Mask: "valid", Aggregation: "sum_maxsim"},
 		}
+		bgeRuntimeFile := os.Getenv("SEA_BGE_RUNTIME_FILE")
+		if bgeRuntimeFile != "" {
+			profiles = liveBGEIndexProfiles(t, bgeRuntimeFile)
+		}
 		var indexRelease types.Release
 		request("POST", "/v1/knowledge/modules/"+indexModule.Id+"/releases", token,
 			types.CreateReleaseReq{SourceRevisionIds: []string{indexSource.RevisionId}, WikiRevisionIds: []string{},
@@ -1231,6 +1235,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			"source_revision_ids": []string{indexSource.RevisionId}, "wiki_revision_ids": []string{},
 			"chunk_profile": indexRelease.ChunkingProfile, "chunk_size": 64, "chunk_overlap": 0,
 			"result_path": resultPath,
+		}
+		if bgeRuntimeFile != "" {
+			fixtureData["bge_runtime_file"] = bgeRuntimeFile
 		}
 		var actualDC *dcJobPlatform
 		if dcRoot := os.Getenv("SEA_DC_JOB_PLATFORM_ROOT"); dcRoot != "" {
