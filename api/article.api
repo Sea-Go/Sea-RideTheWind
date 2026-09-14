@@ -11,6 +11,7 @@ type (
 		ManualTypeTag string            `json:"manual_type_tag"`
 		SecondaryTags []string          `json:"secondary_tags"`
 		AuthorId      string            `json:"author_id"`
+		AuthorName    string            `json:"author_name,omitempty"`
 		CreateTime    int64             `json:"create_time"`
 		UpdateTime    int64             `json:"update_time"`
 		Status        int32             `json:"status"`
@@ -87,6 +88,9 @@ type (
 service article-api {
 	@handler CreateArticle
 	post /article (CreateArticleReq) returns (CreateArticleResp)
+
+	@handler GetAuthorArticle
+	get /me/article/:id (GetArticleReq) returns (GetArticleResp)
 
 	@handler UpdateArticle
 	put /article/:id (UpdateArticleReq) returns (UpdateArticleResp)

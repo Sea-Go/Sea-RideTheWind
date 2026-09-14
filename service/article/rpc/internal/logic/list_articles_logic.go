@@ -43,6 +43,9 @@ func (l *ListArticlesLogic) ListArticles(in *__.ListArticlesRequest) (*__.ListAr
 		SortBy:   in.SortBy,
 		Desc:     in.Desc,
 	}
+	if in.PublicOnly {
+		return l.listPublicArticles(ctx, in, listOpt)
+	}
 	if in.ManualTypeTag != nil {
 		listOpt.ManualTypeTag = *in.ManualTypeTag
 		span.SetAttributes(attribute.String("manual_type_tag", *in.ManualTypeTag))
@@ -95,4 +98,37 @@ func (l *ListArticlesLogic) ListArticles(in *__.ListArticlesRequest) (*__.ListAr
 		Page:     in.Page,
 		PageSize: in.PageSize,
 	}, nil
+}
+
+func (l *ListArticlesLogic) listPublicArticles(ctx context.Context, in *__.ListArticlesRequest, opt model.ListArticlesOption) (*__.ListArticlesResponse, error) {
+	if in.ManualTypeTag != nil {
+		opt.ManualTypeTag = *in.ManualTypeTag
+	}
+	if in.SecondaryTag != nil {
+		opt.SecondaryTag = *in.SecondaryTag
+	}
+	if in.AuthorId != nil {
+		opt.AuthorId = *in.AuthorId
+	}
+	articles, total, err := l.svcCtx.ArticleRepo.ListPublic(ctx, opt)
+	if err != nil {
+		l.Logger.Errorf("ListPublicArticles error: %v", err)
+		return nil, err
+	}
+	result := make([]*__.Article, 0, len(articles))
+	for _, article := range articles {
+		// Public lists carry approved metadata, never a mutable object key or
+		// the full Markdown body. Detail resolves the frozen body separately.
+		result = append(result, publishedArticleResponse(article, ""))
+	}
+	page, size := in.Page, in.PageSize
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 {
+		size = 20
+	} else if size > 100 {
+		size = 100
+	}
+	return &__.ListArticlesResponse{Articles: result, Total: total, Page: page, PageSize: size}, nil
 }

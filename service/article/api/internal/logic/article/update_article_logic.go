@@ -43,6 +43,7 @@ func (l *UpdateArticleLogic) UpdateArticle(req *types.UpdateArticleReq) (resp *t
 	articleResp, err := l.svcCtx.ArticleRpc.GetArticle(l.ctx, &articleservice.GetArticleRequest{
 		ArticleId: req.ArticleId,
 		IncrView:  false,
+		RequesterId: currentUserID,
 	})
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, errmsg.Error, err)
@@ -50,6 +51,8 @@ func (l *UpdateArticleLogic) UpdateArticle(req *types.UpdateArticleReq) (resp *t
 		switch st.Code() {
 		case codes.NotFound:
 			return nil, errmsg.ErrorArticleNone
+		case codes.PermissionDenied:
+			return nil, errmsg.ErrorArticleForbidden
 		case codes.Internal:
 			return nil, errmsg.ErrorServerCommon
 		default:

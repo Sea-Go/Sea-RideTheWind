@@ -9,6 +9,7 @@ import (
 	"sea-try-go/service/article/api/internal/svc"
 	"sea-try-go/service/article/api/internal/types"
 	"sea-try-go/service/article/rpc/articleservice"
+	articlepb "sea-try-go/service/article/rpc/pb"
 
 	"sea-try-go/service/article/common/errmsg"
 	"sea-try-go/service/common/logger"
@@ -42,6 +43,7 @@ func (l *ListArticlesLogic) ListArticles(req *types.ListArticlesReq) (resp *type
 		PageSize:      req.PageSize,
 		SortBy:        req.SortBy,
 		Desc:          req.Desc,
+		PublicOnly:    true,
 	})
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, errmsg.Error, err)
@@ -53,9 +55,17 @@ func (l *ListArticlesLogic) ListArticles(req *types.ListArticlesReq) (resp *type
 			return nil, errmsg.CodeServerBusy
 		}
 	}
+	if res == nil {
+		return nil, errmsg.ErrorServerCommon
+	}
 
 	var articles []types.Article
 	for _, item := range res.Articles {
+		if item == nil || item.Status != articlepb.ArticleStatus_PUBLISHED {
+			// An old RPC instance ignores public_only. Do not serialize its
+			// source rows through a public HTTP endpoint.
+			return nil, errmsg.ErrorServerCommon
+		}
 		articles = append(articles, types.Article{
 			Id:            item.Id,
 			Title:         item.Title,

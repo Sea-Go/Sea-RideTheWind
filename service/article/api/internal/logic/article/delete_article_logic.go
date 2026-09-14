@@ -42,6 +42,7 @@ func (l *DeleteArticleLogic) DeleteArticle(req *types.DeleteArticleReq) (resp *t
 	articleResp, err := l.svcCtx.ArticleRpc.GetArticle(l.ctx, &articleservice.GetArticleRequest{
 		ArticleId: req.ArticleId,
 		IncrView:  false,
+		RequesterId: operatorID,
 	})
 	if err != nil {
 		logger.LogBusinessErr(l.ctx, errmsg.Error, err)
@@ -49,6 +50,8 @@ func (l *DeleteArticleLogic) DeleteArticle(req *types.DeleteArticleReq) (resp *t
 		switch st.Code() {
 		case codes.NotFound:
 			return nil, errmsg.ErrorArticleNone
+		case codes.PermissionDenied:
+			return nil, errmsg.ErrorArticleForbidden
 		case codes.Internal:
 			return nil, errmsg.ErrorServerCommon
 		default:
