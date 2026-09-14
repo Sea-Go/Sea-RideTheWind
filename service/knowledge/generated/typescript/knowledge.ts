@@ -229,6 +229,30 @@ export function getDraftModule(params: components.ModulePathParams, module_id: s
 
 /**
  * @description
+ * @param req
+ */
+export function commitAcceptedAnswer(req: components.CommitAcceptedAnswerReq) {
+	return webapi.post<components.AcceptedAnswerEnvelope>(`/internal/v1/knowledge/accepted-answers`, req)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function listAcceptedAnswers(params: components.ListAcceptedAnswersReqParams) {
+	return webapi.get<components.AcceptedAnswersPageEnvelope>(`/internal/v1/knowledge/accepted-answers`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getAcceptedAnswer(params: components.GetAcceptedAnswerReqParams, answer_id: string) {
+	return webapi.get<components.AcceptedAnswerEnvelope>(`/internal/v1/knowledge/accepted-answers/${answer_id}`, params)
+}
+
+/**
+ * @description
  * @param params
  */
 export function getBuild(params: components.BuildPathParams, build_id: string) {

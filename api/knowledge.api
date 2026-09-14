@@ -271,6 +271,57 @@ type (
 		Msg  string               `json:"msg"`
 		Data SearchCitationRecord `json:"data"`
 	}
+	AcceptedSubjectRef {
+		AuthorityId string `json:"authority_id"`
+		TenantId    string `json:"tenant_id"`
+		SubjectId   string `json:"subject_id"`
+	}
+	CommitAcceptedAnswerReq {
+		AnswerId  string             `json:"answer_id"`
+		SearchId  string             `json:"search_id"`
+		Subject   AcceptedSubjectRef `json:"subject"`
+		SessionId string             `json:"session_id"`
+		TurnJson  string             `json:"turn_json"`
+	}
+	AcceptedAnswer {
+		AnswerId        string             `json:"answer_id"`
+		SearchId        string             `json:"search_id"`
+		Subject         AcceptedSubjectRef `json:"subject"`
+		SessionId       string             `json:"session_id"`
+		Status          string             `json:"status"`
+		AcceptedOrdinal int64              `json:"accepted_ordinal"`
+		AcceptedAt      string             `json:"accepted_at"`
+		TurnJson        string             `json:"turn_json"`
+	}
+	AcceptedAnswerEnvelope {
+		Code int            `json:"code"`
+		Msg  string         `json:"msg"`
+		Data AcceptedAnswer `json:"data"`
+	}
+	GetAcceptedAnswerReq {
+		AnswerId    string `path:"answer_id"`
+		AuthorityId string `form:"authority_id"`
+		TenantId    string `form:"tenant_id"`
+		SubjectId   string `form:"subject_id"`
+		SessionId   string `form:"session_id"`
+	}
+	ListAcceptedAnswersReq {
+		AuthorityId  string `form:"authority_id"`
+		TenantId     string `form:"tenant_id"`
+		SubjectId    string `form:"subject_id"`
+		SessionId    string `form:"session_id"`
+		AfterOrdinal int64  `form:"after_ordinal,optional"`
+		Limit        int    `form:"limit,optional,default=50"`
+	}
+	AcceptedAnswersPage {
+		Items       []AcceptedAnswer `json:"items"`
+		NextOrdinal int64            `json:"next_ordinal,optional,omitempty"`
+	}
+	AcceptedAnswersPageEnvelope {
+		Code int                 `json:"code"`
+		Msg  string              `json:"msg"`
+		Data AcceptedAnswersPage `json:"data"`
+	}
 )
 
 type (
@@ -553,6 +604,15 @@ service knowledge-api {
 
 	@handler GetSearchCitations
 	get /search-citations/:search_id (SearchCitationPath) returns (SearchCitationRecordEnvelope)
+
+	@handler CommitAcceptedAnswer
+	post /accepted-answers (CommitAcceptedAnswerReq) returns (AcceptedAnswerEnvelope)
+
+	@handler GetAcceptedAnswer
+	get /accepted-answers/:answer_id (GetAcceptedAnswerReq) returns (AcceptedAnswerEnvelope)
+
+	@handler ListAcceptedAnswers
+	get /accepted-answers (ListAcceptedAnswersReq) returns (AcceptedAnswersPageEnvelope)
 
 	@handler GetCompile
 	get /compiles/:compile_id (CompilePath) returns (CompileEnvelope)

@@ -37,6 +37,40 @@ type AcceptSearchCitationsReq struct {
 	PackHash string `json:"pack_hash"`
 }
 
+type AcceptedAnswer struct {
+	AnswerId        string             `json:"answer_id"`
+	SearchId        string             `json:"search_id"`
+	Subject         AcceptedSubjectRef `json:"subject"`
+	SessionId       string             `json:"session_id"`
+	Status          string             `json:"status"`
+	AcceptedOrdinal int64              `json:"accepted_ordinal"`
+	AcceptedAt      string             `json:"accepted_at"`
+	TurnJson        string             `json:"turn_json"`
+}
+
+type AcceptedAnswerEnvelope struct {
+	Code int            `json:"code"`
+	Msg  string         `json:"msg"`
+	Data AcceptedAnswer `json:"data"`
+}
+
+type AcceptedAnswersPage struct {
+	Items       []AcceptedAnswer `json:"items"`
+	NextOrdinal int64            `json:"next_ordinal,optional,omitempty"`
+}
+
+type AcceptedAnswersPageEnvelope struct {
+	Code int                 `json:"code"`
+	Msg  string              `json:"msg"`
+	Data AcceptedAnswersPage `json:"data"`
+}
+
+type AcceptedSubjectRef struct {
+	AuthorityId string `json:"authority_id"`
+	TenantId    string `json:"tenant_id"`
+	SubjectId   string `json:"subject_id"`
+}
+
 type ActivateReq struct {
 	ModuleId                string `path:"module_id"`
 	ReleaseId               string `json:"release_id"`
@@ -139,6 +173,14 @@ type ClaimCompileReq struct {
 	InputHash      string `json:"input_hash"`
 }
 
+type CommitAcceptedAnswerReq struct {
+	AnswerId  string             `json:"answer_id"`
+	SearchId  string             `json:"search_id"`
+	Subject   AcceptedSubjectRef `json:"subject"`
+	SessionId string             `json:"session_id"`
+	TurnJson  string             `json:"turn_json"`
+}
+
 type Compile struct {
 	ErrorCode         string   `json:"error_code"`
 	LeaseExpiresAt    string   `json:"lease_expires_at"`
@@ -217,6 +259,23 @@ type CreateWikiReq struct {
 	Content        string      `json:"content"`
 	SourceRefs     []SourceRef `json:"source_refs"`
 	IdempotencyKey string      `json:"idempotency_key"`
+}
+
+type GetAcceptedAnswerReq struct {
+	AnswerId    string `path:"answer_id"`
+	AuthorityId string `form:"authority_id"`
+	TenantId    string `form:"tenant_id"`
+	SubjectId   string `form:"subject_id"`
+	SessionId   string `form:"session_id"`
+}
+
+type ListAcceptedAnswersReq struct {
+	AuthorityId  string `form:"authority_id"`
+	TenantId     string `form:"tenant_id"`
+	SubjectId    string `form:"subject_id"`
+	SessionId    string `form:"session_id"`
+	AfterOrdinal int64  `form:"after_ordinal,optional"`
+	Limit        int    `form:"limit,optional,default=50"`
 }
 
 type ListBuildsResp struct {

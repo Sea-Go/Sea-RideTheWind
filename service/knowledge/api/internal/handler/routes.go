@@ -170,6 +170,21 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			[]rest.Middleware{serverCtx.Worker},
 			[]rest.Route{
 				{
+					Method:  http.MethodPost,
+					Path:    "/accepted-answers",
+					Handler: worker.CommitAcceptedAnswerHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/accepted-answers",
+					Handler: worker.ListAcceptedAnswersHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/accepted-answers/:answer_id",
+					Handler: worker.GetAcceptedAnswerHandler(serverCtx),
+				},
+				{
 					Method:  http.MethodGet,
 					Path:    "/builds/:build_id",
 					Handler: worker.GetBuildHandler(serverCtx),
