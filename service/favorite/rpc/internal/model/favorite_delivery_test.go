@@ -497,8 +497,9 @@ func TestFavoriteDeliverySharedAuthorityFixture(t *testing.T) {
 	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: folderID, UserId: 1001, Name: "shared-authority"}); err != nil {
 		t.Fatal(err)
 	}
+	approvedRevision := "article-shared-authority:r1"
 	if err := store.InsertFavorite(ctx, &FavoriteItem{FavoriteId: favoriteID, FolderId: folderID,
-		UserId: 1001, TargetType: "article", TargetId: "article-shared-authority"}); err != nil {
+		UserId: 1001, TargetType: "article", TargetId: "article-shared-authority", TargetRevision: &approvedRevision}); err != nil {
 		t.Fatal(err)
 	}
 	endpoint, dcURL, dcToken := os.Getenv("FAVORITE_DC_URL")+"/v1/events", os.Getenv("FAVORITE_DC_URL"), os.Getenv("FAVORITE_DC_TOKEN")
