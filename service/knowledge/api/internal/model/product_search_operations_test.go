@@ -115,3 +115,50 @@ func TestProductSearchMigrationProbeAndBadKeys(t *testing.T) {
 		expectError(t, err, model.ErrInvalid)
 	}
 }
+
+func TestProductSearchProjectsOnlyMatchingCommittedCitationAnswer(t *testing.T) {
+	s := testenv.Store(t)
+	f := makeCitationFixture(t, s)
+	subject := types.AcceptedSubjectRef{AuthorityId: "rtw", TenantId: "single", SubjectId: "uid-17"}
+	op, err := s.ReserveProductSearch(ctx, subject, "learning-session-1", "product-answer-key",
+		model.ProductSearchInput{ModuleID: f.module.Id, Query: "What is the first paragraph?",
+			Depth: "fast", Intelligence: "low"})
+	op = must(t, op, err)
+	if _, err := s.VerifiedProductSearch(ctx, op); !errors.Is(err, model.ErrNotFound) {
+		t.Fatalf("uncommitted operation projected an answer: %v", err)
+	}
+	citation := makeCitationRequest(t, f, op.SearchID)
+	receipt, err := s.AcceptSearchCitations(ctx, citation)
+	receipt = must(t, receipt, err)
+	answerReq := acceptedAnswerRequest(t, citation, receipt, op.AnswerID)
+	_, err = s.CommitAcceptedAnswer(ctx, answerReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.VerifiedProductSearch(ctx, op)
+	result = must(t, result, err)
+	if result.SearchId != op.SearchID || result.AnswerId != op.AnswerID || result.Status != "succeeded" ||
+		result.Answer != "The first paragraph is cited." || result.CitationReceiptRef != receipt.DurableRef ||
+		len(result.Citations) != 1 || result.Citations[0].Quote != f.chunk.Text ||
+		result.Citations[0].QuoteHash != f.chunk.TextHash {
+		t.Fatalf("committed original and receipt projection differs: %+v", result)
+	}
+	if err = s.CompleteProductSearch(ctx, op); err != nil {
+		t.Fatal(err)
+	}
+	committed, err := s.GetProductSearchByKey(ctx, subject, op.SessionID, op.Key)
+	committed = must(t, committed, err)
+	if committed.Status != "committed" {
+		t.Fatalf("verified accepted answer did not complete operation: %+v", committed)
+	}
+	wrongQuery := op
+	wrongQuery.Search.Query = "not the committed query"
+	if _, err := s.VerifiedProductSearch(ctx, wrongQuery); !errors.Is(err, model.ErrArtifactUnavailable) {
+		t.Fatalf("different request reused accepted answer: %v", err)
+	}
+	wrongSnapshot := op
+	wrongSnapshot.Snapshot.PublicationRevision = "2"
+	if _, err := s.VerifiedProductSearch(ctx, wrongSnapshot); !errors.Is(err, model.ErrArtifactUnavailable) {
+		t.Fatalf("different publication reused accepted answer: %v", err)
+	}
+}
