@@ -654,6 +654,122 @@ export interface SourceRef {
 	locator: string
 }
 
+export interface ToolBudget {
+	search_calls: number
+	read_calls: number
+	quote_runes: number
+	max_reads_per_search: number
+	max_quote_runes_per_search: number
+}
+
+export interface ToolEvidence {
+	evidence_id: string
+	revision_id: string
+	locator: string
+	quote: string
+	quote_hash: string
+	source_kind: string
+}
+
+export interface ToolParentEnvelope {
+	code: number
+	msg: string
+	data: ToolParentResult
+}
+
+export interface ToolParentPath {
+}
+export interface ToolParentPathParams {
+}
+
+export interface ToolParentReq {
+	module_id: string
+	idempotency_key: string
+}
+export interface ToolParentReqParams {
+}
+
+export interface ToolParentResult {
+	operation_id: string
+	scope_ref: string
+	snapshot_ref: string
+	budget_ref: string
+	module_id: string
+	deadline_at_ms: number
+	allow_lower_intelligence: boolean
+	budget: ToolBudget
+}
+
+export interface ToolReadEnvelope {
+	code: number
+	msg: string
+	data: ToolReadResult
+}
+
+export interface ToolReadReq {
+	search_id: string
+	evidence_id: string
+	idempotency_key: string
+}
+export interface ToolReadReqParams {
+}
+
+export interface ToolReadResult {
+	search_id: string
+	snapshot_ref: string
+	evidence: ToolEvidence
+	citation_receipt: ToolReceipt
+}
+
+export interface ToolReceipt {
+	search_id: string
+	pack_hash: string
+	durable_ref: string
+}
+
+export interface ToolSearchEnvelope {
+	code: number
+	msg: string
+	data: ToolSearchResult
+}
+
+export interface ToolSearchPath {
+}
+export interface ToolSearchPathParams {
+}
+
+export interface ToolSearchReq {
+	query: string
+	depth: string
+	intelligence: string
+	continue_search_id?: string
+	read_calls: number
+	quote_runes: number
+	idempotency_key: string
+}
+export interface ToolSearchReqParams {
+}
+
+export interface ToolSearchResult {
+	search_id: string
+	status: string
+	stop_reason: string
+	snapshot_ref: string
+	requested_intelligence: string
+	effective_intelligence: string
+	evidence: Array<ToolEvidence>
+	gaps: Array<string>
+	conflicts: Array<string>
+	pack_hash?: string
+	citation_receipt?: ToolReceipt
+	usage: ToolUsage
+}
+
+export interface ToolUsage {
+	read_calls: number
+	quote_runes: number
+}
+
 export interface WithdrawReq {
 	target_kind: string
 	target_id: string

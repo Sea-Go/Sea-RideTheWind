@@ -2615,6 +2615,737 @@
         }
       }
     },
+    "/v1/knowledge/answer-sessions/{session_id}/tool-runs": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CreateToolParent",
+        "operationId": "productCreateToolParent",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "module_id",
+                "idempotency_key"
+              ],
+              "properties": {
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "module_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "operation_id",
+                    "scope_ref",
+                    "snapshot_ref",
+                    "budget_ref",
+                    "module_id",
+                    "deadline_at_ms",
+                    "allow_lower_intelligence",
+                    "budget"
+                  ],
+                  "properties": {
+                    "allow_lower_intelligence": {
+                      "type": "boolean"
+                    },
+                    "budget": {
+                      "type": "object",
+                      "required": [
+                        "search_calls",
+                        "read_calls",
+                        "quote_runes",
+                        "max_reads_per_search",
+                        "max_quote_runes_per_search"
+                      ],
+                      "properties": {
+                        "max_quote_runes_per_search": {
+                          "type": "integer"
+                        },
+                        "max_reads_per_search": {
+                          "type": "integer"
+                        },
+                        "quote_runes": {
+                          "type": "integer"
+                        },
+                        "read_calls": {
+                          "type": "integer"
+                        },
+                        "search_calls": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "budget_ref": {
+                      "type": "string"
+                    },
+                    "deadline_at_ms": {
+                      "type": "integer"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "operation_id": {
+                      "type": "string"
+                    },
+                    "scope_ref": {
+                      "type": "string"
+                    },
+                    "snapshot_ref": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/answer-sessions/{session_id}/tool-runs/{operation_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetToolParent",
+        "operationId": "productGetToolParent",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "operation_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "operation_id",
+                    "scope_ref",
+                    "snapshot_ref",
+                    "budget_ref",
+                    "module_id",
+                    "deadline_at_ms",
+                    "allow_lower_intelligence",
+                    "budget"
+                  ],
+                  "properties": {
+                    "allow_lower_intelligence": {
+                      "type": "boolean"
+                    },
+                    "budget": {
+                      "type": "object",
+                      "required": [
+                        "search_calls",
+                        "read_calls",
+                        "quote_runes",
+                        "max_reads_per_search",
+                        "max_quote_runes_per_search"
+                      ],
+                      "properties": {
+                        "max_quote_runes_per_search": {
+                          "type": "integer"
+                        },
+                        "max_reads_per_search": {
+                          "type": "integer"
+                        },
+                        "quote_runes": {
+                          "type": "integer"
+                        },
+                        "read_calls": {
+                          "type": "integer"
+                        },
+                        "search_calls": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "budget_ref": {
+                      "type": "string"
+                    },
+                    "deadline_at_ms": {
+                      "type": "integer"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "operation_id": {
+                      "type": "string"
+                    },
+                    "scope_ref": {
+                      "type": "string"
+                    },
+                    "snapshot_ref": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/answer-sessions/{session_id}/tool-runs/{operation_id}/evidence-reads": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ReadToolEvidence",
+        "operationId": "productReadToolEvidence",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "operation_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "search_id",
+                "evidence_id",
+                "idempotency_key"
+              ],
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "search_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "search_id",
+                    "snapshot_ref",
+                    "evidence",
+                    "citation_receipt"
+                  ],
+                  "properties": {
+                    "citation_receipt": {
+                      "type": "object",
+                      "required": [
+                        "search_id",
+                        "pack_hash",
+                        "durable_ref"
+                      ],
+                      "properties": {
+                        "durable_ref": {
+                          "type": "string"
+                        },
+                        "pack_hash": {
+                          "type": "string"
+                        },
+                        "search_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "required": [
+                        "evidence_id",
+                        "revision_id",
+                        "locator",
+                        "quote",
+                        "quote_hash",
+                        "source_kind"
+                      ],
+                      "properties": {
+                        "evidence_id": {
+                          "type": "string"
+                        },
+                        "locator": {
+                          "type": "string"
+                        },
+                        "quote": {
+                          "type": "string"
+                        },
+                        "quote_hash": {
+                          "type": "string"
+                        },
+                        "revision_id": {
+                          "type": "string"
+                        },
+                        "source_kind": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "snapshot_ref": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/answer-sessions/{session_id}/tool-runs/{operation_id}/searches": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CreateToolSearch",
+        "operationId": "productCreateToolSearch",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "operation_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "query",
+                "depth",
+                "intelligence",
+                "read_calls",
+                "quote_runes",
+                "idempotency_key"
+              ],
+              "properties": {
+                "continue_search_id": {
+                  "type": "string"
+                },
+                "depth": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "intelligence": {
+                  "type": "string"
+                },
+                "query": {
+                  "type": "string"
+                },
+                "quote_runes": {
+                  "type": "integer"
+                },
+                "read_calls": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "search_id",
+                    "status",
+                    "stop_reason",
+                    "snapshot_ref",
+                    "requested_intelligence",
+                    "effective_intelligence",
+                    "evidence",
+                    "gaps",
+                    "conflicts",
+                    "usage"
+                  ],
+                  "properties": {
+                    "citation_receipt": {
+                      "type": "object",
+                      "required": [
+                        "search_id",
+                        "pack_hash",
+                        "durable_ref"
+                      ],
+                      "properties": {
+                        "durable_ref": {
+                          "type": "string"
+                        },
+                        "pack_hash": {
+                          "type": "string"
+                        },
+                        "search_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "conflicts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "effective_intelligence": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "evidence_id",
+                          "revision_id",
+                          "locator",
+                          "quote",
+                          "quote_hash",
+                          "source_kind"
+                        ],
+                        "properties": {
+                          "evidence_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "string"
+                          },
+                          "quote": {
+                            "type": "string"
+                          },
+                          "quote_hash": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          },
+                          "source_kind": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "gaps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "pack_hash": {
+                      "type": "string"
+                    },
+                    "requested_intelligence": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "snapshot_ref": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "stop_reason": {
+                      "type": "string"
+                    },
+                    "usage": {
+                      "type": "object",
+                      "required": [
+                        "read_calls",
+                        "quote_runes"
+                      ],
+                      "properties": {
+                        "quote_runes": {
+                          "type": "integer"
+                        },
+                        "read_calls": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/answer-sessions/{session_id}/tool-runs/{operation_id}/searches/{search_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetToolSearch",
+        "operationId": "productGetToolSearch",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "operation_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "search_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "search_id",
+                    "status",
+                    "stop_reason",
+                    "snapshot_ref",
+                    "requested_intelligence",
+                    "effective_intelligence",
+                    "evidence",
+                    "gaps",
+                    "conflicts",
+                    "usage"
+                  ],
+                  "properties": {
+                    "citation_receipt": {
+                      "type": "object",
+                      "required": [
+                        "search_id",
+                        "pack_hash",
+                        "durable_ref"
+                      ],
+                      "properties": {
+                        "durable_ref": {
+                          "type": "string"
+                        },
+                        "pack_hash": {
+                          "type": "string"
+                        },
+                        "search_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "conflicts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "effective_intelligence": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "evidence_id",
+                          "revision_id",
+                          "locator",
+                          "quote",
+                          "quote_hash",
+                          "source_kind"
+                        ],
+                        "properties": {
+                          "evidence_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "string"
+                          },
+                          "quote": {
+                            "type": "string"
+                          },
+                          "quote_hash": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          },
+                          "source_kind": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "gaps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "pack_hash": {
+                      "type": "string"
+                    },
+                    "requested_intelligence": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "snapshot_ref": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "stop_reason": {
+                      "type": "string"
+                    },
+                    "usage": {
+                      "type": "object",
+                      "required": [
+                        "read_calls",
+                        "quote_runes"
+                      ],
+                      "properties": {
+                        "quote_runes": {
+                          "type": "integer"
+                        },
+                        "read_calls": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/knowledge/builds/{build_id}/cancel": {
       "post": {
         "consumes": [

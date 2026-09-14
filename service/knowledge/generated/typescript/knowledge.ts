@@ -270,6 +270,49 @@ export function getProductSearch(params: components.ProductSearchPathParams, ses
 
 /**
  * @description
+ * @param params
+ * @param req
+ */
+export function createToolParent(params: components.ToolParentReqParams, req: components.ToolParentReq, session_id: string) {
+	return webapi.post<components.ToolParentEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/tool-runs`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getToolParent(params: components.ToolParentPathParams, session_id: string, operation_id: string) {
+	return webapi.get<components.ToolParentEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/tool-runs/${operation_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ * @param req
+ */
+export function readToolEvidence(params: components.ToolReadReqParams, req: components.ToolReadReq, session_id: string, operation_id: string) {
+	return webapi.post<components.ToolReadEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/tool-runs/${operation_id}/evidence-reads`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ * @param req
+ */
+export function createToolSearch(params: components.ToolSearchReqParams, req: components.ToolSearchReq, session_id: string, operation_id: string) {
+	return webapi.post<components.ToolSearchEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/tool-runs/${operation_id}/searches`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getToolSearch(params: components.ToolSearchPathParams, session_id: string, operation_id: string, search_id: string) {
+	return webapi.get<components.ToolSearchEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/tool-runs/${operation_id}/searches/${search_id}`, params)
+}
+
+/**
+ * @description
  * @param req
  */
 export function commitAcceptedAnswer(req: components.CommitAcceptedAnswerReq) {

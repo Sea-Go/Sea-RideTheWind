@@ -393,6 +393,107 @@ type (
 		Msg  string              `json:"msg"`
 		Data ProductSearchResult `json:"data"`
 	}
+	ToolParentReq {
+		SessionId      string `path:"session_id"`
+		ModuleId       string `json:"module_id"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	ToolParentPath {
+		SessionId   string `path:"session_id"`
+		OperationId string `path:"operation_id"`
+	}
+	ToolBudget {
+		SearchCalls            int `json:"search_calls"`
+		ReadCalls              int `json:"read_calls"`
+		QuoteRunes             int `json:"quote_runes"`
+		MaxReadsPerSearch      int `json:"max_reads_per_search"`
+		MaxQuoteRunesPerSearch int `json:"max_quote_runes_per_search"`
+	}
+	ToolParentResult {
+		OperationId            string     `json:"operation_id"`
+		ScopeRef               string     `json:"scope_ref"`
+		SnapshotRef            string     `json:"snapshot_ref"`
+		BudgetRef              string     `json:"budget_ref"`
+		ModuleId               string     `json:"module_id"`
+		DeadlineAtMs           int64      `json:"deadline_at_ms"`
+		AllowLowerIntelligence bool       `json:"allow_lower_intelligence"`
+		Budget                 ToolBudget `json:"budget"`
+	}
+	ToolParentEnvelope {
+		Code int              `json:"code"`
+		Msg  string           `json:"msg"`
+		Data ToolParentResult `json:"data"`
+	}
+	ToolSearchReq {
+		SessionId        string `path:"session_id"`
+		OperationId      string `path:"operation_id"`
+		Query            string `json:"query"`
+		Depth            string `json:"depth"`
+		Intelligence     string `json:"intelligence"`
+		ContinueSearchId string `json:"continue_search_id,optional,omitempty"`
+		ReadCalls        int    `json:"read_calls"`
+		QuoteRunes       int    `json:"quote_runes"`
+		IdempotencyKey   string `json:"idempotency_key"`
+	}
+	ToolSearchPath {
+		SessionId   string `path:"session_id"`
+		OperationId string `path:"operation_id"`
+		SearchId    string `path:"search_id"`
+	}
+	ToolEvidence {
+		EvidenceId string `json:"evidence_id"`
+		RevisionId string `json:"revision_id"`
+		Locator    string `json:"locator"`
+		Quote      string `json:"quote"`
+		QuoteHash  string `json:"quote_hash"`
+		SourceKind string `json:"source_kind"`
+	}
+	ToolReceipt {
+		SearchId   string `json:"search_id"`
+		PackHash   string `json:"pack_hash"`
+		DurableRef string `json:"durable_ref"`
+	}
+	ToolUsage {
+		ReadCalls  int `json:"read_calls"`
+		QuoteRunes int `json:"quote_runes"`
+	}
+	ToolSearchResult {
+		SearchId              string         `json:"search_id"`
+		Status                string         `json:"status"`
+		StopReason            string         `json:"stop_reason"`
+		SnapshotRef           string         `json:"snapshot_ref"`
+		RequestedIntelligence string         `json:"requested_intelligence"`
+		EffectiveIntelligence string         `json:"effective_intelligence"`
+		Evidence              []ToolEvidence `json:"evidence"`
+		Gaps                  []string       `json:"gaps"`
+		Conflicts             []string       `json:"conflicts"`
+		PackHash              string         `json:"pack_hash,optional,omitempty"`
+		CitationReceipt       *ToolReceipt   `json:"citation_receipt,optional,omitempty"`
+		Usage                 ToolUsage      `json:"usage"`
+	}
+	ToolSearchEnvelope {
+		Code int              `json:"code"`
+		Msg  string           `json:"msg"`
+		Data ToolSearchResult `json:"data"`
+	}
+	ToolReadReq {
+		SessionId      string `path:"session_id"`
+		OperationId    string `path:"operation_id"`
+		SearchId       string `json:"search_id"`
+		EvidenceId     string `json:"evidence_id"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	ToolReadResult {
+		SearchId        string       `json:"search_id"`
+		SnapshotRef     string       `json:"snapshot_ref"`
+		Evidence        ToolEvidence `json:"evidence"`
+		CitationReceipt ToolReceipt  `json:"citation_receipt"`
+	}
+	ToolReadEnvelope {
+		Code int            `json:"code"`
+		Msg  string         `json:"msg"`
+		Data ToolReadResult `json:"data"`
+	}
 )
 
 type (
@@ -669,6 +770,21 @@ service knowledge-api {
 	jwt:    UserAuth
 )
 service knowledge-api {
+	@handler CreateToolParent
+	post /answer-sessions/:session_id/tool-runs (ToolParentReq) returns (ToolParentEnvelope)
+
+	@handler GetToolParent
+	get /answer-sessions/:session_id/tool-runs/:operation_id (ToolParentPath) returns (ToolParentEnvelope)
+
+	@handler CreateToolSearch
+	post /answer-sessions/:session_id/tool-runs/:operation_id/searches (ToolSearchReq) returns (ToolSearchEnvelope)
+
+	@handler GetToolSearch
+	get /answer-sessions/:session_id/tool-runs/:operation_id/searches/:search_id (ToolSearchPath) returns (ToolSearchEnvelope)
+
+	@handler ReadToolEvidence
+	post /answer-sessions/:session_id/tool-runs/:operation_id/evidence-reads (ToolReadReq) returns (ToolReadEnvelope)
+
 	@handler CreateProductSearch
 	post /answer-sessions/:session_id/searches (ProductSearchReq) returns (ProductSearchEnvelope)
 

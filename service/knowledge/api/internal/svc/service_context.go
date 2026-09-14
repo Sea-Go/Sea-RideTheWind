@@ -53,6 +53,20 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 			return nil, fmt.Errorf("search summary requires bounded fast/detailed budgets and a larger RTW HTTP timeout")
 		}
 	}
+	if c.SearchTools.Endpoint != "" || c.SearchTools.ScopeKey != "" {
+		u, err := url.Parse(c.SearchTools.Endpoint)
+		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") ||
+			u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "/v1/search/tools/search" ||
+			len(c.SearchTools.ScopeKey) < 32 {
+			return nil, fmt.Errorf("search Tools require a private /v1/search/tools/search endpoint and scope key of at least 32 bytes")
+		}
+		if c.SearchTools.FastTimeoutMillis < 1000 || c.SearchTools.FastTimeoutMillis > 60000 ||
+			c.SearchTools.DetailedTimeoutMillis < c.SearchTools.FastTimeoutMillis ||
+			c.SearchTools.DetailedTimeoutMillis > 180000 ||
+			c.Timeout < int64(c.SearchTools.DetailedTimeoutMillis+5000) {
+			return nil, fmt.Errorf("search Tools require bounded fast/detailed budgets and a larger RTW HTTP timeout")
+		}
+	}
 	pc, err := pgxpool.ParseConfig(c.Postgres.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("invalid postgres configuration")
@@ -108,6 +122,11 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	}
 	if c.SearchSummary.Endpoint != "" {
 		if err = store.CheckProductSearchSchema(ctx); err != nil {
+			return fail(err)
+		}
+	}
+	if c.SearchTools.Endpoint != "" {
+		if err = store.CheckToolSearchSchema(ctx); err != nil {
 			return fail(err)
 		}
 	}
