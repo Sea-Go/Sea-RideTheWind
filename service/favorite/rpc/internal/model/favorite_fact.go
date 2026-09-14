@@ -38,7 +38,7 @@ type FavoriteFactOutbox struct {
 
 func (FavoriteFactOutbox) TableName() string { return "favorite_fact_outbox" }
 
-type favoriteSubjectRef struct {
+type FavoriteSubjectRef struct {
 	AuthorityID string `json:"authority_id"`
 	TenantID    string `json:"tenant_id"`
 	SubjectID   string `json:"subject_id"`
@@ -47,7 +47,7 @@ type favoriteSubjectRef struct {
 type favoriteFactPayload struct {
 	SchemaVersion  int                `json:"schema_version"`
 	EventID        string             `json:"event_id"`
-	Subject        favoriteSubjectRef `json:"subject_ref"`
+	Subject        FavoriteSubjectRef `json:"subject_ref"`
 	TargetType     string             `json:"target_type"`
 	TargetID       string             `json:"target_id"`
 	TargetRevision *string            `json:"target_revision"` // unavailable from current Article RPC
@@ -86,7 +86,7 @@ func favoriteOutbox(item FavoriteItem, version int64, operation string, now time
 		AggregateVersion: version, OperationID: eventID, OccurredAt: at,
 		Payload: favoriteFactPayload{
 			SchemaVersion: 1, EventID: eventID,
-			Subject:    favoriteSubjectRef{"rtw.identity", "platform", strconv.FormatInt(item.UserId, 10)},
+			Subject:    FavoriteSubjectRef{"rtw.identity", "platform", strconv.FormatInt(item.UserId, 10)},
 			TargetType: item.TargetType, TargetID: item.TargetId, TargetRevision: nil,
 			Operation: operation, SourceRef: fmt.Sprintf("rtw.favorite/%d", item.FavoriteId),
 			EventTime: at, AvailableAt: at, FavoriteID: strconv.FormatInt(item.FavoriteId, 10),
