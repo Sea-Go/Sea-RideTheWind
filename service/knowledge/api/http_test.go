@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -236,7 +237,27 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	var build types.Build
 	request("POST", "/v1/knowledge/releases/"+r.ReleaseId+"/index-builds", token, types.CreateBuildReq{IdempotencyKey: "http-build"}, &build, 200)
 	request("POST", "/internal/v1/knowledge/builds/"+build.BuildId+"/claim", c.WorkerToken, types.ClaimBuildReq{LeaseExpiresAt: time.Now().Add(time.Hour).Format(time.RFC3339Nano), Generation: build.Generation, AttemptId: "http-worker", LeaseEpoch: 1, ManifestHash: build.ManifestHash}, &build, 200)
-	ref := testenv.Put(t, s, testenv.Index(t, s, build, r))
+	// The HTTP citation path consumes a real fixed chunk/locator, not the
+	// structural-only chunk marker used by other H06 test fixtures.
+	quote := "Evidence"
+	quoteHash := object.Hash([]byte(quote))
+	chunkIdentity, err := json.Marshal([]any{a.RevisionId, r.ChunkingProfile, 2, 0, quoteHash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	chunk := types.CitationChunk{ChunkId: object.Hash(chunkIdentity), RevisionId: a.RevisionId,
+		ContentId: a.EntityId, SourceKind: a.Kind, Original: types.CitationObject{Key: a.ObjectKey, Sha256: a.ContentHash},
+		Location: types.CitationLocation{Locator: "paragraph:2", OriginalByteStart: 8, OriginalByteEnd: 16,
+			NormalizedRuneStart: 0, NormalizedRuneEnd: len([]rune(quote))},
+		Text: quote, TextHash: quoteHash, EncodingKey: object.Hash([]byte(quote)), Required: true}
+	chunkManifest := map[string]any{"schema_version": 1, "module_id": m.Id, "release_id": r.ReleaseId,
+		"input_manifest_hash": r.ManifestHash, "profile": r.ChunkingProfile, "parser_version": "sea.paragraph.v1",
+		"chunker_version": "trpc.fixed.v1.8.1", "chunk_size": 32, "overlap": 0,
+		"inputs": []any{map[string]any{"revision_id": a.RevisionId, "content_id": a.EntityId,
+			"source_kind": a.Kind, "original": chunk.Original, "chunk_count": 1}}, "chunks": []types.CitationChunk{chunk}}
+	index := testenv.Index(t, s, build, r)
+	index.ChunkManifest = testenv.Put(t, s, chunkManifest)
+	ref := testenv.Put(t, s, index)
 	result := types.AcceptBuildReq{Generation: build.Generation, AttemptId: build.AttemptId, LeaseEpoch: build.LeaseEpoch, ManifestHash: build.ManifestHash, State: "READY", IndexManifestRef: ref.Key, IndexManifestHash: ref.SHA256}
 	request("POST", "/internal/v1/knowledge/builds/"+build.BuildId+"/results", c.WorkerToken, result, &build, 200)
 	request("GET", "/v1/knowledge/modules/"+m.Id+"/published", "", nil, nil, 404)
@@ -262,6 +283,66 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if published.ManifestHash != r.ManifestHash {
 		t.Fatal(published)
 	}
+	read := types.ReadSearchSourceReq{ModuleId: m.Id, ReleaseId: r.ReleaseId, Generation: build.Generation,
+		PublicationRevision: "1", RevisionId: a.RevisionId, ChunkId: chunk.ChunkId}
+	request("POST", "/internal/v1/knowledge/search-sources/read", "", read, nil, 401)
+	var original types.CitationChunk
+	request("POST", "/internal/v1/knowledge/search-sources/read", c.WorkerToken, read, &original, 200)
+	if !reflect.DeepEqual(original, chunk) {
+		t.Fatalf("HTTP original differs from fixed chunk: %+v", original)
+	}
+	badRead := read
+	badRead.PublicationRevision = "2"
+	request("POST", "/internal/v1/knowledge/search-sources/read", c.WorkerToken, badRead, nil, 404)
+	searchID := "search-http-citation"
+	key := struct {
+		SourceKind string `json:"source_kind"`
+		ContentID  string `json:"content_id"`
+		RevisionID string `json:"revision_id"`
+		ChunkID    string `json:"chunk_id"`
+	}{chunk.SourceKind, chunk.ContentId, chunk.RevisionId, chunk.ChunkId}
+	idInput, err := json.Marshal(struct {
+		SearchID string
+		Key      any
+		Hash     string
+	}{searchID, key, chunk.TextHash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	indexes := map[string]any{}
+	for _, lane := range index.Lanes {
+		indexes[lane.Profile.Lane] = lane.Artifact
+	}
+	pack := map[string]any{"search_id": searchID, "snapshot": map[string]any{
+		"module_id": m.Id, "release_id": r.ReleaseId, "generation": build.Generation,
+		"publication_revision": "1", "indexes": indexes, "valid_revision_ids": []string{a.RevisionId}},
+		"profile": map[string]any{}, "status": "complete", "stop_reason": "", "coverage_status": "covered",
+		"gaps": []string{}, "evidence": []any{map[string]any{
+			"evidence_id": "ev_" + object.Hash(idInput)[:24], "key": key, "locator": chunk.Location,
+			"original": chunk.Original, "quote": quote, "quote_hash": quoteHash,
+			"relevance": 0.03, "sources": []any{},
+		}}}
+	packRaw, err := json.Marshal(pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accept := types.AcceptSearchCitationsReq{SearchId: searchID, PackJson: string(packRaw), PackHash: object.Hash(packRaw)}
+	var citation types.SearchCitationReceipt
+	request("POST", "/internal/v1/knowledge/search-citations", c.WorkerToken, accept, &citation, 200)
+	if citation.SearchId != searchID || citation.PackHash != accept.PackHash || citation.DurableRef == "" {
+		t.Fatalf("HTTP response lacks durable receipt: %+v", citation)
+	}
+	var replay types.SearchCitationReceipt
+	request("POST", "/internal/v1/knowledge/search-citations", c.WorkerToken, accept, &replay, 200)
+	if replay != citation {
+		t.Fatalf("HTTP replay changed receipt: %+v %+v", citation, replay)
+	}
+	var citations types.SearchCitationRecord
+	request("GET", "/internal/v1/knowledge/search-citations/"+searchID, c.WorkerToken, nil, &citations, 200)
+	if citations.DurableRef != citation.DurableRef || len(citations.Evidence) != 1 ||
+		citations.Evidence[0].QuoteHash != quoteHash || citations.Evidence[0].State != "available" {
+		t.Fatalf("HTTP committed mapping differs: %+v", citations)
+	}
 	var stored types.Revision
 	request("GET", "/internal/v1/knowledge/revisions/"+a.RevisionId, c.WorkerToken, nil, &stored, 200)
 	if stored.Content != "Book A\n\nEvidence" {
@@ -276,6 +357,10 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		t.Fatalf("durable outbox correlation missing: traceparent=%q request_id=%q err=%v", traceparent, originRequestID, err)
 	}
 	verifyProductReaders(t, s, request, token, filepath.Join(dir, "objects"), m, a, w, r, build)
+	request("GET", "/internal/v1/knowledge/search-citations/"+searchID, c.WorkerToken, nil, &citations, 200)
+	if len(citations.Evidence) != 1 || citations.Evidence[0].State != "unavailable" {
+		t.Fatalf("withdrawal did not invalidate historical citation: %+v", citations)
+	}
 	metrics, err := client.Get(base + "/metrics")
 	if err != nil {
 		t.Fatal(err)
@@ -310,6 +395,9 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 			}
 		}
 		t.Fatalf("activation replay or conflict counted as another committed publication: %v", activationMetrics)
+	}
+	if !strings.Contains(string(metricBody), `sea_knowledge_commits_total{operation="knowledge.search.citations.accept"} 1`) {
+		t.Fatal("citation replay was counted as another durable commit")
 	}
 	var records []map[string]any
 	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
@@ -359,6 +447,14 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 				t.Fatalf("request correlation missing: %#v", record)
 			}
 		}
+		if strings.HasPrefix(event, "knowledge.search.") {
+			if record["trace_id"] == nil || record["span_id"] == nil || record["request_id"] == nil || record["operation_id"] == nil {
+				t.Fatalf("citation stage lacks request and trace correlation: %#v", record)
+			}
+			if strings.Contains(fmt.Sprint(record), quote) {
+				t.Fatalf("citation stage logged source quote: %#v", record)
+			}
+		}
 		if event == "http.request.completed" && record["route"] == "unmatched" && record["method"] == "POST" && record["status"] == float64(404) {
 			seenUnmatchedPost = true
 		}
@@ -366,7 +462,7 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if !seenUnmatchedPost {
 		t.Fatal("unmatched POST lost its bounded actual HTTP method")
 	}
-	for _, event := range []string{"knowledge.service.starting", "knowledge.service.started", "knowledge.module.create.succeeded", "knowledge.release.activate.rejected", "http.request.completed"} {
+	for _, event := range []string{"knowledge.service.starting", "knowledge.service.started", "knowledge.module.create.succeeded", "knowledge.release.activate.rejected", "knowledge.search.source.read.succeeded", "knowledge.search.citations.accept.succeeded", "knowledge.search.citations.accept.replayed", "knowledge.search.citations.get.succeeded", "http.request.completed"} {
 		if !seen[event] {
 			t.Fatalf("missing runtime event %s in %d records", event, len(records))
 		}

@@ -48,6 +48,7 @@ goctl api ts --api api/knowledge.api --dir service/knowledge/generated/typescrip
 - H06 `IndexManifest` 当前由 `api/internal/model/builds.go` 的接纳结构定义 r1，读取不可变对象并校验其 SHA256、固定构建身份、ChunkManifest，以及 dense/sparse/multivector 的 profile、空间、维度、数量、分片和探针引用。`testenv.Index` 明确构建的是结构 fixture；fixture 数值与探针声明不证明真实编码或索引效果。后续 WS06 冻结生产者 schema 后进行双向契约接纳。
 - READY 不自动发布。`PUT /modules/{id}/activation` 对 release/build/expected_pointer_revision/reason 验证后，在同事务更新指针、publication 审计和 Outbox。回滚使用同一接口、保持 pointer_revision 递增。现网页没有 idempotency_key 时，以 actor/module/expected_pointer_revision 作为重试身份；同键不同输入返回 409。
 - 已取消/被替代构建不影响旧 READY build；已撤回来源不能通过回滚重新启用。公开读取固定同一 PostgreSQL 快照，正文对象和修订仍按 hash 核对。
+- H07 worker 引用接口按发布指针版本、release、generation 读取原文 chunk，并在模块锁下接纳 BTW 固定 EvidencePack 的精确 JSON/hash；同 search_id 重投同收据，按 search_id 回查只给引用身份与当前可用状态。路径、提交点和局部验收见 [search-citations.md](docs/acceptance/search-citations.md)。
 
 ## 启动与存储
 
