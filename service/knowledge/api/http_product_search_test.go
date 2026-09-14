@@ -221,24 +221,34 @@ func decodeProductFixtureScope(t *testing.T, header string) (productFixtureScope
 // startRealBTWProductServer starts an independently compiled BTW test process.
 // The existing fixture remains a byte-preserving relay, so its test stages
 // cannot fabricate an accepted turn for this path.
-func startRealBTWProductServer(t *testing.T, dir, btwRoot, rtwBase, workerToken string) string {
+func startRealBTWProductServer(t *testing.T, dir, btwRoot, rtwBase, workerToken, moduleID string, candidate *types.CitationChunk) string {
 	t.Helper()
-	readyPath := filepath.Join(dir, "btw-product-server-url")
-	fixturePath := filepath.Join(dir, "btw-product-server-fixture.json")
+	variant := "empty"
+	if candidate != nil {
+		variant = "cited"
+	}
+	readyPath := filepath.Join(dir, "btw-product-"+variant+"-server-url")
+	fixturePath := filepath.Join(dir, "btw-product-"+variant+"-server-fixture.json")
 	fixture, err := json.Marshal(map[string]string{"rtw_base": rtwBase, "worker_token": workerToken,
-		"scope_key": productFixtureScopeKey, "ready_path": readyPath})
+		"scope_key": productFixtureScopeKey, "ready_path": readyPath, "module_id": moduleID})
+	if candidate != nil {
+		fixture, err = json.Marshal(map[string]any{"rtw_base": rtwBase, "worker_token": workerToken,
+			"scope_key": productFixtureScopeKey, "ready_path": readyPath, "module_id": moduleID,
+			"candidate": map[string]string{"revision_id": candidate.RevisionId,
+				"chunk_id": candidate.ChunkId, "quote_hash": candidate.TextHash}})
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(fixturePath, fixture, 0600); err != nil {
 		t.Fatal(err)
 	}
-	logPath := filepath.Join(dir, "btw-product-server.log")
+	logPath := filepath.Join(dir, "btw-product-"+variant+"-server.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
-	binary := filepath.Join(dir, "btw-product-server.test")
+	binary := filepath.Join(dir, "btw-product-"+variant+"-server.test")
 	compile := exec.Command("go", "test", "-c", "-mod=readonly", "-race", "-o", binary,
 		"./internal/transport/http/search")
 	compile.Dir = btwRoot
