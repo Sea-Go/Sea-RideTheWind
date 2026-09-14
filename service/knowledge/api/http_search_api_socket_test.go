@@ -255,6 +255,21 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 		}
 		logFile.Close()
 		logs, _ := os.ReadFile(logPath)
+		for _, secret := range []string{workerToken, dc.Token, modelKey} {
+			if secret != "" && bytes.Contains(logs, []byte(secret)) {
+				t.Error("formal cmd/api log contains a configured credential")
+			}
+		}
+		if process.served.Load() {
+			if evidence := os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"); evidence != "" {
+				if err := os.MkdirAll(evidence, 0700); err != nil {
+					t.Error(err)
+				} else if err := os.WriteFile(filepath.Join(evidence,
+					"formal-search-api-"+strings.ReplaceAll(apiAddr, ":", "-")+".jsonl"), logs, 0600); err != nil {
+					t.Error(err)
+				}
+			}
+		}
 		if !bytes.Contains(logs, []byte(`"event":"search.api.started"`)) ||
 			!bytes.Contains(logs, []byte(`"event":"search.api.stopped"`)) {
 			t.Error("formal cmd/api omitted structured startup or shutdown events")

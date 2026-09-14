@@ -47,9 +47,15 @@ fi
 export SEA_BGE_RUNTIME_FILE="$dc_runtime"
 export SEA_BTW_INDEX_CONSUMER_ROOT SEA_DC_JOB_PLATFORM_ROOT
 export KNOWLEDGE_KEEP_EVIDENCE=1
-export KNOWLEDGE_REAL_USER_GATE=1
+knowledge_test_pattern='^TestRealHTTPKnowledgeWorkflow'
+if [[ "${SEA_BGE_WORKER_PUBLISH_SEARCH:-0}" == 1 ]]; then
+  export KNOWLEDGE_REAL_USER_GATE=0
+  knowledge_test_pattern='^TestRealHTTPKnowledgeWorkflow$'
+else
+  export KNOWLEDGE_REAL_USER_GATE=1
+fi
 cd "$rtw_root"
-GOFLAGS='-run=^TestRealHTTPKnowledgeWorkflow' bash service/knowledge/scripts/acceptance.sh \
+GOFLAGS="-run=$knowledge_test_pattern" bash service/knowledge/scripts/acceptance.sh \
   >"$evidence/rtw-btw-jobs-test.log" 2>&1
 touch "$(dirname "$dc_runtime")/release"
 wait "$dc_pid"
