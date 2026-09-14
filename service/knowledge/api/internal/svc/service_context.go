@@ -3,6 +3,8 @@ package svc
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 	"time"
 
 	"sea-try-go/service/knowledge/api/internal/config"
@@ -26,6 +28,7 @@ type ServiceContext struct {
 	Worker        rest.Middleware
 	Store         *model.Store
 	UserRpc       identity.UserReader
+	SearchHTTP    *http.Client
 	userRpcClient zrpc.Client
 }
 
@@ -35,6 +38,20 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	}
 	if _, err := c.UserRpc.BuildTarget(); err != nil {
 		return nil, fmt.Errorf("user RPC configuration: %w", err)
+	}
+	if c.SearchSummary.Endpoint != "" || c.SearchSummary.ScopeKey != "" {
+		u, err := url.Parse(c.SearchSummary.Endpoint)
+		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") ||
+			u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "/v1/search/summary" ||
+			len(c.SearchSummary.ScopeKey) < 32 {
+			return nil, fmt.Errorf("search summary requires a private /v1/search/summary endpoint and scope key of at least 32 bytes")
+		}
+		if c.SearchSummary.FastTimeoutMillis < 1000 || c.SearchSummary.FastTimeoutMillis > 60000 ||
+			c.SearchSummary.DetailedTimeoutMillis < c.SearchSummary.FastTimeoutMillis ||
+			c.SearchSummary.DetailedTimeoutMillis > 180000 ||
+			c.Timeout < int64(c.SearchSummary.DetailedTimeoutMillis+5000) {
+			return nil, fmt.Errorf("search summary requires bounded fast/detailed budgets and a larger RTW HTTP timeout")
+		}
 	}
 	pc, err := pgxpool.ParseConfig(c.Postgres.DSN)
 	if err != nil {
@@ -89,11 +106,19 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 			return fail(err)
 		}
 	}
+	if c.SearchSummary.Endpoint != "" {
+		if err = store.CheckProductSearchSchema(ctx); err != nil {
+			return fail(err)
+		}
+	}
 	userClient, err := zrpc.NewClient(c.UserRpc)
 	if err != nil {
 		return fail(fmt.Errorf("user RPC configuration: %w", err))
 	}
 	return &ServiceContext{Config: c, Store: store, UserRpc: userservice.NewUserService(userClient), userRpcClient: userClient,
+		SearchHTTP: &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		}},
 		Administrator: middleware.NewAdministratorMiddleware(c.AdministratorIDs).Handle,
 		Worker:        middleware.NewWorkerMiddleware(c.WorkerToken).Handle}, nil
 }

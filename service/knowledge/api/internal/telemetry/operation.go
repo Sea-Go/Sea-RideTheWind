@@ -39,11 +39,13 @@ var operations = map[string]bool{
 	"knowledge.outbox.poll":             true,
 	"knowledge.search.snapshot.current": true, "knowledge.search.source.read": true, "knowledge.search.citations.accept": true, "knowledge.search.citations.get": true,
 	"knowledge.answer.accept": true, "knowledge.answer.get": true, "knowledge.answer.list": true,
+	"knowledge.product.search": true, "knowledge.product.search.get": true,
 }
 
 var readOnlyOperations = map[string]bool{
 	"knowledge.search.snapshot.current": true, "knowledge.search.source.read": true, "knowledge.search.citations.get": true,
 	"knowledge.answer.get": true, "knowledge.answer.list": true, "knowledge.outbox.poll": true,
+	"knowledge.product.search.get": true,
 }
 
 func (r *Runtime) PollFailure(ctx context.Context, err error) {

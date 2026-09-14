@@ -2294,6 +2294,327 @@
         }
       }
     },
+    "/v1/knowledge/answer-sessions/{session_id}/searches": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CreateProductSearch",
+        "operationId": "productCreateProductSearch",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "module_id",
+                "query",
+                "depth",
+                "intelligence",
+                "idempotency_key"
+              ],
+              "properties": {
+                "depth": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "intelligence": {
+                  "type": "string"
+                },
+                "module_id": {
+                  "type": "string"
+                },
+                "query": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "search_id",
+                    "answer_id",
+                    "status",
+                    "citations"
+                  ],
+                  "properties": {
+                    "answer": {
+                      "type": "string"
+                    },
+                    "answer_id": {
+                      "type": "string"
+                    },
+                    "citation_receipt_ref": {
+                      "type": "string"
+                    },
+                    "citations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "evidence_id",
+                          "source_kind",
+                          "content_id",
+                          "revision_id",
+                          "locator",
+                          "original",
+                          "quote",
+                          "quote_hash"
+                        ],
+                        "properties": {
+                          "content_id": {
+                            "type": "string"
+                          },
+                          "evidence_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "object",
+                            "required": [
+                              "locator",
+                              "original_byte_start",
+                              "original_byte_end",
+                              "normalized_rune_start",
+                              "normalized_rune_end"
+                            ],
+                            "properties": {
+                              "locator": {
+                                "type": "string"
+                              },
+                              "normalized_rune_end": {
+                                "type": "integer"
+                              },
+                              "normalized_rune_start": {
+                                "type": "integer"
+                              },
+                              "original_byte_end": {
+                                "type": "integer"
+                              },
+                              "original_byte_start": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "original": {
+                            "type": "object",
+                            "required": [
+                              "key",
+                              "sha256"
+                            ],
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "quote": {
+                            "type": "string"
+                          },
+                          "quote_hash": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          },
+                          "source_kind": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/answer-sessions/{session_id}/searches/{search_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetProductSearch",
+        "operationId": "productGetProductSearch",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "search_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "search_id",
+                    "answer_id",
+                    "status",
+                    "citations"
+                  ],
+                  "properties": {
+                    "answer": {
+                      "type": "string"
+                    },
+                    "answer_id": {
+                      "type": "string"
+                    },
+                    "citation_receipt_ref": {
+                      "type": "string"
+                    },
+                    "citations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "evidence_id",
+                          "source_kind",
+                          "content_id",
+                          "revision_id",
+                          "locator",
+                          "original",
+                          "quote",
+                          "quote_hash"
+                        ],
+                        "properties": {
+                          "content_id": {
+                            "type": "string"
+                          },
+                          "evidence_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "object",
+                            "required": [
+                              "locator",
+                              "original_byte_start",
+                              "original_byte_end",
+                              "normalized_rune_start",
+                              "normalized_rune_end"
+                            ],
+                            "properties": {
+                              "locator": {
+                                "type": "string"
+                              },
+                              "normalized_rune_end": {
+                                "type": "integer"
+                              },
+                              "normalized_rune_start": {
+                                "type": "integer"
+                              },
+                              "original_byte_end": {
+                                "type": "integer"
+                              },
+                              "original_byte_start": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "original": {
+                            "type": "object",
+                            "required": [
+                              "key",
+                              "sha256"
+                            ],
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "quote": {
+                            "type": "string"
+                          },
+                          "quote_hash": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          },
+                          "source_kind": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/knowledge/builds/{build_id}/cancel": {
       "post": {
         "consumes": [

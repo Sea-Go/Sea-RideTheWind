@@ -358,6 +358,41 @@ type (
 		Msg  string                      `json:"msg"`
 		Data ProductAnswerCitationStates `json:"data"`
 	}
+	ProductSearchReq {
+		SessionId      string `path:"session_id"`
+		ModuleId       string `json:"module_id"`
+		Query          string `json:"query"`
+		Depth          string `json:"depth"`
+		Intelligence   string `json:"intelligence"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	ProductSearchPath {
+		SessionId string `path:"session_id"`
+		SearchId  string `path:"search_id"`
+	}
+	ProductSearchCitation {
+		EvidenceId string           `json:"evidence_id"`
+		SourceKind string           `json:"source_kind"`
+		ContentId  string           `json:"content_id"`
+		RevisionId string           `json:"revision_id"`
+		Locator    CitationLocation `json:"locator"`
+		Original   CitationObject   `json:"original"`
+		Quote      string           `json:"quote"`
+		QuoteHash  string           `json:"quote_hash"`
+	}
+	ProductSearchResult {
+		SearchId           string                  `json:"search_id"`
+		AnswerId           string                  `json:"answer_id"`
+		Status             string                  `json:"status"`
+		Answer             string                  `json:"answer,optional,omitempty"`
+		Citations          []ProductSearchCitation `json:"citations"`
+		CitationReceiptRef string                  `json:"citation_receipt_ref,optional,omitempty"`
+	}
+	ProductSearchEnvelope {
+		Code int                 `json:"code"`
+		Msg  string              `json:"msg"`
+		Data ProductSearchResult `json:"data"`
+	}
 )
 
 type (
@@ -634,6 +669,12 @@ service knowledge-api {
 	jwt:    UserAuth
 )
 service knowledge-api {
+	@handler CreateProductSearch
+	post /answer-sessions/:session_id/searches (ProductSearchReq) returns (ProductSearchEnvelope)
+
+	@handler GetProductSearch
+	get /answer-sessions/:session_id/searches/:search_id (ProductSearchPath) returns (ProductSearchEnvelope)
+
 	@handler ListProductAcceptedAnswers
 	get /answer-sessions/:session_id/accepted-answers (ProductAcceptedAnswersReq) returns (AcceptedAnswersPageEnvelope)
 
