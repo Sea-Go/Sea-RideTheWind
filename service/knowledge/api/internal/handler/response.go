@@ -27,6 +27,12 @@ func ConfigureResponses() {
 		case errors.Is(err, identity.ErrUserNotFound), errors.Is(err, identity.ErrIdentityMismatch):
 			status = http.StatusForbidden
 			msg = "authenticated user unavailable"
+		case errors.Is(err, identity.ErrUserInactive):
+			status = http.StatusForbidden
+			msg = "authenticated user inactive"
+		case errors.Is(err, identity.ErrStatusUnavailable):
+			status = http.StatusServiceUnavailable
+			msg = "authenticated user status unavailable"
 		case grpcstatus.Code(err) == codes.Unavailable:
 			status = http.StatusServiceUnavailable
 		case errors.Is(err, model.ErrInvalid):

@@ -25,6 +25,8 @@ type getUserRPCStub struct {
 	err    error
 }
 
+func userStatusPointer(status int64) *int64 { return &status }
+
 func (s *getUserRPCStub) GetUser(_ context.Context, req *pb.GetUserReq, _ ...grpc.CallOption) (*pb.GetUserResp, error) {
 	s.called++
 	s.uid = req.Uid
@@ -41,7 +43,9 @@ func TestGetUserUsesAuthenticatedRPCIdentity(t *testing.T) {
 		code  int
 		calls int
 	}{
-		{"valid", json.Number("9123"), &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123, Username: "member"}}, nil, errmsg.Success, 1},
+		{"valid", json.Number("9123"), &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123, Username: "member", Status: userStatusPointer(0)}}, nil, errmsg.Success, 1},
+		{"banned", json.Number("9123"), &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123, Status: userStatusPointer(1)}}, nil, errmsg.ErrorUserBanned, 1},
+		{"old-rpc", json.Number("9123"), &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9123}}, nil, errmsg.CodeServerBusy, 1},
 		{"deleted", json.Number("9123"), nil, status.Error(codes.NotFound, "gone"), errmsg.ErrorUserNotExist, 1},
 		{"mismatched", json.Number("9123"), &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: 9911}}, nil, errmsg.ErrorServerCommon, 1},
 		{"zero", json.Number("0"), nil, nil, errmsg.ErrorTokenRuntime, 0},

@@ -10,9 +10,11 @@ import (
 )
 
 var (
-	ErrInvalidClaim     = shared.ErrInvalidClaim
-	ErrUserNotFound     = shared.ErrUserNotFound
-	ErrIdentityMismatch = shared.ErrIdentityMismatch
+	ErrInvalidClaim      = shared.ErrInvalidClaim
+	ErrUserNotFound      = shared.ErrUserNotFound
+	ErrIdentityMismatch  = shared.ErrIdentityMismatch
+	ErrUserInactive      = shared.ErrUserInactive
+	ErrStatusUnavailable = shared.ErrStatusUnavailable
 )
 
 const (

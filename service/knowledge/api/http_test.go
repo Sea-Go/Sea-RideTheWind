@@ -36,8 +36,9 @@ import (
 
 type productUserRPC struct {
 	pb.UnimplementedUserServiceServer
-	deleted atomic.Bool
-	calls   atomic.Int64
+	deleted       atomic.Bool
+	missingStatus atomic.Bool
+	calls         atomic.Int64
 }
 
 func (s *productUserRPC) GetUser(_ context.Context, req *pb.GetUserReq) (*pb.GetUserResp, error) {
@@ -52,7 +53,12 @@ func (s *productUserRPC) GetUser(_ context.Context, req *pb.GetUserReq) (*pb.Get
 	if uid == 8888 {
 		uid = 7777 // An RPC mismatch must never produce a SubjectRef.
 	}
-	return &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: uid}}, nil
+	info := &pb.UserInfo{Uid: uid}
+	if !s.missingStatus.Load() {
+		active := int64(0)
+		info.Status = &active
+	}
+	return &pb.GetUserResp{Found: true, User: info}, nil
 }
 
 func TestHTTPProcessHelper(t *testing.T) {
@@ -558,6 +564,11 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if len(ownHistory.Items) != 1 || ownHistory.Items[0] != accepted {
 		t.Fatalf("client subject fields changed own history: %+v", ownHistory)
 	}
+	if !realUser {
+		userRPC.missingStatus.Store(true)
+		request("GET", productPath, productToken, nil, nil, 503)
+		userRPC.missingStatus.Store(false)
+	}
 	var ownAnswer types.AcceptedAnswer
 	request("GET", productPath+"/"+answerID, productToken, nil, &ownAnswer, 200)
 	if ownAnswer != accepted {
@@ -638,8 +649,13 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		// A disabled account is still returned by today's GetUser handler. This
 		// observed counterexample keeps the H02 disable gate open.
 		realUsers.markDisabled(t, productUID)
-		request("GET", productPath, productToken, nil, &ownHistory, 200)
-		t.Log("H02 gap: real User RPC GetUser returns status=1 users; product history remains readable")
+		request("GET", productPath, productToken, nil, nil, 403)
+		request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
+		request("GET", citationStatePath, productToken, nil, nil, 403)
+		request("GET", productPath, otherToken, nil, &otherHistory, 200)
+		if len(otherHistory.Items) != 0 {
+			t.Fatalf("active other subject changed after disabling owner: %+v", otherHistory)
+		}
 		realUsers.delete(t, productUID)
 		request("GET", productPath, productToken, nil, nil, 403)
 		request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)

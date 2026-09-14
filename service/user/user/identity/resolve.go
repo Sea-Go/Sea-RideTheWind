@@ -17,9 +17,11 @@ import (
 )
 
 var (
-	ErrInvalidClaim     = errors.New("invalid authenticated user claim")
-	ErrUserNotFound     = errors.New("authenticated user not found")
-	ErrIdentityMismatch = errors.New("authenticated user RPC identity mismatch")
+	ErrInvalidClaim      = errors.New("invalid authenticated user claim")
+	ErrUserNotFound      = errors.New("authenticated user not found")
+	ErrIdentityMismatch  = errors.New("authenticated user RPC identity mismatch")
+	ErrUserInactive      = errors.New("authenticated user inactive")
+	ErrStatusUnavailable = errors.New("authenticated user status unavailable")
 )
 
 const (
@@ -61,8 +63,9 @@ func ClaimedUID(ctx context.Context) (int64, error) {
 	return uid, nil
 }
 
-// ResolveUser verifies that the authenticated UID still names the same user
-// in RTW. It must be called only behind go-zero's JWT middleware.
+// ResolveUser verifies that the authenticated UID still names an active user
+// in RTW. It must be called only behind go-zero's JWT middleware. An older RPC
+// without status presence cannot establish an authenticated product subject.
 func ResolveUser(ctx context.Context, users UserReader) (*pb.UserInfo, error) {
 	uid, err := ClaimedUID(ctx)
 	if err != nil {
@@ -83,6 +86,12 @@ func ResolveUser(ctx context.Context, users UserReader) (*pb.UserInfo, error) {
 	}
 	if response.User.Uid != uid {
 		return nil, ErrIdentityMismatch
+	}
+	if response.User.Status == nil {
+		return nil, ErrStatusUnavailable
+	}
+	if response.User.GetStatus() != 0 {
+		return nil, ErrUserInactive
 	}
 	return response.User, nil
 }
