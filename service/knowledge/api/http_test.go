@@ -1288,8 +1288,15 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		}
 		consumer := exec.Command("bash", "cmd/worker/acceptance.sh")
 		consumer.Dir = btwRoot
+		consumerTest := "TestRTWRealProviderIndexDispatch"
+		if os.Getenv("SEA_BGE_WORKER_PROCESSES") == "1" {
+			if bgeRuntimeFile == "" || actualDC == nil {
+				t.Fatal("real BGE worker processes require the locked provider and actual DC jobs")
+			}
+			consumerTest = "TestRTWRealBGEWorkerProcesses"
+		}
 		consumer.Env = append(os.Environ(), "SEA_RTW_REAL_INDEX_FIXTURE="+fixturePath,
-			"GOFLAGS=-run=^TestRTWRealProviderIndexDispatch$")
+			"GOFLAGS=-run=^"+consumerTest+"$")
 		output, runErr := consumer.CombinedOutput()
 		if runErr != nil {
 			t.Fatalf("BTW index consumer did not hand off real RTW READY: %v\n%s", runErr, output)
