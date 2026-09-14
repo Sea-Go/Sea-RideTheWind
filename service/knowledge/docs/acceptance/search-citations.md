@@ -19,6 +19,12 @@
 - 隔离 PostgreSQL 16 + 真实 HTTP go-zero 子进程验证：未携 Worker token 的读取拒绝；固定源片段返回、错 publication 拒绝、引用提交后 GET 可回查；重投不增加第二次提交；撤回后 GET 标不可用。
 - PG 模型反例验证：错 generation/publication/revision/chunk，伪造 quote/locator/index，search_id 异包冲突，两请求并发只有一个提交，原文对象读取期间撤回不能写入引用；收据返回时数据库已有精确 pack hash/bytes。历史撤回后同输入仍可回查收据。独立 race 测试还核对 CRLF 原文字节位置、Unicode 规范化 rune 范围及偏移拒收。
 - 测试构建采用合成发布和结构性 H06 三路 probe 工件，**不证明**真实 Dense/Sparse/Multi-vector 同代构建或实际排序；本切片只验 RTW 原文/引用侧。
-- 尚无 BTW 正式 HTTP SourceReader/CitationAcceptor 适配器、真实搜索请求/首个公开 SSE 引用门禁、Collector→DC 下钻、客户端恢复、`AcceptedRootHistory.Commit/List`。后者需要以完整 SubjectRef、SessionID、AnswerID、SearchID、收据及校验后公开 turn 另行定义权威持久化和历史投影；不能以本引用表代替回答历史。
+- BTW后续已有生成Worker HTTP客户端/SourceReader/CitationAcceptor并完成本页末的局部跨仓引用联验；仍无正式搜索API进程、首个公开SSE引用门禁、Collector→DC下钻或客户端历史。RTW后续已另建已接受答案产品历史表，不能把本引用表或它的产品投影当成BTW可续跑Agent原始事件。
 
 复验命令：`service/knowledge/scripts/acceptance.sh`（脚本创建/删除隔离 PG16，执行 `go test -race ./service/knowledge/... -count=1 -v`、`go vet ./service/knowledge/...`、`git diff --check`）；`KNOWLEDGE_GOCTL=<临时目录>/goctl service/knowledge/scripts/generate.sh`（goctl 1.9.2）。正式 H07 真实接纳需 BTW 消费上述生成合同，在同一 Trace 下跑到公开 EOF，再核对 RTW 收据和客户端历史。
+
+### BTW生成客户端消费同一RTW实例（后续局部联验）
+
+在RTW集成开发树与BTW集成开发树固定版本下，设置`SEA_BTW_CITATION_CONSUMER_ROOT=/Users/edy/Sea/.codex-worktrees/sea-btw-runtime-content-20260914`运行**完整**`bash service/knowledge/scripts/acceptance.sh`，退出码0。`TestRealHTTPKnowledgeWorkflow`启动真实RTW go-zero HTTP进程与隔离PG16，发布带结构性三路IndexManifest的固定release，然后把该fixture交给另一个Go模块的BTW生成客户端测试进程。BTW实际经Worker HTTP读取同版原文、以自身`EvidencePack`序列化结果提交新search_id引用并回查同一RTW数据库收据；RTW日志中原文读取与引用接纳应用阶段的trace_id均与BTW提供的W3C父Trace ID一致。测试断言该新search_id与RTW原有search_id合计正好**两次唯一引用提交**，重放不增加计数。
+
+这证明H07**引用子链**的两仓真实进程/PG/HTTP/Trace合同，仍以合成三路IndexManifest为输入；没有真实BGE-M3同代三引擎、BTW正式搜索API/单根回答运行、RTW AcceptedRootHistory跨仓消费、网页/桌宠公开EOF或Collector→DC下钻。因此本页RTW局部状态可上推到`INTEGRATED`引用合同，H07/OBS-r3整体仍`PARTIAL/NOT_VERIFIED`。
