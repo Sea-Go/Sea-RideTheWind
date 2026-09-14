@@ -291,6 +291,68 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if !reflect.DeepEqual(original, chunk) {
 		t.Fatalf("HTTP original differs from fixed chunk: %+v", original)
 	}
+	if btwRoot := os.Getenv("SEA_BTW_CITATION_CONSUMER_ROOT"); btwRoot != "" {
+		// This optional local cross-repository gate lets the generated BTW
+		// client consume the same actual RTW HTTP process and PG publication.
+		// Ordinary RTW tests remain repository-local when the variable is unset.
+		fixedIndexes := map[string]any{}
+		for _, lane := range index.Lanes {
+			fixedIndexes[lane.Profile.Lane] = lane.Artifact
+		}
+		fixtureRaw, err := json.Marshal(map[string]any{
+			"base_url": base, "token": c.WorkerToken, "chunk": chunk,
+			"trace_id_path": filepath.Join(dir, "btw-citation-trace-id"),
+			"snapshot": map[string]any{"module_id": m.Id, "release_id": r.ReleaseId,
+				"generation": build.Generation, "publication_revision": "1",
+				"indexes": fixedIndexes, "valid_revision_ids": []string{a.RevisionId}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		fixturePath := filepath.Join(dir, "btw-citation-fixture.json")
+		if err := os.WriteFile(fixturePath, fixtureRaw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		consumer := exec.Command("go", "test", "-mod=readonly", "-race", "-count=1",
+			"-run", "^TestRTWRealProviderCitationAdapter$", "-v", "./internal/app")
+		consumer.Dir = btwRoot
+		consumer.Env = append(os.Environ(), "SEA_RTW_REAL_CITATION_FIXTURE="+fixturePath)
+		output, err := consumer.CombinedOutput()
+		if err != nil {
+			t.Fatalf("BTW generated client rejected real RTW source/receipt: %v\n%s", err, output)
+		}
+		if testing.Verbose() {
+			t.Logf("BTW real RTW citation consumer: %s", strings.TrimSpace(string(output)))
+		}
+		traceRaw, err := os.ReadFile(filepath.Join(dir, "btw-citation-trace-id"))
+		if err != nil || len(traceRaw) != 32 {
+			t.Fatalf("BTW consumer did not return actual Trace ID: %q %v", traceRaw, err)
+		}
+		foundRead, foundAccept := false, false
+		for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+			logs, readErr := os.ReadFile(filepath.Join(dir, "http.log"))
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			for _, line := range bytes.Split(bytes.TrimSpace(logs), []byte("\n")) {
+				var record struct {
+					Event   string `json:"event"`
+					TraceID string `json:"trace_id"`
+				}
+				if json.Unmarshal(line, &record) != nil || record.TraceID != string(traceRaw) {
+					continue
+				}
+				foundRead = foundRead || record.Event == "knowledge.search.source.read.succeeded"
+				foundAccept = foundAccept || record.Event == "knowledge.search.citations.accept.succeeded"
+			}
+			if foundRead && foundAccept {
+				break
+			}
+		}
+		if !foundRead || !foundAccept {
+			t.Fatalf("RTW original/citation stages did not share BTW Trace ID %s: read=%v accept=%v", traceRaw, foundRead, foundAccept)
+		}
+	}
 	badRead := read
 	badRead.PublicationRevision = "2"
 	request("POST", "/internal/v1/knowledge/search-sources/read", c.WorkerToken, badRead, nil, 404)
@@ -442,7 +504,11 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		}
 		t.Fatalf("activation replay or conflict counted as another committed publication: %v", activationMetrics)
 	}
-	if !strings.Contains(string(metricBody), `sea_knowledge_commits_total{operation="knowledge.search.citations.accept"} 1`) {
+	expectedCitationCommits := 1
+	if os.Getenv("SEA_BTW_CITATION_CONSUMER_ROOT") != "" {
+		expectedCitationCommits++ // the external BTW client committed a second search_id
+	}
+	if !strings.Contains(string(metricBody), fmt.Sprintf(`sea_knowledge_commits_total{operation="knowledge.search.citations.accept"} %d`, expectedCitationCommits)) {
 		t.Fatal("citation replay was counted as another durable commit")
 	}
 	var records []map[string]any
