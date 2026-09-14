@@ -48,7 +48,9 @@ export FAVORITE_DC_URL="http://127.0.0.1:$favorite_dc_port"
 export FAVORITE_DC_TOKEN="$PLATFORM_SERVICE_TOKEN"
 (cd "$favorite_dc_root" && go build -mod=readonly -o "$favorite_tmp/dc-platform" ./cmd/platform)
 (cd "$favorite_repo" && go build -mod=readonly -o "$favorite_tmp/favorite-fact-dispatch" ./service/favorite/rpc/cmd/fact-dispatch)
+(cd "$favorite_repo" && go build -mod=readonly -o "$favorite_tmp/favorite-fact-authority" ./service/favorite/rpc/cmd/fact-authority)
 export FAVORITE_DISPATCH_BIN="$favorite_tmp/favorite-fact-dispatch"
+export FAVORITE_AUTHORITY_BIN="$favorite_tmp/favorite-fact-authority"
 "$favorite_tmp/dc-platform" -listen "127.0.0.1:$favorite_dc_port" -migrate >"$favorite_tmp/dc-platform.log" 2>&1 &
 favorite_dc_pid=$!
 favorite_ready=false
