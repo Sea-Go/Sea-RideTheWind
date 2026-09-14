@@ -1,0 +1,22 @@
+Name: knowledge-api
+Host: 127.0.0.1
+Port: 8186
+Mode: dev
+Timeout: 15000
+MaxBytes: 16777216
+Log:
+  Mode: console
+  Level: info
+Auth:
+  AccessSecret: ${KNOWLEDGE_AUTH_SECRET}
+  AccessExpire: 3600
+AdministratorIDs:
+  - ${KNOWLEDGE_ADMIN_ID}
+WorkerToken: ${KNOWLEDGE_WORKER_TOKEN}
+Postgres:
+  DSN: ${KNOWLEDGE_POSTGRES_DSN}
+  MaxConnections: 8
+  Migrate: false
+Objects:
+  Backend: local
+  LocalDirectory: ${KNOWLEDGE_OBJECT_DIRECTORY}

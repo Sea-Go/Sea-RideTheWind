@@ -1,0 +1,3078 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "https"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0"
+  },
+  "basePath": "/",
+  "paths": {
+    "/internal/v1/knowledge/builds/{build_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetBuild",
+        "operationId": "workerGetBuild",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "build_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "lease_expires_at",
+                    "build_id",
+                    "release_id",
+                    "module_id",
+                    "manifest_hash",
+                    "generation",
+                    "state",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "index_manifest_ref",
+                    "index_manifest_hash",
+                    "error_code"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "build_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "index_manifest_hash": {
+                      "type": "string"
+                    },
+                    "index_manifest_ref": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/builds/{build_id}/claim": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ClaimBuild",
+        "operationId": "workerClaimBuild",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "build_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "lease_expires_at",
+                "generation",
+                "attempt_id",
+                "lease_epoch",
+                "cancel_version",
+                "manifest_hash"
+              ],
+              "properties": {
+                "attempt_id": {
+                  "type": "string"
+                },
+                "cancel_version": {
+                  "type": "integer"
+                },
+                "generation": {
+                  "type": "integer"
+                },
+                "lease_epoch": {
+                  "type": "integer"
+                },
+                "lease_expires_at": {
+                  "type": "string"
+                },
+                "manifest_hash": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "lease_expires_at",
+                    "build_id",
+                    "release_id",
+                    "module_id",
+                    "manifest_hash",
+                    "generation",
+                    "state",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "index_manifest_ref",
+                    "index_manifest_hash",
+                    "error_code"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "build_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "index_manifest_hash": {
+                      "type": "string"
+                    },
+                    "index_manifest_ref": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/builds/{build_id}/results": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "AcceptBuild",
+        "operationId": "workerAcceptBuild",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "build_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "generation",
+                "attempt_id",
+                "lease_epoch",
+                "cancel_version",
+                "manifest_hash",
+                "state"
+              ],
+              "properties": {
+                "attempt_id": {
+                  "type": "string"
+                },
+                "cancel_version": {
+                  "type": "integer"
+                },
+                "error_code": {
+                  "type": "string"
+                },
+                "generation": {
+                  "type": "integer"
+                },
+                "index_manifest_hash": {
+                  "type": "string"
+                },
+                "index_manifest_ref": {
+                  "type": "string"
+                },
+                "lease_epoch": {
+                  "type": "integer"
+                },
+                "manifest_hash": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "lease_expires_at",
+                    "build_id",
+                    "release_id",
+                    "module_id",
+                    "manifest_hash",
+                    "generation",
+                    "state",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "index_manifest_ref",
+                    "index_manifest_hash",
+                    "error_code"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "build_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "index_manifest_hash": {
+                      "type": "string"
+                    },
+                    "index_manifest_ref": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/compiles/{compile_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetCompile",
+        "operationId": "workerGetCompile",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "compile_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "error_code",
+                    "lease_expires_at",
+                    "compile_id",
+                    "module_id",
+                    "page_id",
+                    "base_revision_id",
+                    "source_revision_ids",
+                    "guidance",
+                    "input_hash",
+                    "state",
+                    "generation",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "revision_id",
+                    "result_hash"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "base_revision_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "compile_id": {
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "guidance": {
+                      "type": "string"
+                    },
+                    "input_hash": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "result_hash": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "source_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/compiles/{compile_id}/claim": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ClaimCompile",
+        "operationId": "workerClaimCompile",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "compile_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "lease_expires_at",
+                "generation",
+                "attempt_id",
+                "lease_epoch",
+                "cancel_version",
+                "input_hash"
+              ],
+              "properties": {
+                "attempt_id": {
+                  "type": "string"
+                },
+                "cancel_version": {
+                  "type": "integer"
+                },
+                "generation": {
+                  "type": "integer"
+                },
+                "input_hash": {
+                  "type": "string"
+                },
+                "lease_epoch": {
+                  "type": "integer"
+                },
+                "lease_expires_at": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "error_code",
+                    "lease_expires_at",
+                    "compile_id",
+                    "module_id",
+                    "page_id",
+                    "base_revision_id",
+                    "source_revision_ids",
+                    "guidance",
+                    "input_hash",
+                    "state",
+                    "generation",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "revision_id",
+                    "result_hash"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "base_revision_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "compile_id": {
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "guidance": {
+                      "type": "string"
+                    },
+                    "input_hash": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "result_hash": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "source_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/compiles/{compile_id}/results": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "AcceptCompile",
+        "operationId": "workerAcceptCompile",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "compile_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "generation",
+                "attempt_id",
+                "lease_epoch",
+                "cancel_version",
+                "input_hash"
+              ],
+              "properties": {
+                "attempt_id": {
+                  "type": "string"
+                },
+                "cancel_version": {
+                  "type": "integer"
+                },
+                "content_hash": {
+                  "type": "string"
+                },
+                "error_code": {
+                  "type": "string"
+                },
+                "generation": {
+                  "type": "integer"
+                },
+                "input_hash": {
+                  "type": "string"
+                },
+                "lease_epoch": {
+                  "type": "integer"
+                },
+                "object_key": {
+                  "type": "string"
+                },
+                "source_refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "revision_id",
+                      "locator"
+                    ],
+                    "properties": {
+                      "locator": {
+                        "type": "string"
+                      },
+                      "revision_id": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "state": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "error_code",
+                    "lease_expires_at",
+                    "compile_id",
+                    "module_id",
+                    "page_id",
+                    "base_revision_id",
+                    "source_revision_ids",
+                    "guidance",
+                    "input_hash",
+                    "state",
+                    "generation",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "revision_id",
+                    "result_hash"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "base_revision_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "compile_id": {
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "guidance": {
+                      "type": "string"
+                    },
+                    "input_hash": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "result_hash": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "source_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/releases/{release_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetRelease",
+        "operationId": "workerGetRelease",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "release_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "release_id",
+                    "module_id",
+                    "ordinal",
+                    "source_revision_ids",
+                    "wiki_revision_ids",
+                    "chunking_profile",
+                    "retrieval_profiles",
+                    "manifest_hash",
+                    "manifest_ref",
+                    "created_at"
+                  ],
+                  "properties": {
+                    "chunking_profile": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "manifest_ref": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "ordinal": {
+                      "type": "integer"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "retrieval_profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "lane",
+                          "encoder",
+                          "tokenizer",
+                          "space",
+                          "dimensions"
+                        ],
+                        "properties": {
+                          "aggregation": {
+                            "type": "string"
+                          },
+                          "dimensions": {
+                            "type": "integer"
+                          },
+                          "encoder": {
+                            "type": "string"
+                          },
+                          "lane": {
+                            "type": "string"
+                          },
+                          "mask": {
+                            "type": "string"
+                          },
+                          "space": {
+                            "type": "string"
+                          },
+                          "tokenizer": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "source_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "wiki_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/revisions/{revision_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetRevision",
+        "operationId": "workerGetRevision",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "revision_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "revision_id",
+                    "module_id",
+                    "entity_id",
+                    "kind",
+                    "base_revision_id",
+                    "title",
+                    "media_type",
+                    "object_key",
+                    "content_hash",
+                    "content",
+                    "source_refs",
+                    "provenance",
+                    "created_by",
+                    "created_at",
+                    "withdrawn"
+                  ],
+                  "properties": {
+                    "base_revision_id": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "content_hash": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "created_by": {
+                      "type": "string"
+                    },
+                    "entity_id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "media_type": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "object_key": {
+                      "type": "string"
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "source_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "revision_id",
+                          "locator"
+                        ],
+                        "properties": {
+                          "locator": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "withdrawn": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/builds/{build_id}/cancel": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CancelBuild",
+        "operationId": "knowledgeCancelBuild",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "build_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "reason",
+                "idempotency_key"
+              ],
+              "properties": {
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "lease_expires_at",
+                    "build_id",
+                    "release_id",
+                    "module_id",
+                    "manifest_hash",
+                    "generation",
+                    "state",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "index_manifest_ref",
+                    "index_manifest_hash",
+                    "error_code"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "build_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "index_manifest_hash": {
+                      "type": "string"
+                    },
+                    "index_manifest_ref": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/compiles/{compile_id}/cancel": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CancelCompile",
+        "operationId": "knowledgeCancelCompile",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "compile_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "reason",
+                "idempotency_key"
+              ],
+              "properties": {
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "error_code",
+                    "lease_expires_at",
+                    "compile_id",
+                    "module_id",
+                    "page_id",
+                    "base_revision_id",
+                    "source_revision_ids",
+                    "guidance",
+                    "input_hash",
+                    "state",
+                    "generation",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "revision_id",
+                    "result_hash"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "base_revision_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "compile_id": {
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "guidance": {
+                      "type": "string"
+                    },
+                    "input_hash": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "result_hash": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "source_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ListModules",
+        "operationId": "knowledgeListModules",
+        "parameters": [
+          {
+            "type": "integer",
+            "default": 12,
+            "name": "limit",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "cursor",
+            "in": "query",
+            "allowEmptyValue": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "title",
+                          "subtitle",
+                          "description",
+                          "category",
+                          "image",
+                          "sources",
+                          "pages",
+                          "release",
+                          "updated",
+                          "lifecycle",
+                          "pointer_revision",
+                          "active_release_id",
+                          "active_build_id"
+                        ],
+                        "properties": {
+                          "active_build_id": {
+                            "type": "string"
+                          },
+                          "active_release_id": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "image": {
+                            "type": "string"
+                          },
+                          "lifecycle": {
+                            "type": "string"
+                          },
+                          "pages": {
+                            "type": "integer"
+                          },
+                          "pointer_revision": {
+                            "type": "integer"
+                          },
+                          "release": {
+                            "type": "string"
+                          },
+                          "sources": {
+                            "type": "integer"
+                          },
+                          "subtitle": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "updated": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CreateModule",
+        "operationId": "knowledgeCreateModule",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "title",
+                "idempotency_key"
+              ],
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "title",
+                    "subtitle",
+                    "description",
+                    "category",
+                    "image",
+                    "sources",
+                    "pages",
+                    "release",
+                    "updated",
+                    "lifecycle",
+                    "pointer_revision",
+                    "active_release_id",
+                    "active_build_id"
+                  ],
+                  "properties": {
+                    "active_build_id": {
+                      "type": "string"
+                    },
+                    "active_release_id": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "image": {
+                      "type": "string"
+                    },
+                    "lifecycle": {
+                      "type": "string"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "pointer_revision": {
+                      "type": "integer"
+                    },
+                    "release": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "integer"
+                    },
+                    "subtitle": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "updated": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetModule",
+        "operationId": "knowledgeGetModule",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "title",
+                    "subtitle",
+                    "description",
+                    "category",
+                    "image",
+                    "sources",
+                    "pages",
+                    "release",
+                    "updated",
+                    "lifecycle",
+                    "pointer_revision",
+                    "active_release_id",
+                    "active_build_id"
+                  ],
+                  "properties": {
+                    "active_build_id": {
+                      "type": "string"
+                    },
+                    "active_release_id": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "image": {
+                      "type": "string"
+                    },
+                    "lifecycle": {
+                      "type": "string"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "pointer_revision": {
+                      "type": "integer"
+                    },
+                    "release": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "integer"
+                    },
+                    "subtitle": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "updated": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/activation": {
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "Activate",
+        "operationId": "knowledgeActivate",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "release_id",
+                "build_id",
+                "expected_pointer_revision",
+                "reason"
+              ],
+              "properties": {
+                "build_id": {
+                  "type": "string"
+                },
+                "expected_pointer_revision": {
+                  "type": "integer"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "release_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "active_release_id",
+                    "active_build_id",
+                    "pointer_revision",
+                    "candidate_release_id",
+                    "build_id",
+                    "build_state",
+                    "manifest_hash"
+                  ],
+                  "properties": {
+                    "active_build_id": {
+                      "type": "string"
+                    },
+                    "active_release_id": {
+                      "type": "string"
+                    },
+                    "build_id": {
+                      "type": "string"
+                    },
+                    "build_state": {
+                      "type": "string"
+                    },
+                    "candidate_release_id": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "pointer_revision": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/compiles": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CreateCompile",
+        "operationId": "knowledgeCreateCompile",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "page_id",
+                "source_revision_ids",
+                "guidance",
+                "idempotency_key"
+              ],
+              "properties": {
+                "base_revision_id": {
+                  "type": "string"
+                },
+                "guidance": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "page_id": {
+                  "type": "string"
+                },
+                "source_revision_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "error_code",
+                    "lease_expires_at",
+                    "compile_id",
+                    "module_id",
+                    "page_id",
+                    "base_revision_id",
+                    "source_revision_ids",
+                    "guidance",
+                    "input_hash",
+                    "state",
+                    "generation",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "revision_id",
+                    "result_hash"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "base_revision_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "compile_id": {
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "guidance": {
+                      "type": "string"
+                    },
+                    "input_hash": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "result_hash": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "source_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/published": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetPublishedRelease",
+        "operationId": "knowledgeGetPublishedRelease",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "release_id",
+                    "module_id",
+                    "ordinal",
+                    "source_revision_ids",
+                    "wiki_revision_ids",
+                    "chunking_profile",
+                    "retrieval_profiles",
+                    "manifest_hash",
+                    "manifest_ref",
+                    "created_at"
+                  ],
+                  "properties": {
+                    "chunking_profile": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "manifest_ref": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "ordinal": {
+                      "type": "integer"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "retrieval_profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "lane",
+                          "encoder",
+                          "tokenizer",
+                          "space",
+                          "dimensions"
+                        ],
+                        "properties": {
+                          "aggregation": {
+                            "type": "string"
+                          },
+                          "dimensions": {
+                            "type": "integer"
+                          },
+                          "encoder": {
+                            "type": "string"
+                          },
+                          "lane": {
+                            "type": "string"
+                          },
+                          "mask": {
+                            "type": "string"
+                          },
+                          "space": {
+                            "type": "string"
+                          },
+                          "tokenizer": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "source_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "wiki_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/releases": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CreateRelease",
+        "operationId": "knowledgeCreateRelease",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "source_revision_ids",
+                "wiki_revision_ids",
+                "chunking_profile",
+                "retrieval_profiles",
+                "idempotency_key"
+              ],
+              "properties": {
+                "chunking_profile": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "retrieval_profiles": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "lane",
+                      "encoder",
+                      "tokenizer",
+                      "space",
+                      "dimensions"
+                    ],
+                    "properties": {
+                      "aggregation": {
+                        "type": "string"
+                      },
+                      "dimensions": {
+                        "type": "integer"
+                      },
+                      "encoder": {
+                        "type": "string"
+                      },
+                      "lane": {
+                        "type": "string"
+                      },
+                      "mask": {
+                        "type": "string"
+                      },
+                      "space": {
+                        "type": "string"
+                      },
+                      "tokenizer": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "source_revision_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "wiki_revision_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "release_id",
+                    "module_id",
+                    "ordinal",
+                    "source_revision_ids",
+                    "wiki_revision_ids",
+                    "chunking_profile",
+                    "retrieval_profiles",
+                    "manifest_hash",
+                    "manifest_ref",
+                    "created_at"
+                  ],
+                  "properties": {
+                    "chunking_profile": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "manifest_ref": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "ordinal": {
+                      "type": "integer"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "retrieval_profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "lane",
+                          "encoder",
+                          "tokenizer",
+                          "space",
+                          "dimensions"
+                        ],
+                        "properties": {
+                          "aggregation": {
+                            "type": "string"
+                          },
+                          "dimensions": {
+                            "type": "integer"
+                          },
+                          "encoder": {
+                            "type": "string"
+                          },
+                          "lane": {
+                            "type": "string"
+                          },
+                          "mask": {
+                            "type": "string"
+                          },
+                          "space": {
+                            "type": "string"
+                          },
+                          "tokenizer": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "source_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "wiki_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/releases/current": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CurrentRelease",
+        "operationId": "knowledgeCurrentRelease",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "active_release_id",
+                    "active_build_id",
+                    "pointer_revision",
+                    "candidate_release_id",
+                    "build_id",
+                    "build_state",
+                    "manifest_hash"
+                  ],
+                  "properties": {
+                    "active_build_id": {
+                      "type": "string"
+                    },
+                    "active_release_id": {
+                      "type": "string"
+                    },
+                    "build_id": {
+                      "type": "string"
+                    },
+                    "build_state": {
+                      "type": "string"
+                    },
+                    "candidate_release_id": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "pointer_revision": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/revisions": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ListRevisions",
+        "operationId": "knowledgeListRevisions",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "revision_id",
+                          "module_id",
+                          "entity_id",
+                          "kind",
+                          "base_revision_id",
+                          "title",
+                          "media_type",
+                          "object_key",
+                          "content_hash",
+                          "content",
+                          "source_refs",
+                          "provenance",
+                          "created_by",
+                          "created_at",
+                          "withdrawn"
+                        ],
+                        "properties": {
+                          "base_revision_id": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          },
+                          "content_hash": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "created_by": {
+                            "type": "string"
+                          },
+                          "entity_id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "media_type": {
+                            "type": "string"
+                          },
+                          "module_id": {
+                            "type": "string"
+                          },
+                          "object_key": {
+                            "type": "string"
+                          },
+                          "provenance": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          },
+                          "source_refs": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "revision_id",
+                                "locator"
+                              ],
+                              "properties": {
+                                "locator": {
+                                  "type": "string"
+                                },
+                                "revision_id": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "withdrawn": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/sources": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CreateSource",
+        "operationId": "knowledgeCreateSource",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "title",
+                "content",
+                "media_type",
+                "provenance",
+                "idempotency_key"
+              ],
+              "properties": {
+                "base_revision_id": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "media_type": {
+                  "type": "string"
+                },
+                "provenance": {
+                  "type": "string"
+                },
+                "source_id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "revision_id",
+                    "module_id",
+                    "entity_id",
+                    "kind",
+                    "base_revision_id",
+                    "title",
+                    "media_type",
+                    "object_key",
+                    "content_hash",
+                    "content",
+                    "source_refs",
+                    "provenance",
+                    "created_by",
+                    "created_at",
+                    "withdrawn"
+                  ],
+                  "properties": {
+                    "base_revision_id": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "content_hash": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "created_by": {
+                      "type": "string"
+                    },
+                    "entity_id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "media_type": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "object_key": {
+                      "type": "string"
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "source_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "revision_id",
+                          "locator"
+                        ],
+                        "properties": {
+                          "locator": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "withdrawn": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CreateWiki",
+        "operationId": "knowledgeCreateWiki",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "page_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "title",
+                "content",
+                "source_refs",
+                "idempotency_key"
+              ],
+              "properties": {
+                "base_revision_id": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "source_refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "revision_id",
+                      "locator"
+                    ],
+                    "properties": {
+                      "locator": {
+                        "type": "string"
+                      },
+                      "revision_id": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "title": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "revision_id",
+                    "module_id",
+                    "entity_id",
+                    "kind",
+                    "base_revision_id",
+                    "title",
+                    "media_type",
+                    "object_key",
+                    "content_hash",
+                    "content",
+                    "source_refs",
+                    "provenance",
+                    "created_by",
+                    "created_at",
+                    "withdrawn"
+                  ],
+                  "properties": {
+                    "base_revision_id": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "content_hash": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "created_by": {
+                      "type": "string"
+                    },
+                    "entity_id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "media_type": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "object_key": {
+                      "type": "string"
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "source_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "revision_id",
+                          "locator"
+                        ],
+                        "properties": {
+                          "locator": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "withdrawn": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/withdrawals": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "Withdraw",
+        "operationId": "knowledgeWithdraw",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "target_kind",
+                "target_id",
+                "reason",
+                "idempotency_key"
+              ],
+              "properties": {
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "target_id": {
+                  "type": "string"
+                },
+                "target_kind": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "accepted"
+                  ],
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/releases/{release_id}/index-builds": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CreateBuild",
+        "operationId": "knowledgeCreateBuild",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "release_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "idempotency_key"
+              ],
+              "properties": {
+                "idempotency_key": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "lease_expires_at",
+                    "build_id",
+                    "release_id",
+                    "module_id",
+                    "manifest_hash",
+                    "generation",
+                    "state",
+                    "attempt_id",
+                    "lease_epoch",
+                    "cancel_version",
+                    "index_manifest_ref",
+                    "index_manifest_hash",
+                    "error_code"
+                  ],
+                  "properties": {
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "build_id": {
+                      "type": "string"
+                    },
+                    "cancel_version": {
+                      "type": "integer"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "index_manifest_hash": {
+                      "type": "string"
+                    },
+                    "index_manifest_ref": {
+                      "type": "string"
+                    },
+                    "lease_epoch": {
+                      "type": "integer"
+                    },
+                    "lease_expires_at": {
+                      "type": "string"
+                    },
+                    "manifest_hash": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/workbench/modules": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ListDraftModules",
+        "operationId": "knowledgeListDraftModules",
+        "parameters": [
+          {
+            "type": "integer",
+            "default": 12,
+            "name": "limit",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "cursor",
+            "in": "query",
+            "allowEmptyValue": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "title",
+                          "subtitle",
+                          "description",
+                          "category",
+                          "image",
+                          "sources",
+                          "pages",
+                          "release",
+                          "updated",
+                          "lifecycle",
+                          "pointer_revision",
+                          "active_release_id",
+                          "active_build_id"
+                        ],
+                        "properties": {
+                          "active_build_id": {
+                            "type": "string"
+                          },
+                          "active_release_id": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "image": {
+                            "type": "string"
+                          },
+                          "lifecycle": {
+                            "type": "string"
+                          },
+                          "pages": {
+                            "type": "integer"
+                          },
+                          "pointer_revision": {
+                            "type": "integer"
+                          },
+                          "release": {
+                            "type": "string"
+                          },
+                          "sources": {
+                            "type": "integer"
+                          },
+                          "subtitle": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "updated": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-date": "2026-09-14 10:59:36",
+  "x-description": "This is a goctl generated swagger file.",
+  "x-github": "https://github.com/zeromicro/go-zero",
+  "x-go-zero-doc": "https://go-zero.dev/",
+  "x-goctl-version": "1.9.2"
+}

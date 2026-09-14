@@ -1,0 +1,26 @@
+{
+  "event_id": "evt_knowledge_h04_fixture_001",
+  "event_type": "knowledge.revision.created.v1",
+  "schema_version": 1,
+  "producer": "ridethewind.knowledge",
+  "aggregate_id": "module_h04_fixture",
+  "aggregate_version": 1,
+  "operation_id": "command:fixture-source-create-001",
+  "occurred_at": "2026-09-14T00:00:00Z",
+  "payload": {
+    "revision_id": "revision_book_a_v1",
+    "module_id": "module_h04_fixture",
+    "entity_id": "source_book_a",
+    "kind": "source",
+    "base_revision_id": "",
+    "title": "Book A",
+    "media_type": "text/markdown",
+    "object_key": "sha256/840faa15c7c980c62c8aa941fd33e8b9c7a385e6fbe1ac908e62ba54fd40c495",
+    "content_hash": "840faa15c7c980c62c8aa941fd33e8b9c7a385e6fbe1ac908e62ba54fd40c495",
+    "source_refs": [],
+    "provenance": "synthetic contract fixture",
+    "created_by": "fixture-admin",
+    "created_at": "2026-09-14T00:00:00Z",
+    "withdrawn": false
+  }
+}

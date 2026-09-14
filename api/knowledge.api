@@ -1,0 +1,391 @@
+syntax = "v1"
+
+type (
+	Module {
+		Id              string `json:"id"`
+		Title           string `json:"title"`
+		Subtitle        string `json:"subtitle"`
+		Description     string `json:"description"`
+		Category        string `json:"category"`
+		Image           string `json:"image"`
+		Sources         int    `json:"sources"`
+		Pages           int    `json:"pages"`
+		Release         string `json:"release"`
+		Updated         string `json:"updated"`
+		Lifecycle       string `json:"lifecycle"`
+		PointerRevision int64  `json:"pointer_revision"`
+		ActiveReleaseId string `json:"active_release_id"`
+		ActiveBuildId   string `json:"active_build_id"`
+	}
+	ModulePath {
+		ModuleId string `path:"module_id"`
+	}
+	ListModulesReq {
+		Limit  int    `form:"limit,default=12"`
+		Cursor string `form:"cursor,optional"`
+	}
+	ListModulesResp {
+		Items      []Module `json:"items"`
+		NextCursor string   `json:"next_cursor,omitempty"`
+	}
+	CreateModuleReq {
+		Title          string `json:"title"`
+		Description    string `json:"description,optional"`
+		Category       string `json:"category,optional"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	SourceRef {
+		RevisionId string `json:"revision_id"`
+		Locator    string `json:"locator"`
+	}
+	Revision {
+		RevisionId     string      `json:"revision_id"`
+		ModuleId       string      `json:"module_id"`
+		EntityId       string      `json:"entity_id"`
+		Kind           string      `json:"kind"`
+		BaseRevisionId string      `json:"base_revision_id"`
+		Title          string      `json:"title"`
+		MediaType      string      `json:"media_type"`
+		ObjectKey      string      `json:"object_key"`
+		ContentHash    string      `json:"content_hash"`
+		Content        string      `json:"content,omitempty"`
+		SourceRefs     []SourceRef `json:"source_refs"`
+		Provenance     string      `json:"provenance"`
+		CreatedBy      string      `json:"created_by"`
+		CreatedAt      string      `json:"created_at"`
+		Withdrawn      bool        `json:"withdrawn"`
+	}
+	CreateSourceReq {
+		ModuleId       string `path:"module_id"`
+		EntityId       string `json:"source_id,optional"`
+		BaseRevisionId string `json:"base_revision_id,optional"`
+		Title          string `json:"title"`
+		Content        string `json:"content"`
+		MediaType      string `json:"media_type"`
+		Provenance     string `json:"provenance"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	CreateWikiReq {
+		ModuleId       string      `path:"module_id"`
+		PageId         string      `path:"page_id"`
+		BaseRevisionId string      `json:"base_revision_id,optional"`
+		Title          string      `json:"title"`
+		Content        string      `json:"content"`
+		SourceRefs     []SourceRef `json:"source_refs"`
+		IdempotencyKey string      `json:"idempotency_key"`
+	}
+	RevisionPath {
+		RevisionId string `path:"revision_id"`
+	}
+	ListRevisionsResp {
+		Items []Revision `json:"items"`
+	}
+	RetrievalProfile {
+		Lane        string `json:"lane"`
+		Encoder     string `json:"encoder"`
+		Tokenizer   string `json:"tokenizer"`
+		Space       string `json:"space"`
+		Dimensions  int    `json:"dimensions"`
+		Mask        string `json:"mask,optional"`
+		Aggregation string `json:"aggregation,optional"`
+	}
+	Release {
+		ReleaseId         string             `json:"release_id"`
+		ModuleId          string             `json:"module_id"`
+		Ordinal           int64              `json:"ordinal"`
+		SourceRevisionIds []string           `json:"source_revision_ids"`
+		WikiRevisionIds   []string           `json:"wiki_revision_ids"`
+		ChunkingProfile   string             `json:"chunking_profile"`
+		RetrievalProfiles []RetrievalProfile `json:"retrieval_profiles"`
+		ManifestHash      string             `json:"manifest_hash"`
+		ManifestRef       string             `json:"manifest_ref"`
+		CreatedAt         string             `json:"created_at"`
+	}
+	CreateReleaseReq {
+		ModuleId          string             `path:"module_id"`
+		SourceRevisionIds []string           `json:"source_revision_ids"`
+		WikiRevisionIds   []string           `json:"wiki_revision_ids"`
+		ChunkingProfile   string             `json:"chunking_profile"`
+		RetrievalProfiles []RetrievalProfile `json:"retrieval_profiles"`
+		IdempotencyKey    string             `json:"idempotency_key"`
+	}
+	ReleasePath {
+		ReleaseId string `path:"release_id"`
+	}
+	Build {
+		LeaseExpiresAt    string `json:"lease_expires_at"`
+		BuildId           string `json:"build_id"`
+		ReleaseId         string `json:"release_id"`
+		ModuleId          string `json:"module_id"`
+		ManifestHash      string `json:"manifest_hash"`
+		Generation        int64  `json:"generation"`
+		State             string `json:"state"`
+		AttemptId         string `json:"attempt_id"`
+		LeaseEpoch        int64  `json:"lease_epoch"`
+		CancelVersion     int64  `json:"cancel_version"`
+		IndexManifestRef  string `json:"index_manifest_ref"`
+		IndexManifestHash string `json:"index_manifest_hash"`
+		ErrorCode         string `json:"error_code"`
+	}
+	CreateBuildReq {
+		ReleaseId      string `path:"release_id"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	BuildPath {
+		BuildId string `path:"build_id"`
+	}
+	ClaimBuildReq {
+		LeaseExpiresAt string `json:"lease_expires_at"`
+		BuildId        string `path:"build_id"`
+		Generation     int64  `json:"generation"`
+		AttemptId      string `json:"attempt_id"`
+		LeaseEpoch     int64  `json:"lease_epoch"`
+		CancelVersion  int64  `json:"cancel_version"`
+		ManifestHash   string `json:"manifest_hash"`
+	}
+	AcceptBuildReq {
+		BuildId           string `path:"build_id"`
+		Generation        int64  `json:"generation"`
+		AttemptId         string `json:"attempt_id"`
+		LeaseEpoch        int64  `json:"lease_epoch"`
+		CancelVersion     int64  `json:"cancel_version"`
+		ManifestHash      string `json:"manifest_hash"`
+		IndexManifestRef  string `json:"index_manifest_ref,optional"`
+		IndexManifestHash string `json:"index_manifest_hash,optional"`
+		State             string `json:"state"`
+		ErrorCode         string `json:"error_code,optional"`
+	}
+	CancelBuildReq {
+		BuildId        string `path:"build_id"`
+		Reason         string `json:"reason"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	ReleaseState {
+		ActiveReleaseId    string `json:"active_release_id"`
+		ActiveBuildId      string `json:"active_build_id"`
+		PointerRevision    int64  `json:"pointer_revision"`
+		CandidateReleaseId string `json:"candidate_release_id"`
+		BuildId            string `json:"build_id"`
+		BuildState         string `json:"build_state"`
+		ManifestHash       string `json:"manifest_hash"`
+	}
+	ActivateReq {
+		ModuleId                string `path:"module_id"`
+		ReleaseId               string `json:"release_id"`
+		BuildId                 string `json:"build_id"`
+		ExpectedPointerRevision int64  `json:"expected_pointer_revision"`
+		Reason                  string `json:"reason"`
+		IdempotencyKey          string `json:"idempotency_key,optional"`
+	}
+	WithdrawReq {
+		ModuleId       string `path:"module_id"`
+		TargetKind     string `json:"target_kind"`
+		TargetId       string `json:"target_id"`
+		Reason         string `json:"reason"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	Receipt {
+		Accepted bool `json:"accepted"`
+	}
+)
+
+type (
+	Compile {
+		ErrorCode         string   `json:"error_code"`
+		LeaseExpiresAt    string   `json:"lease_expires_at"`
+		CompileId         string   `json:"compile_id"`
+		ModuleId          string   `json:"module_id"`
+		PageId            string   `json:"page_id"`
+		BaseRevisionId    string   `json:"base_revision_id"`
+		SourceRevisionIds []string `json:"source_revision_ids"`
+		Guidance          string   `json:"guidance"`
+		InputHash         string   `json:"input_hash"`
+		State             string   `json:"state"`
+		Generation        int64    `json:"generation"`
+		AttemptId         string   `json:"attempt_id"`
+		LeaseEpoch        int64    `json:"lease_epoch"`
+		CancelVersion     int64    `json:"cancel_version"`
+		RevisionId        string   `json:"revision_id"`
+		ResultHash        string   `json:"result_hash"`
+	}
+	CreateCompileReq {
+		ModuleId          string   `path:"module_id"`
+		PageId            string   `json:"page_id"`
+		BaseRevisionId    string   `json:"base_revision_id,optional"`
+		SourceRevisionIds []string `json:"source_revision_ids"`
+		Guidance          string   `json:"guidance"`
+		IdempotencyKey    string   `json:"idempotency_key"`
+	}
+	CompilePath {
+		CompileId string `path:"compile_id"`
+	}
+	ClaimCompileReq {
+		LeaseExpiresAt string `json:"lease_expires_at"`
+		CompileId      string `path:"compile_id"`
+		Generation     int64  `json:"generation"`
+		AttemptId      string `json:"attempt_id"`
+		LeaseEpoch     int64  `json:"lease_epoch"`
+		CancelVersion  int64  `json:"cancel_version"`
+		InputHash      string `json:"input_hash"`
+	}
+	AcceptCompileReq {
+		State         string      `json:"state,optional"`
+		ErrorCode     string      `json:"error_code,optional"`
+		CompileId     string      `path:"compile_id"`
+		Generation    int64       `json:"generation"`
+		AttemptId     string      `json:"attempt_id"`
+		LeaseEpoch    int64       `json:"lease_epoch"`
+		CancelVersion int64       `json:"cancel_version"`
+		InputHash     string      `json:"input_hash"`
+		ObjectKey     string      `json:"object_key,optional"`
+		ContentHash   string      `json:"content_hash,optional"`
+		Title         string      `json:"title,optional"`
+		SourceRefs    []SourceRef `json:"source_refs,optional"`
+	}
+	CancelCompileReq {
+		CompileId      string `path:"compile_id"`
+		Reason         string `json:"reason"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+)
+
+type (
+	BuildEnvelope {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data Build  `json:"data"`
+	}
+	CompileEnvelope {
+		Code int     `json:"code"`
+		Msg  string  `json:"msg"`
+		Data Compile `json:"data"`
+	}
+	ListModulesRespEnvelope {
+		Code int             `json:"code"`
+		Msg  string          `json:"msg"`
+		Data ListModulesResp `json:"data"`
+	}
+	ListRevisionsRespEnvelope {
+		Code int               `json:"code"`
+		Msg  string            `json:"msg"`
+		Data ListRevisionsResp `json:"data"`
+	}
+	ModuleEnvelope {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data Module `json:"data"`
+	}
+	ReceiptEnvelope {
+		Code int     `json:"code"`
+		Msg  string  `json:"msg"`
+		Data Receipt `json:"data"`
+	}
+	ReleaseEnvelope {
+		Code int     `json:"code"`
+		Msg  string  `json:"msg"`
+		Data Release `json:"data"`
+	}
+	ReleaseStateEnvelope {
+		Code int          `json:"code"`
+		Msg  string       `json:"msg"`
+		Data ReleaseState `json:"data"`
+	}
+	RevisionEnvelope {
+		Code int      `json:"code"`
+		Msg  string   `json:"msg"`
+		Data Revision `json:"data"`
+	}
+)
+
+@server (
+	prefix: /v1/knowledge
+	group:  knowledge
+)
+service knowledge-api {
+	@handler ListModules
+	get /modules (ListModulesReq) returns (ListModulesRespEnvelope)
+
+	@handler GetModule
+	get /modules/:module_id (ModulePath) returns (ModuleEnvelope)
+
+	@handler GetPublishedRelease
+	get /modules/:module_id/published (ModulePath) returns (ReleaseEnvelope)
+}
+
+@server (
+	prefix:     /v1/knowledge
+	group:      knowledge
+	jwt:        Auth
+	middleware: Administrator
+)
+service knowledge-api {
+	@handler CreateModule
+	post /modules (CreateModuleReq) returns (ModuleEnvelope)
+
+	@handler ListDraftModules
+	get /workbench/modules (ListModulesReq) returns (ListModulesRespEnvelope)
+
+	@handler CreateCompile
+	post /modules/:module_id/compiles (CreateCompileReq) returns (CompileEnvelope)
+
+	@handler CancelCompile
+	post /compiles/:compile_id/cancel (CancelCompileReq) returns (CompileEnvelope)
+
+	@handler CreateSource
+	post /modules/:module_id/sources (CreateSourceReq) returns (RevisionEnvelope)
+
+	@handler ListRevisions
+	get /modules/:module_id/revisions (ModulePath) returns (ListRevisionsRespEnvelope)
+
+	@handler CreateWiki
+	post /modules/:module_id/wiki-pages/:page_id/revisions (CreateWikiReq) returns (RevisionEnvelope)
+
+	@handler CreateRelease
+	post /modules/:module_id/releases (CreateReleaseReq) returns (ReleaseEnvelope)
+
+	@handler CurrentRelease
+	get /modules/:module_id/releases/current (ModulePath) returns (ReleaseStateEnvelope)
+
+	@handler CreateBuild
+	post /releases/:release_id/index-builds (CreateBuildReq) returns (BuildEnvelope)
+
+	@handler CancelBuild
+	post /builds/:build_id/cancel (CancelBuildReq) returns (BuildEnvelope)
+
+	@handler Activate
+	put /modules/:module_id/activation (ActivateReq) returns (ReleaseStateEnvelope)
+
+	@handler Withdraw
+	post /modules/:module_id/withdrawals (WithdrawReq) returns (ReceiptEnvelope)
+}
+
+@server (
+	prefix:     /internal/v1/knowledge
+	group:      worker
+	middleware: Worker
+)
+service knowledge-api {
+	@handler GetCompile
+	get /compiles/:compile_id (CompilePath) returns (CompileEnvelope)
+
+	@handler ClaimCompile
+	post /compiles/:compile_id/claim (ClaimCompileReq) returns (CompileEnvelope)
+
+	@handler AcceptCompile
+	post /compiles/:compile_id/results (AcceptCompileReq) returns (CompileEnvelope)
+
+	@handler GetRevision
+	get /revisions/:revision_id (RevisionPath) returns (RevisionEnvelope)
+
+	@handler GetRelease
+	get /releases/:release_id (ReleasePath) returns (ReleaseEnvelope)
+
+	@handler GetBuild
+	get /builds/:build_id (BuildPath) returns (BuildEnvelope)
+
+	@handler ClaimBuild
+	post /builds/:build_id/claim (ClaimBuildReq) returns (BuildEnvelope)
+
+	@handler AcceptBuild
+	post /builds/:build_id/results (AcceptBuildReq) returns (BuildEnvelope)
+}
