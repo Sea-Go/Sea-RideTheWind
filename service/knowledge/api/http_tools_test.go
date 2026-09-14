@@ -10,8 +10,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -21,9 +27,11 @@ import (
 const toolFixtureScopeKey = "test-only-tools-scope-key-32-bytes-minimum"
 
 type toolSearchFixture struct {
-	server *httptest.Server
-	stage  atomic.Int64 // 1: forged evidence without RTW citation; 0: genuine empty result.
-	calls  atomic.Int64
+	server     *httptest.Server
+	stage      atomic.Int64 // 1: forged evidence; 0: empty fixture; 2: transparent real BTW relay.
+	calls      atomic.Int64
+	mu         sync.Mutex
+	forwardURL string
 }
 
 func newToolSearchFixture(t *testing.T) *toolSearchFixture {
@@ -127,6 +135,37 @@ func newToolSearchFixture(t *testing.T) *toolSearchFixture {
 			http.Error(w, "bad body", 400)
 			return
 		}
+		if f.stage.Load() == 2 {
+			f.mu.Lock()
+			endpoint := f.forwardURL
+			f.mu.Unlock()
+			if endpoint == "" {
+				t.Error("real BTW Tools endpoint unavailable")
+				http.Error(w, "unavailable", 502)
+				return
+			}
+			forwarded, e := http.NewRequestWithContext(r.Context(), http.MethodPost,
+				endpoint+"/v1/search/tools/search", bytes.NewReader(raw))
+			if e != nil {
+				t.Error(e)
+				http.Error(w, "unavailable", 502)
+				return
+			}
+			forwarded.Header = r.Header.Clone()
+			upstream, e := (&http.Client{Timeout: 30 * time.Second}).Do(forwarded)
+			if e != nil {
+				t.Errorf("real BTW Tools call failed: %v", e)
+				http.Error(w, "unavailable", 502)
+				return
+			}
+			defer upstream.Body.Close()
+			w.Header().Set("Content-Type", upstream.Header.Get("Content-Type"))
+			w.WriteHeader(upstream.StatusCode)
+			if _, e = io.Copy(w, io.LimitReader(upstream.Body, 1<<20)); e != nil {
+				t.Errorf("real BTW Tools reply failed: %v", e)
+			}
+			return
+		}
 		result := types.ToolSearchResult{SearchId: body.SearchID, Status: "empty",
 			StopReason: "no_evidence", SnapshotRef: scope.SnapshotRef,
 			RequestedIntelligence: body.Intelligence, EffectiveIntelligence: body.Intelligence,
@@ -146,4 +185,76 @@ func newToolSearchFixture(t *testing.T) *toolSearchFixture {
 	}))
 	t.Cleanup(f.server.Close)
 	return f
+}
+
+// The optional cross-repository gate starts BTW's independently compiled
+// handler process. This process, not the local relay, owns Tool/Graph output.
+func startRealBTWToolsServer(t *testing.T, dir, btwRoot, rtwBase, workerToken, moduleID string) string {
+	t.Helper()
+	readyPath := filepath.Join(dir, "btw-tools-server-url")
+	fixturePath := filepath.Join(dir, "btw-tools-server-fixture.json")
+	fixture, err := json.Marshal(map[string]string{"rtw_base": rtwBase, "worker_token": workerToken,
+		"scope_key": toolFixtureScopeKey, "ready_path": readyPath, "module_id": moduleID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(fixturePath, fixture, 0600); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(dir, "btw-tools-server.log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(dir, "btw-tools-server.test")
+	compile := exec.Command("go", "test", "-c", "-mod=readonly", "-race", "-o", binary,
+		"./internal/transport/http/search")
+	compile.Dir = btwRoot
+	if output, err := compile.CombinedOutput(); err != nil {
+		logFile.Close()
+		t.Fatalf("compile real BTW Tools server: %v\n%s", err, output)
+	}
+	cmd := exec.Command(binary, "-test.run=^TestRTWRealToolsSearchServer$", "-test.v")
+	cmd.Dir = btwRoot
+	cmd.Env = append(os.Environ(), "SEA_RTW_TOOLS_SERVER_FIXTURE="+fixturePath)
+	cmd.Stdout, cmd.Stderr = logFile, logFile
+	if err := cmd.Start(); err != nil {
+		logFile.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		exited := make(chan error, 1)
+		go func() { exited <- cmd.Wait() }()
+		select {
+		case err := <-exited:
+			if err != nil {
+				t.Errorf("BTW Tools server exited unsuccessfully: %v", err)
+			}
+		case <-time.After(15 * time.Second):
+			_ = cmd.Process.Kill()
+			<-exited
+			t.Error("BTW Tools server did not stop after SIGTERM")
+		}
+		logFile.Close()
+		if t.Failed() {
+			log, _ := os.ReadFile(logPath)
+			t.Logf("BTW Tools server log: %s", log)
+		}
+	})
+	for deadline := time.Now().Add(45 * time.Second); time.Now().Before(deadline); time.Sleep(25 * time.Millisecond) {
+		contents, err := os.ReadFile(readyPath)
+		if err != nil {
+			continue
+		}
+		endpoint := strings.TrimSpace(string(contents))
+		parsed, parseErr := url.Parse(endpoint)
+		if parseErr == nil && parsed.Scheme == "http" && parsed.Host != "" && parsed.Path == "" {
+			return endpoint
+		}
+		t.Fatalf("BTW Tools ready file contained invalid endpoint: %q", endpoint)
+	}
+	log, _ := os.ReadFile(logPath)
+	t.Fatalf("BTW Tools server did not become ready: %s", log)
+	return ""
 }

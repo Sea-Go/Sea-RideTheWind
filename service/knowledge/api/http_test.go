@@ -618,6 +618,50 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		replayedParent.Budget.QuoteRunes != 32768 {
 		t.Fatalf("Tool budget did not reserve once/refund verified empty result: %+v", replayedParent.Budget)
 	}
+	if btwRoot := os.Getenv("SEA_BTW_TOOLS_CONSUMER_ROOT"); btwRoot != "" {
+		endpoint := startRealBTWToolsServer(t, dir, btwRoot, base, c.WorkerToken, m.Id)
+		toolFixture.mu.Lock()
+		toolFixture.forwardURL = endpoint
+		toolFixture.mu.Unlock()
+		toolFixture.stage.Store(2)
+		realBody := map[string]any{"query": "Find the current evidence", "depth": "fast",
+			"intelligence": "low", "read_calls": 8, "quote_runes": 8192,
+			"idempotency_key": "tool-search-real-btw-1"}
+		callsBefore := toolFixture.calls.Load()
+		var realResult types.ToolSearchResult
+		request("POST", toolSearchPath, productToken, realBody, &realResult, 200)
+		if realResult.SearchId == "" || realResult.Status != "empty" ||
+			realResult.SnapshotRef != toolParent.SnapshotRef || len(realResult.Evidence) != 0 ||
+			realResult.CitationReceipt != nil || realResult.PackHash != "" ||
+			toolFixture.calls.Load() != callsBefore+1 {
+			t.Fatalf("real BTW Tool search escaped fixed empty scope: %+v calls=%d",
+				realResult, toolFixture.calls.Load())
+		}
+		var citationCount, childCount int
+		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_search_citations
+ WHERE search_id=$1`, realResult.SearchId).Scan(&citationCount); err != nil || citationCount != 0 {
+			t.Fatalf("real BTW empty Tool invented RTW citation: count=%d err=%v", citationCount, err)
+		}
+		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_tool_searches
+ WHERE operation_id=$1 AND search_id=$2 AND status='complete'`, toolParent.OperationId,
+			realResult.SearchId).Scan(&childCount); err != nil || childCount != 1 {
+			t.Fatalf("real BTW Tool child not durably completed: count=%d err=%v", childCount, err)
+		}
+		var realReplay types.ToolSearchResult
+		request("POST", toolSearchPath, productToken, realBody, &realReplay, 200)
+		if !reflect.DeepEqual(realReplay, realResult) || toolFixture.calls.Load() != callsBefore+1 {
+			t.Fatal("real BTW Tool replay reran search or changed evidence")
+		}
+		request("GET", toolSearchPath+"/"+realResult.SearchId, productToken, nil, &realReplay, 200)
+		if !reflect.DeepEqual(realReplay, realResult) {
+			t.Fatal("real BTW Tool fixed GET disagrees with POST")
+		}
+		request("GET", parentPath, productToken, nil, &replayedParent, 200)
+		if replayedParent.Budget.SearchCalls != 2 || replayedParent.Budget.ReadCalls != 24 ||
+			replayedParent.Budget.QuoteRunes != 32768 {
+			t.Fatalf("real BTW Tool budget did not commit once: %+v", replayedParent.Budget)
+		}
+	}
 	searchPath := "/v1/knowledge/answer-sessions/search-facade-session/searches"
 	searchBody := map[string]any{"module_id": m.Id, "query": "What does this book say?",
 		"depth": "fast", "intelligence": "low", "idempotency_key": "product-search-key-1"}
