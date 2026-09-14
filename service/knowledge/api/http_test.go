@@ -898,6 +898,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if withdrawnJudgment.State != "withdrawn" || withdrawnJudgment.JudgmentId != judgment.JudgmentId {
 		t.Fatalf("admin withdrawal did not append revision: %+v", withdrawnJudgment)
 	}
+	runRealSearchSourceHandoff(t, dir, s, base, c.WorkerToken, judgment, withdrawnJudgment)
 	request("POST", searchPath, productToken, searchBody, &productStatus, 200)
 	if !reflect.DeepEqual(productStatus, productSearch) || searchFixture.calls.Load() != 2 {
 		t.Fatal("same-key replay reran BTW or changed accepted answer")
