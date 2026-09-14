@@ -10,4 +10,6 @@
 
 隔离 PG16 模型用例通过：未发布 READY 拒绝、后续 READY 候选不影响当前、发布/回滚同索引新指针、缺 lane/错 space、原对象损坏、对象 I/O 中指针变化和撤回。真实 go-zero HTTP 子进程通过生成 OpenAPI 响应校验、Worker 未授权拒绝、未发布拒绝、发布后三路精确引用、切换新 release、只撤回旧历史修订不影响新当前、模块撤回拒绝；新增阶段沿用同一 go-zero Writer/OTel/Prometheus Runtime，日志不记录正文或对象字节。
 
-复验：`KNOWLEDGE_GOCTL=<临时目录>/goctl service/knowledge/scripts/generate.sh`；`bash service/knowledge/scripts/acceptance.sh`（隔离 PostgreSQL 16、`go test -race ./service/knowledge/... -count=1 -v`、`go vet ./service/knowledge/...`、`git diff --check`）。RTW 的测试索引工件是结构性 fixture，**不证明** BTW 真实同代 Dense/Sparse/Multi-vector 构建或检索数值；BTW 正式客户端尚未调用本接口，Collector→DataCenter 下钻和完整 H07 产品验收也尚未完成。
+复验：`KNOWLEDGE_GOCTL=<临时目录>/goctl service/knowledge/scripts/generate.sh`；`bash service/knowledge/scripts/acceptance.sh`（隔离 PostgreSQL 16、`go test -race ./service/knowledge/... -count=1 -v`、`go vet ./service/knowledge/...`、`git diff --check`）。RTW 的测试索引工件是结构性 fixture，**不证明** BTW 真实同代 Dense/Sparse/Multi-vector 构建或检索数值。此固定提交时 BTW 客户端尚未调用本接口；后续两仓同进程联验已接通，见下段。Collector→DataCenter 下钻和完整 H07 产品验收仍未完成。
+
+后续BTW从本仓`7519ecc`生成 `SearchSnapshot` DTO，`RTWSearchSnapshotProvider`向真实RTW进程只传module_id，拿当前发布快照再沿**这份返回值**完成原文→引用→答案产品turn。第一次失败揭示原手工跨仓fixture少列一个已发布wiki修订，而RTW当前快照正确包含source+wiki；修正测试预期为完整有效集合后，`SEA_BTW_CITATION_CONSUMER_ROOT=<BTW集成树> bash service/knowledge/scripts/acceptance.sh`的隔离PG16/真实HTTP/race/vet全部通过。BTW源码范围见`internal/app/RTW_SEARCH_SNAPSHOT_ACCEPTANCE.md`。这只把当前快照**子链**上推到`INTEGRATED`，不改变H03/H07整体`PARTIAL`。
