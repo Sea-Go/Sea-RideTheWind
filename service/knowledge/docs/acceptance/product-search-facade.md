@@ -25,3 +25,9 @@ RTW 用固定 Go JSON 字段顺序 `module_id,query,depth,intelligence` 的 SHA2
 本分支验收实测：上述完整命令以 `-race` 运行通过；`TestRealHTTPKnowledgeWorkflowWithUserCenter`、普通 go-zero/PG HTTP 流程、`TestProductSearchOperationFixedSnapshotLeaseAndReplay`、`TestProductSearchMigrationProbeAndBadKeys` 与 `TestProductSearchProjectsOnlyMatchingCommittedCitationAnswer` 均 PASS，脚本内 `go vet ./service/knowledge/...` 和 User Center race/vet 也通过。成功、202 与 503 均按真实 HTTP 状态断言；测试在 BTW fixture 返回伪 200 而未 Commit 时得到 503、历史为空，在 BTW 通过真实 RTW 私有 HTTP Commit 后故意返回 502 时仍按 AnswerID 恢复 200。直接 PG 测试另验证 `succeeded` 必须有同一快照原文、引用收据与已接纳答案，异查询/异发布不能复用答案。操作表迁移脚本在旧结构（缺表）隔离 schema 上实跑并通过启动前探测。正式 BTW 进程、真实三路索引、模型总结、网页/桌宠和 Collector 下钻尚未在本分支验收。
 
 下一交接由 BTW 私有 HTTP 入口在真 Runner/同代三路索引中消费 RTW 签发的 scope，并同一隔离 RTW PG 完成原文、引用、答案 Commit；RTW 再用本入口发布。网页与 WhaleHall 桌宠只需传产品请求字段，处理 202/503 同键重试、展示 200 已验证答案与固定引用，并验证两端 EOF、会话历史一致。SSE、Tool 形式及在线观测下钻属于后续切片。
+
+## 真实 BTW 服务的空证据子链
+
+集成树追加 `TestRTWRealProductSearchServer`：RTW 在隔离 PostgreSQL 上使用真实 go-zero HTTP 签发产品范围，产品 POST 的四字段正文与原始签名头经透明中继进入独立 BTW 测试进程。BTW 在真实 HTTP 入口验签，执行 tRPC 根 Graph/Runner，空证据路径向同一 RTW Worker HTTP 提交 `insufficient`；RTW 从自己的 PostgreSQL 验证固定 AnswerID、SearchID、`rtw.identity/platform/<UID>` 与会话，只存在一条已接纳答案且没有引用。相同幂等键重投不再运行 BTW，产品 GET 与 POST 的终态一致。BTW 子进程验证原文读取、引用接纳和模型调用均为零，并检查原生根 Agent Span。对应 BTW 消费者验收见 `internal/transport/http/search/RTW_PRODUCT_SERVER_ACCEPTANCE.md`。
+
+在 RTW 集成树设置 `SEA_BTW_PRODUCT_SEARCH_ROOT=/Users/edy/Sea/.codex-worktrees/sea-btw-runtime-content-20260914`、`SEA_BTW_CITATION_CONSUMER_ROOT`、`SEA_BTW_INDEX_CONSUMER_ROOT` 与 `KNOWLEDGE_REAL_USER_GATE=1` 后运行 `bash service/knowledge/scripts/acceptance.sh`，退出码 0；脚本包含真实 User Center/隔离用户库测试及各子链的 race 与 vet。这证明 H02/J02 的**真实签发与空证据回答子链 `INTEGRATED`**，并不证明有证据的成功回答、同代三路检索、模型总结、正式 BTW 服务部署、公开 SSE/Tools 或两端客户端展示；整体仍为 `PARTIAL`。
