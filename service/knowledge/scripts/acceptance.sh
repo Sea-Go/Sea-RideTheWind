@@ -35,6 +35,12 @@ if [[ "${KNOWLEDGE_KEEP_EVIDENCE:-0}" == 1 ]]; then
   export KNOWLEDGE_OBS_EVIDENCE_DIR="$knowledge_tmp/observability"
 fi
 cd "$knowledge_repo"
+if [[ "${KNOWLEDGE_REAL_USER_GATE:-0}" == 1 ]]; then
+  go build -race -o "$knowledge_tmp/user-rpc" ./service/user/user/rpc
+  go build -race -o "$knowledge_tmp/usercenter" ./service/user/user/api
+  export KNOWLEDGE_REAL_USER_RPC_BINARY="$knowledge_tmp/user-rpc"
+  export KNOWLEDGE_REAL_USER_API_BINARY="$knowledge_tmp/usercenter"
+fi
 go test -race ./service/knowledge/... -count=1 -v | tee "$knowledge_tmp/test.log"
 go vet ./service/knowledge/...
 git diff --check
