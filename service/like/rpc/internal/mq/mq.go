@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"time"
 
 	"sea-try-go/service/common/logger"
+	"sea-try-go/service/like/common/errmsg"
 	"sea-try-go/service/like/rpc/internal/model"
 	"sea-try-go/service/like/rpc/internal/mq/internal/config"
 	"sea-try-go/service/like/rpc/internal/mq/internal/mqs"
@@ -27,14 +27,18 @@ type OutboxRelayService struct {
 }
 
 func (s *OutboxRelayService) Start() {
-	fmt.Println("Starting Outbox Relay...")
+	logger.LogInfo(s.ctx, "like outbox relay started")
 	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-s.ctx.Done():
-			fmt.Println("Stopping Outbox Relay...")
+			logger.LogInfo(s.ctx, "like outbox relay stopped")
+			return
 		case <-ticker.C:
-			_ = s.sender.SendPending(s.ctx, 100)
+			if err := s.sender.SendPending(s.ctx, 100); err != nil {
+				logger.LogBusinessErr(s.ctx, errmsg.ErrorKafkaPush, err)
+			}
 		}
 	}
 }
@@ -75,7 +79,7 @@ func main() {
 	}
 	serviceGroup.Add(relayService)
 
-	fmt.Printf("Starting mq consumer [%s]...\n", c.Name)
+	logger.LogInfo(backgroundCtx, "like mq consumer starting")
 
 	serviceGroup.Start()
 }
