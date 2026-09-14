@@ -61,6 +61,8 @@ GET /internal/v1/favorite/facts/rtw.community.favorite/favorite.9007199254740995
 
 BTW Binder 应用 `producer,event_id` 向此 RTW 读口查源，再逐字段核对 DC batch 中的 EventSpec、producer、event_id、输入 hash、offset、receipt_id、received_at；仅使用 RTW 回的 `subject_ref` 绑定事实。DC 的技术接纳或 RTW 的读口成功 **不是** BTW 事实接纳、DWD 入仓或用户特征生效。撤回按 `predecessor_event_id` 关联已验建立事实。
 
+跨仓验收可给 `acceptance-dc.sh` 传两个互不相同且尚不存在的绝对文件路径：`FAVORITE_SHARED_READY_FILE` 和 `FAVORITE_SHARED_RELEASE_FILE`。仅测试模式下，`TestFavoriteDeliverySharedAuthorityFixture` 在同一隔离 PG schema 与真实 DC 上提交高位建立/撤回，启动独立 RTW 权威 HTTP，再原子创建仅当前用户可读的 ready JSON。字段固定为 `authority_url,authority_token,dc_url,dc_token,producer,assert_event_id,retract_event_id,assert_receipt,retract_receipt`；两个 receipt 都含 DC 原 `input_hash/offset/receipt_id/received_at`。外层 BTW 验收脚本等待 ready，用完后即使失败也创建 release 文件；RTW 测试据此退出并清理 HTTP、schema、PG 和 DC，删除 ready 文件。未设置两变量时该模式跳过；等待最长四分钟，避免遗留测试进程。ready 内容含仅限本次隔离测试使用的服务令牌，不写日志或提交仓库。
+
 ## 已冻结历史与迁移边界
 
 迁移前先检查 `favorite_fact_outbox` 中 `jsonb_typeof(payload->'payload'->'favorite_id')` 和 `jsonb_typeof(payload->'payload'->'folder_id')`。旧版安全范围内的数字事件按原 EventSpec/hash 继续投递和读取。超过 2^53 的旧版数字事件，派发器在本地校验阶段阻断、不调用 DC、不修改 payload/event_id/版本；它只把技术状态置为 `3=blocked`，记录结构化 `favorite.delivery.blocked`/`INVALID_FROZEN_ENVELOPE`，后续合法行仍可派发。已失败的旧行也不得直接改写为字符串后按同一个事件 ID 重投。需要先查 DC `(producer,event_id)` 回执确认是否有既存输入，再单独制定新的事件版本/迁移合同和 BTW 兼容规则；当前实现不自动修复历史行。原库执行 `001_favorite_fact_outbox.sql` 与 `002_favorite_fact_delivery.sql` 后才可启用读口。
@@ -70,5 +72,6 @@ BTW Binder 应用 `producer,event_id` 向此 RTW 读口查源，再逐字段核�
 - 修复前，`favorite_id=9007199254740995`、`folder_id=9007199254740993` 的真实 RTW→DC `cmd/platform` 请求返回 HTTP `400 INVALID_JSON`；隔离证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-dc.13C9j3`。
 - 修复后，`SEA_DC_PLATFORM_ROOT=<隔离 DC 工作树> bash service/favorite/rpc/acceptance-dc.sh` 通过：高位建立与撤回各获不同 DC 回执及连续 offset，固定事件重投不增新事件；独立 RTW HTTP 进程在接纳前 `404`、接纳后 `200` 并与 DC 原 hash/receipt/received_at 对齐，未知/错 producer/无令牌/篡改/跨用户或旧来源夹具均拒绝，缺配置的读进程无法启动。旧高位数字事件被标为 `blocked` 后，同批后继合法事件仍由真实 DC 接纳为 offset 5；最终证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-dc.MTEAX9`。
 - `bash service/favorite/rpc/acceptance.sh` 在隔离 PG16 上 `-race -count=1` 与 vet 退出 `0`，覆盖跨用户、旧来源、撤回主体冲突、小整数旧事件兼容、高位旧数字阻断且 Outbox 不改写、后继事件继续派发；最终证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-fact.aEq8Fq`。
+- 共享验收模式实跑退出 `0`：ready 文件仅当前用户可读，外部进程在 release 前用真实 HTTP 分别回查 assert/retract 的 RTW 源事实与 DC 回执，逐项比较 JCS hash、receipt ID、offset 和时间，得到连续 offset 6/7；创建 release 后 ready 自动删除、服务与 PG 停止。证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-dc.UAd8o7`。此项验证跨进程握手与源/技术回执，BTW 正式 Binder 仍需另行实测。
 
 文章公开边界仍待交接：当前 `resolveArticleSnapshot` 调 `ArticleRpc.GetArticle(ArticleId, IncrView:false)`，基线 `GetArticleRequest` 没有可证明公开修订的 `PublicOnly` 字段。应在文章域公开读 RPC 新字段集成后给收藏快照加公开门禁，不从 `status` 猜测冻结 r1。本分支未改文章或生成 pb。

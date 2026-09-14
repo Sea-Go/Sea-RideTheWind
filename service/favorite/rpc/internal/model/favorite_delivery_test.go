@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -469,6 +470,117 @@ func TestFavoriteAuthorityProcessDefaultClosed(t *testing.T) {
 	if err := command.Run(); err == nil {
 		t.Fatal("unconfigured source authority process stayed available")
 	}
+}
+
+// TestFavoriteDeliverySharedAuthorityFixture is a test-only rendezvous for a
+// separate BTW process. The ready file is mode 0600 and is never logged; the
+// source HTTP process, DC, and isolated PG schema remain alive until release.
+func TestFavoriteDeliverySharedAuthorityFixture(t *testing.T) {
+	readyPath, releasePath := os.Getenv("FAVORITE_SHARED_READY_FILE"), os.Getenv("FAVORITE_SHARED_RELEASE_FILE")
+	if readyPath == "" && releasePath == "" {
+		t.Skip("set both FAVORITE_SHARED_READY_FILE and FAVORITE_SHARED_RELEASE_FILE for cross-repo test")
+	}
+	if !filepath.IsAbs(readyPath) || !filepath.IsAbs(releasePath) || readyPath == releasePath ||
+		os.Getenv("FAVORITE_DC_URL") == "" || os.Getenv("FAVORITE_DC_TOKEN") == "" ||
+		os.Getenv("FAVORITE_AUTHORITY_BIN") == "" || os.Getenv("FAVORITE_DISPATCH_BIN") == "" {
+		t.Fatal("shared favorite acceptance configuration incomplete")
+	}
+	for _, path := range []string{readyPath, releasePath} {
+		if _, err := os.Stat(path); err == nil || !os.IsNotExist(err) {
+			t.Fatalf("shared favorite handoff path must be new: %s", path)
+		}
+	}
+	store := favoriteFactStore(t)
+	authorityURL, authorityToken := startFavoriteAuthorityProcess(t, store)
+	const folderID, favoriteID int64 = 9007199254741991, 9007199254741993
+	ctx := context.Background()
+	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: folderID, UserId: 1001, Name: "shared-authority"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InsertFavorite(ctx, &FavoriteItem{FavoriteId: favoriteID, FolderId: folderID,
+		UserId: 1001, TargetType: "article", TargetId: "article-shared-authority"}); err != nil {
+		t.Fatal(err)
+	}
+	endpoint, dcURL, dcToken := os.Getenv("FAVORITE_DC_URL")+"/v1/events", os.Getenv("FAVORITE_DC_URL"), os.Getenv("FAVORITE_DC_TOKEN")
+	if err := runFavoriteDispatchProcess(t, store, endpoint, dcToken); err != nil {
+		t.Fatalf("shared assert dispatch: %v", err)
+	}
+	assertID := fmt.Sprintf("favorite.%d.v1", favoriteID)
+	assertReceipt := readFavoriteDCReceipt(t, &http.Client{Timeout: 3 * time.Second}, dcURL, dcToken, assertID)
+	if status, fact := readFavoriteAuthority(t, authorityURL, authorityToken, favoriteProducer, assertID); status != 200 || fact.SourceEventHash != assertReceipt.InputHash ||
+		fact.TechnicalReceipt.ReceiptID != assertReceipt.ReceiptID {
+		t.Fatalf("shared assert source not ready: status=%d fact=%+v", status, fact)
+	}
+	if err := store.DeleteFavoriteByFavoriteId(ctx, favoriteID, 1001); err != nil {
+		t.Fatal(err)
+	}
+	if err := runFavoriteDispatchProcess(t, store, endpoint, dcToken); err != nil {
+		t.Fatalf("shared retract dispatch: %v", err)
+	}
+	retractID := fmt.Sprintf("favorite.%d.v2", favoriteID)
+	retractReceipt := readFavoriteDCReceipt(t, &http.Client{Timeout: 3 * time.Second}, dcURL, dcToken, retractID)
+	if status, fact := readFavoriteAuthority(t, authorityURL, authorityToken, favoriteProducer, retractID); status != 200 || fact.PredecessorEventID != assertID ||
+		fact.SourceEventHash != retractReceipt.InputHash ||
+		fact.TechnicalReceipt.ReceiptID != retractReceipt.ReceiptID ||
+		retractReceipt.Offset != assertReceipt.Offset+1 {
+		t.Fatalf("shared retract source not ready: status=%d fact=%+v", status, fact)
+	}
+	ready := struct {
+		AuthorityURL   string                   `json:"authority_url"`
+		AuthorityToken string                   `json:"authority_token"`
+		DCURL          string                   `json:"dc_url"`
+		DCToken        string                   `json:"dc_token"`
+		Producer       string                   `json:"producer"`
+		AssertEventID  string                   `json:"assert_event_id"`
+		RetractEventID string                   `json:"retract_event_id"`
+		AssertReceipt  FavoriteTechnicalReceipt `json:"assert_receipt"`
+		RetractReceipt FavoriteTechnicalReceipt `json:"retract_receipt"`
+	}{authorityURL, authorityToken, dcURL, dcToken, favoriteProducer, assertID, retractID,
+		assertReceipt, retractReceipt}
+	if err := writeFavoriteSharedReady(readyPath, ready); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(readyPath) })
+	deadline := time.NewTimer(4 * time.Minute)
+	defer deadline.Stop()
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			t.Fatal("shared favorite acceptance release timed out")
+		case <-ticker.C:
+			if _, err := os.Stat(releasePath); err == nil {
+				return
+			} else if !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+func writeFavoriteSharedReady(path string, value any) error {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	file, err := os.CreateTemp(filepath.Dir(path), ".favorite-ready-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	if err := file.Chmod(0600); err != nil {
+		file.Close()
+		return err
+	}
+	if _, err := file.Write(body); err != nil {
+		file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Link(file.Name(), path)
 }
 
 func startFavoriteAuthorityProcess(t *testing.T, store *FavoriteModel) (string, string) {
