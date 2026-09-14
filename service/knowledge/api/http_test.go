@@ -1204,13 +1204,19 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatalf("cross-repository input was not an unclaimed build: %+v", indexBuild)
 		}
 		resultPath := filepath.Join(dir, "btw-real-index-result.json")
-		fixtureRaw, marshalErr := json.Marshal(map[string]any{
+		fixtureData := map[string]any{
 			"base_url": base, "worker_token": c.WorkerToken, "objects_dir": filepath.Join(dir, "objects"),
 			"build_id": indexBuild.BuildId, "release_id": indexRelease.ReleaseId, "module_id": indexModule.Id,
 			"source_revision_ids": []string{indexSource.RevisionId}, "wiki_revision_ids": []string{},
 			"chunk_profile": indexRelease.ChunkingProfile, "chunk_size": 64, "chunk_overlap": 0,
 			"result_path": resultPath,
-		})
+		}
+		var actualDC *dcJobPlatform
+		if dcRoot := os.Getenv("SEA_DC_JOB_PLATFORM_ROOT"); dcRoot != "" {
+			actualDC = startRealDCJobPlatform(t, dir, dcRoot)
+			fixtureData["dc_job_url"], fixtureData["dc_job_token"] = actualDC.BaseURL, actualDC.Token
+		}
+		fixtureRaw, marshalErr := json.Marshal(fixtureData)
 		if marshalErr != nil {
 			t.Fatal(marshalErr)
 		}
@@ -1239,6 +1245,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			IndexManifestHash string `json:"index_manifest_hash"`
 			DCAckRef          string `json:"dc_ack_ref"`
 			DCAckHash         string `json:"dc_ack_hash"`
+			DCJobID           string `json:"dc_job_id"`
+			DCLeaseEpoch      int64  `json:"dc_lease_epoch"`
+			RTWLeaseEpoch     int64  `json:"rtw_lease_epoch"`
 			RTWState          string `json:"rtw_state"`
 			RTWGeneration     int64  `json:"rtw_generation"`
 		}
@@ -1255,6 +1264,13 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			acceptedBuild.IndexManifestHash != handoff.IndexManifestHash ||
 			acceptedBuild.Generation != indexBuild.Generation {
 			t.Fatalf("RTW HTTP returned a different accepted build: %+v", acceptedBuild)
+		}
+		if actualDC != nil {
+			if handoff.DCJobID == "" || handoff.DCLeaseEpoch != 1 || handoff.RTWLeaseEpoch != 2 ||
+				acceptedBuild.LeaseEpoch != handoff.RTWLeaseEpoch {
+				t.Fatalf("actual DC job and RTW build fence were conflated: handoff=%+v RTW=%+v", handoff, acceptedBuild)
+			}
+			actualDC.assertAcceptedIndexJob(t, handoff.DCJobID, handoff.IndexManifestHash, handoff.DCLeaseEpoch)
 		}
 		var storedBuildRaw []byte
 		if err := s.DB.QueryRow(context.Background(), "SELECT data FROM knowledge_builds WHERE id=$1", indexBuild.BuildId).
