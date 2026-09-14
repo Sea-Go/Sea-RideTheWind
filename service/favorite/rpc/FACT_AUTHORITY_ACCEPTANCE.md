@@ -14,7 +14,7 @@ GET /internal/v1/favorite/facts/rtw.community.favorite/favorite.9007199254740995
 
 `200` 正文含 `event`（源 Outbox 冻结完整 EventSpec）、`subject_ref`（RTW 构造并核过的 `rtw.identity/platform/<UID>`）、撤回时的 `predecessor_event_id`、`technical_receipt`（RTW 已提交的 DC `accepted` 回执及 `receipt_id/input_hash/offset/received_at`）、`source_event_hash`（对源 EventSpec 同版 JCS/SHA-256）。建立事实无 `predecessor_event_id`。同键只读重投返回同一业务事实和技术回执；调用方不传主体、目标或 hash，因此无法覆盖 RTW 的主体归属。
 
-响应形状示例（hash 与回执 ID 为示意值，实际返回必须和 DC 回执一致）：
+响应形状示例是无修订指针的旧收藏（hash 与回执 ID 为示意值，实际返回必须和 DC 回执一致）；新发布文章收藏会返回具体 `target_revision`：
 
 ```json
 {
@@ -74,4 +74,4 @@ BTW Binder 应用 `producer,event_id` 向此 RTW 读口查源，再逐字段核�
 - `bash service/favorite/rpc/acceptance.sh` 在隔离 PG16 上 `-race -count=1` 与 vet 退出 `0`，覆盖跨用户、旧来源、撤回主体冲突、小整数旧事件兼容、高位旧数字阻断且 Outbox 不改写、后继事件继续派发；最终证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-fact.aEq8Fq`。
 - 共享验收模式实跑退出 `0`：ready 文件仅当前用户可读，外部进程在 release 前用真实 HTTP 分别回查 assert/retract 的 RTW 源事实与 DC 回执，逐项比较 JCS hash、receipt ID、offset 和时间，得到连续 offset 6/7；创建 release 后 ready 自动删除、服务与 PG 停止。证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-dc.UAd8o7`。此项验证跨进程握手与源/技术回执，BTW 正式 Binder 仍需另行实测。
 
-文章公开边界仍待交接：当前 `resolveArticleSnapshot` 调 `ArticleRpc.GetArticle(ArticleId, IncrView:false)`，基线 `GetArticleRequest` 没有可证明公开修订的 `PublicOnly` 字段。应在文章域公开读 RPC 新字段集成后给收藏快照加公开门禁，不从 `status` 猜测冻结 r1。本分支未改文章或生成 pb。
+文章公开边界是本文件验收时的历史缺口，现已由 Article `PublicOnly` 公开投影和 Favorite 发布快照后续切片处理；修订持久化、旧行 `NULL` 与新事件合同见 [FAVORITE_REVISION_ACCEPTANCE.md](FAVORITE_REVISION_ACCEPTANCE.md)。本文件的高位 ID、源哈希、回执与旧 Outbox 不改写合同保持有效。
