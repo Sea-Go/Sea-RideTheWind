@@ -13,3 +13,5 @@
 复验：`KNOWLEDGE_GOCTL=<临时目录>/goctl service/knowledge/scripts/generate.sh`；`bash service/knowledge/scripts/acceptance.sh`（隔离 PostgreSQL 16、`go test -race ./service/knowledge/... -count=1 -v`、`go vet ./service/knowledge/...`、`git diff --check`）。RTW 的测试索引工件是结构性 fixture，**不证明** BTW 真实同代 Dense/Sparse/Multi-vector 构建或检索数值。此固定提交时 BTW 客户端尚未调用本接口；后续两仓同进程联验已接通，见下段。Collector→DataCenter 下钻和完整 H07 产品验收仍未完成。
 
 后续BTW从本仓`7519ecc`生成 `SearchSnapshot` DTO，`RTWSearchSnapshotProvider`向真实RTW进程只传module_id，拿当前发布快照再沿**这份返回值**完成原文→引用→答案产品turn。第一次失败揭示原手工跨仓fixture少列一个已发布wiki修订，而RTW当前快照正确包含source+wiki；修正测试预期为完整有效集合后，`SEA_BTW_CITATION_CONSUMER_ROOT=<BTW集成树> bash service/knowledge/scripts/acceptance.sh`的隔离PG16/真实HTTP/race/vet全部通过。BTW源码范围见`internal/app/RTW_SEARCH_SNAPSHOT_ACCEPTANCE.md`。这只把当前快照**子链**上推到`INTEGRATED`，不改变H03/H07整体`PARTIAL`。
+
+进一步复验把同一快照交给BTW typed `search_fast/read_evidence`及真实tRPC-Agent-Go Runner/LLMAgent的`search_fast` Tool调用。初次请求因BTW `search_id=operation:1`不符合本仓持久引用ID语法而400；BTW改为`search_`加固定operation/序号SHA256后重新跑全服务PG16/race/vet通过。当前本仓引用提交指标在跨仓模式下精确为4：本仓原fixture、BTW普通Delivery、BTW直接Tool、BTW Agent Tool，均为不同search_id；重复提交不增指标。本地Tool-call模型fixture不代表实际DC生产模型或H07公开入口。
