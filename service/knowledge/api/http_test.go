@@ -320,7 +320,7 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 			"trace_id_path": filepath.Join(dir, "btw-citation-trace-id"),
 			"snapshot": map[string]any{"module_id": m.Id, "release_id": r.ReleaseId,
 				"generation": build.Generation, "publication_revision": "1",
-				"indexes": fixedIndexes, "valid_revision_ids": []string{a.RevisionId}},
+				"indexes": fixedIndexes, "valid_revision_ids": []string{a.RevisionId, w.RevisionId}},
 		})
 		if err != nil {
 			t.Fatal(err)
