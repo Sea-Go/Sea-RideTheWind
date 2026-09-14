@@ -1295,11 +1295,46 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	request("GET", searchPath+"/"+productSearchID, productToken, nil, nil, 503)
 	request("GET", citationStatePath, productToken, nil, nil, 503)
 	if btwRoot := os.Getenv("SEA_BTW_INDEX_CONSUMER_ROOT"); btwRoot != "" {
-		// A separate unpublished module gives BTW an actual, unclaimed RTW
-		// build. BTW must construct the three lanes and submit its own READY.
+		// The ordinary fixture uses an unpublished module. Cancellation keeps
+		// the already published module's active pointer while new candidates build.
+		cancelNewRelease := os.Getenv("SEA_BGE_WORKER_CANCEL_RELEASE") == "1"
 		var indexModule types.Module
-		request("POST", "/v1/knowledge/modules", token,
-			types.CreateModuleReq{Title: "Cross-repository index handoff", IdempotencyKey: "http-index-module"}, &indexModule, 200)
+		var publishedBefore types.ReleaseState
+		var publicationCountBefore int
+		if cancelNewRelease {
+			// The main workflow later withdraws its original source. A separate
+			// task-owned module keeps a valid published baseline for CAS checks.
+			request("POST", "/v1/knowledge/modules", token,
+				types.CreateModuleReq{Title: "Cancellation publication baseline", IdempotencyKey: "http-cancel-module"}, &indexModule, 200)
+			var baselineSource types.Revision
+			request("POST", "/v1/knowledge/modules/"+indexModule.Id+"/sources", token,
+				types.CreateSourceReq{Title: "Published baseline", Content: "baseline\n\npublic",
+					MediaType: "text/markdown", Provenance: "synthetic", IdempotencyKey: "http-cancel-baseline-source"},
+				&baselineSource, 200)
+			var baselineRelease types.Release
+			request("POST", "/v1/knowledge/modules/"+indexModule.Id+"/releases", token,
+				types.CreateReleaseReq{SourceRevisionIds: []string{baselineSource.RevisionId},
+					WikiRevisionIds: []string{}, ChunkingProfile: "index-paragraph-v1",
+					RetrievalProfiles: testenv.Profiles(), IdempotencyKey: "http-cancel-baseline-release"},
+				&baselineRelease, 200)
+			var baselineBuild types.Build
+			request("POST", "/v1/knowledge/releases/"+baselineRelease.ReleaseId+"/index-builds", token,
+				types.CreateBuildReq{IdempotencyKey: "http-cancel-baseline-build"}, &baselineBuild, 200)
+			baselineBuild = testenv.Ready(t, s, baselineBuild, baselineRelease)
+			request("PUT", "/v1/knowledge/modules/"+indexModule.Id+"/activation", token,
+				types.ActivateReq{ReleaseId: baselineRelease.ReleaseId, BuildId: baselineBuild.BuildId,
+					ExpectedPointerRevision: 0, Reason: "isolated cancellation fixture baseline"}, &publishedBefore, 200)
+			if publishedBefore.ActiveReleaseId == "" || publishedBefore.ActiveBuildId == "" || publishedBefore.PointerRevision < 1 {
+				t.Fatalf("cancel/new-release fixture requires an already published module: %+v", publishedBefore)
+			}
+			if err := s.DB.QueryRow(context.Background(), "SELECT count(*) FROM knowledge_publications WHERE module_id=$1", indexModule.Id).
+				Scan(&publicationCountBefore); err != nil || publicationCountBefore < 1 {
+				t.Fatalf("published baseline receipt absent: count=%d err=%v", publicationCountBefore, err)
+			}
+		} else {
+			request("POST", "/v1/knowledge/modules", token,
+				types.CreateModuleReq{Title: "Cross-repository index handoff", IdempotencyKey: "http-index-module"}, &indexModule, 200)
+		}
 		var indexSource types.Revision
 		request("POST", "/v1/knowledge/modules/"+indexModule.Id+"/sources", token,
 			types.CreateSourceReq{Title: "Index source", Content: "east\n\nnorth", MediaType: "text/markdown",
@@ -1336,11 +1371,17 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		if bgeRuntimeFile != "" {
 			fixtureData["bge_runtime_file"] = bgeRuntimeFile
 		}
+		if cancelNewRelease {
+			fixtureData["admin_token"] = token
+			fixtureData["published_release_id"] = publishedBefore.ActiveReleaseId
+			fixtureData["published_build_id"] = publishedBefore.ActiveBuildId
+			fixtureData["published_pointer_revision"] = publishedBefore.PointerRevision
+		}
 		var actualDC *dcJobPlatform
 		if dcRoot := os.Getenv("SEA_DC_JOB_PLATFORM_ROOT"); dcRoot != "" {
 			actualDC = startRealDCJobPlatform(t, dir, dcRoot)
 			fixtureData["dc_job_url"], fixtureData["dc_job_token"] = actualDC.BaseURL, actualDC.Token
-			if os.Getenv("SEA_BGE_WORKER_EXPIRY") == "1" {
+			if os.Getenv("SEA_BGE_WORKER_EXPIRY") == "1" || cancelNewRelease {
 				fixtureData["dc_job_dsn"] = actualDC.Pool.Config().ConnString()
 			}
 		}
@@ -1363,6 +1404,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			if os.Getenv("SEA_BGE_WORKER_EXPIRY") == "1" {
 				consumerTest = "TestRTWRealBGEWorkerLeaseExpiry"
 			}
+			if cancelNewRelease {
+				consumerTest = "TestRTWRealBGECancelNewRelease"
+			}
 		}
 		consumer.Env = append(os.Environ(), "SEA_RTW_REAL_INDEX_FIXTURE="+fixturePath,
 			"GOFLAGS=-run=^"+consumerTest+"$")
@@ -1379,6 +1423,12 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		}
 		var handoff struct {
 			BuildID           string `json:"build_id"`
+			OldBuildID        string `json:"old_build_id"`
+			OldReleaseID      string `json:"old_release_id"`
+			FirstNewBuildID   string `json:"first_new_build_id"`
+			NewReleaseID      string `json:"new_release_id"`
+			NewReleaseOrdinal int64  `json:"new_release_ordinal"`
+			OldDCJobID        string `json:"old_dc_job_id"`
 			IndexManifestRef  string `json:"index_manifest_ref"`
 			IndexManifestHash string `json:"index_manifest_hash"`
 			DCAckRef          string `json:"dc_ack_ref"`
@@ -1389,18 +1439,45 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			RTWState          string `json:"rtw_state"`
 			RTWGeneration     int64  `json:"rtw_generation"`
 		}
-		if err := json.Unmarshal(resultRaw, &handoff); err != nil || handoff.BuildID != indexBuild.BuildId ||
-			handoff.RTWGeneration != indexBuild.Generation || handoff.RTWState != "READY" ||
+		if err := json.Unmarshal(resultRaw, &handoff); err != nil {
+			t.Fatalf("decode BTW accepted handoff: %v", err)
+		}
+		expectedBuildID, expectedGeneration := indexBuild.BuildId, indexBuild.Generation
+		if cancelNewRelease {
+			expectedBuildID, expectedGeneration = handoff.BuildID, 2
+		}
+		if handoff.BuildID != expectedBuildID ||
+			handoff.RTWGeneration != expectedGeneration || handoff.RTWState != "READY" ||
 			handoff.IndexManifestRef != "sha256/"+handoff.IndexManifestHash ||
 			handoff.DCAckRef != "sha256:"+handoff.IndexManifestHash ||
 			handoff.DCAckHash != handoff.IndexManifestHash {
-			t.Fatalf("BTW result does not tie READY to DC ACK: %+v err=%v", handoff, err)
+			t.Fatalf("BTW result does not tie READY to DC ACK: %+v", handoff)
+		}
+		if cancelNewRelease {
+			if handoff.BuildID == indexBuild.BuildId || handoff.OldBuildID != indexBuild.BuildId ||
+				handoff.OldReleaseID != indexRelease.ReleaseId || handoff.FirstNewBuildID == "" ||
+				handoff.NewReleaseID == "" || handoff.NewReleaseID == indexRelease.ReleaseId ||
+				handoff.NewReleaseOrdinal != indexRelease.Ordinal+1 || handoff.OldDCJobID == "" {
+				t.Fatalf("replacement Release/Build identity was not distinct: %+v", handoff)
+			}
+			var old, firstNew types.Build
+			request("GET", "/internal/v1/knowledge/builds/"+indexBuild.BuildId, c.WorkerToken, nil, &old, 200)
+			request("GET", "/internal/v1/knowledge/builds/"+handoff.FirstNewBuildID, c.WorkerToken, nil, &firstNew, 200)
+			if old.State != "CANCELLED" || old.IndexManifestRef != "" || firstNew.State != "SUPERSEDED" ||
+				firstNew.Generation != 1 || firstNew.ReleaseId != handoff.NewReleaseID {
+				t.Fatalf("old cancelled/new generation predecessor mismatch: old=%+v first=%+v", old, firstNew)
+			}
+			var newRelease types.Release
+			request("GET", "/internal/v1/knowledge/releases/"+handoff.NewReleaseID, c.WorkerToken, nil, &newRelease, 200)
+			if newRelease.Ordinal != handoff.NewReleaseOrdinal || newRelease.ManifestHash == indexRelease.ManifestHash {
+				t.Fatalf("new Release was not frozen independently: %+v", newRelease)
+			}
 		}
 		var acceptedBuild types.Build
-		request("GET", "/internal/v1/knowledge/builds/"+indexBuild.BuildId, c.WorkerToken, nil, &acceptedBuild, 200)
+		request("GET", "/internal/v1/knowledge/builds/"+expectedBuildID, c.WorkerToken, nil, &acceptedBuild, 200)
 		if acceptedBuild.State != "READY" || acceptedBuild.IndexManifestRef != handoff.IndexManifestRef ||
 			acceptedBuild.IndexManifestHash != handoff.IndexManifestHash ||
-			acceptedBuild.Generation != indexBuild.Generation {
+			acceptedBuild.Generation != expectedGeneration {
 			t.Fatalf("RTW HTTP returned a different accepted build: %+v", acceptedBuild)
 		}
 		if actualDC != nil {
@@ -1413,9 +1490,21 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 				t.Fatalf("actual DC job and RTW build fence were conflated: handoff=%+v RTW=%+v", handoff, acceptedBuild)
 			}
 			actualDC.assertAcceptedIndexJob(t, handoff.DCJobID, handoff.IndexManifestHash, handoff.DCLeaseEpoch)
+			if cancelNewRelease {
+				var oldState string
+				var cancelVersion int64
+				var oldResults int
+				err := actualDC.Pool.QueryRow(context.Background(), `SELECT state,cancel_version,
+ (SELECT count(*) FROM jobs.attempt WHERE job_id=$1 AND result_hash IS NOT NULL)
+ FROM jobs.job WHERE id=$1`, handoff.OldDCJobID).Scan(&oldState, &cancelVersion, &oldResults)
+				if err != nil || oldState != "cancelled" || cancelVersion != 1 || oldResults != 0 {
+					t.Fatalf("old DC job survived explicit cancellation: state=%s cancel=%d results=%d err=%v",
+						oldState, cancelVersion, oldResults, err)
+				}
+			}
 		}
 		var storedBuildRaw []byte
-		if err := s.DB.QueryRow(context.Background(), "SELECT data FROM knowledge_builds WHERE id=$1", indexBuild.BuildId).
+		if err := s.DB.QueryRow(context.Background(), "SELECT data FROM knowledge_builds WHERE id=$1", expectedBuildID).
 			Scan(&storedBuildRaw); err != nil {
 			t.Fatal(err)
 		}
@@ -1426,14 +1515,24 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		var acceptedEvents, indexPublications int
 		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_outbox
 	WHERE event_type='knowledge.index.build.accepted.v1' AND aggregate_id=$1
-	AND payload->'payload'->>'build_id'=$2`, indexModule.Id, indexBuild.BuildId).Scan(&acceptedEvents); err != nil || acceptedEvents != 1 {
+	AND payload->'payload'->>'build_id'=$2`, indexModule.Id, expectedBuildID).Scan(&acceptedEvents); err != nil || acceptedEvents != 1 {
 			t.Fatalf("RTW acceptance outbox was not exactly once: count=%d err=%v", acceptedEvents, err)
 		}
 		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_publications WHERE module_id=$1`,
-			indexModule.Id).Scan(&indexPublications); err != nil || indexPublications != 0 {
+			indexModule.Id).Scan(&indexPublications); err != nil || indexPublications != publicationCountBefore {
 			t.Fatalf("index READY moved the manual publication pointer: count=%d err=%v", indexPublications, err)
 		}
-		request("GET", "/internal/v1/knowledge/modules/"+indexModule.Id+"/search-snapshot", c.WorkerToken, nil, nil, 404)
+		if cancelNewRelease {
+			var publishedAfter types.ReleaseState
+			request("GET", "/v1/knowledge/modules/"+indexModule.Id+"/releases/current", token, nil, &publishedAfter, 200)
+			if publishedAfter.ActiveReleaseId != publishedBefore.ActiveReleaseId ||
+				publishedAfter.ActiveBuildId != publishedBefore.ActiveBuildId ||
+				publishedAfter.PointerRevision != publishedBefore.PointerRevision {
+				t.Fatalf("candidate build changed active publication: before=%+v after=%+v", publishedBefore, publishedAfter)
+			}
+		} else {
+			request("GET", "/internal/v1/knowledge/modules/"+indexModule.Id+"/search-snapshot", c.WorkerToken, nil, nil, 404)
+		}
 	}
 	metrics, err := client.Get(base + "/metrics")
 	if err != nil {
