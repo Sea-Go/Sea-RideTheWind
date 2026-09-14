@@ -528,7 +528,7 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	}
 	expectedCitationCommits := 1
 	if os.Getenv("SEA_BTW_CITATION_CONSUMER_ROOT") != "" {
-		expectedCitationCommits++ // the external BTW client committed a second search_id
+		expectedCitationCommits += 3 // BTW delivery, direct typed Tool and native Agent Tool commit distinct search IDs
 	}
 	if !strings.Contains(string(metricBody), fmt.Sprintf(`sea_knowledge_commits_total{operation="knowledge.search.citations.accept"} %d`, expectedCitationCommits)) {
 		t.Fatal("citation replay was counted as another durable commit")
