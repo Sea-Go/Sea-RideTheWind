@@ -38,7 +38,7 @@ goctl api swagger --api api/knowledge.api --dir service/knowledge/generated --fi
 goctl api ts --api api/knowledge.api --dir service/knowledge/generated/typescript
 ```
 
-统一入口为 `service/knowledge/scripts/generate.sh`（可通过 KNOWLEDGE_GOCTL 指定生成器路径），包含生成器版本检查、生成文本空白规范化及去除 Swagger 生成时钟元数据。本次生成器 goctl 1.9.2，运行 go-zero v1.10.2。成功 `code=200,msg,data` 已在 DSL 定义 envelope；错误使用真实 HTTP 400/401/403/404/409/410/499/504/500，业务未知错误不作为空成功。
+统一入口为 `service/knowledge/scripts/generate.sh`（可通过 KNOWLEDGE_GOCTL 指定生成器路径），包含生成器版本检查、生成文本空白规范化及去除 Swagger 生成时钟元数据。本次生成器 goctl 1.9.2，运行 go-zero v1.10.2。成功 `code=200,msg,data` 已在 DSL 定义 envelope；错误使用真实 HTTP 400/401/403/404/409/410/499/503/504/500，业务未知错误不作为空成功。
 
 - 公开 GET `/v1/knowledge/modules`、`/modules/{id}`、`/modules/{id}/published` 仅展示有效已发布内容；候选/管理员列表为 `/workbench/modules`。
 - 管理命令复用已验证 JWT 的 `userId`，并由部署配置 AdministratorIDs 指定首批管理员。统一身份中心的后续业务角色映射仍属 WS02-A；客户端自报身份不作为依据。
@@ -81,4 +81,46 @@ Delivery.Enabled 默认 false。DC 接入后配置独立 `/v1/events` 接收地�
 
 独立复验复现了工件读取耗时超过租约后仍提交 READY/ACCEPTED 的缺陷。结果写入现在通过 PostgreSQL `clock_timestamp()` 在最终 UPDATE 再次核对租约；拒收会回滚同事务产生的 Wiki 修订、页头与 Outbox。新增构建和编制两个慢读取反例，覆盖状态与副作用均不提交。2026-09-14 使用隔离 PostgreSQL 16 执行完整 `scripts/acceptance.sh` 通过（含 race、HTTP 与静态检查）。
 
-管理员模块详情、历史 release/build/compile 列表和修订正文读接口仍待补齐；网页当前写链交付不代表完整工作台验收。
+该基线尚缺管理员与公开历史读面；以下 H02 补充实现补齐接口，最终网页/桌宠集成仍须各消费者独立验收。
+
+
+### H02 产品读取实现工作区（2026-09-14）
+
+继续使用以上 W0/W1/R1/D1/G1/X1/N1/T1 声明，读面基线为 `627c1c9`。本次主职责 C4 为模块范围查询、稳定分页与历史发布资格；C1/C2/C7 为 go-zero 产品路由、logic 与生成契约，C8 为隔离 PG/HTTP 验收。仅 `api/knowledge.api` 与 `service/knowledge/` 可写；不修改原始工作树、其他服务和共享 Docs。管理员产品接口不转发内部 worker 路由；权限仍用已有 JWT/Administrator 装配，不建立新身份系统。
+
+
+### H02 产品读取契约 r2
+
+全部路径前缀是 `/v1/knowledge`，成功响应沿用 `{code:200,msg:"success",data:...}`。权限复用现有中间件，不向浏览器传递 worker token。
+
+| 读取面 | GET 路径 | data 类型与语义 |
+| --- | --- | --- |
+| 管理员 | `/workbench/modules/:module_id` | Module；包括未发布和已撤回模块的管理状态 |
+| 管理员 | `/modules/:module_id/revisions` | `{items: Revision[],next_cursor?}`，只列元数据、当前 withdrawn |
+| 管理员 | `/modules/:module_id/revisions/:revision_id` | Revision，包括经 hash 验证的 content；已撤回内容不返回正文 |
+| 管理员 | `/modules/:module_id/releases` | `{items: Release[],next_cursor?}` |
+| 管理员 | `/modules/:module_id/releases/:release_id` | 固定 Release 元数据；不把候选当已发布 |
+| 管理员 | `/modules/:module_id/builds`、`/modules/:module_id/builds/:build_id` | Build 列表或详情，包括旧 READY、取消、替代与失败状态 |
+| 管理员 | `/modules/:module_id/compiles`、`/modules/:module_id/compiles/:compile_id` | Compile 列表或详情，供刷新恢复及状态轮询 |
+| 公开 | `/modules/:module_id/published-releases/:release_id` | 曾实际发布且当前有效的固定 Release |
+| 公开 | `/modules/:module_id/releases/:release_id/revisions` | 该固定已发布 Release 的 Revision 元数据分页 |
+| 公开 | `/modules/:module_id/releases/:release_id/revisions/:revision_id` | 该 Release 成员的固定正文、hash、来源定位 |
+
+所有列表采用 `limit`（默认 20，允许 1–100）和不透明 `cursor`，`next_cursor` 缺省表示结束。管理员原有 revisions 列表由无界返回改为有界列表；调用者必须跟随 next_cursor。每次不带 cursor 的查询开始新一轮，按持久化 `list_order` 倒序；cursor 固定首轮成员上界及模块/资源种类/公开 release 范围，后续新增记录不挤入旧轮次，任务状态仍读取当前值。游标不得换模块、资源种类或 release 使用；不使用 offset，不把 UUID 字典序当创建顺序。
+
+`schema.sql` 为 revisions/releases/builds/compiles 增加 identity 列及 `(module_id,list_order DESC)` 索引，并为 publication 增加模块/版本索引。创建路径先获得模块事务锁，再插入记录并分配 identity，因此同模块晚提交创建无法落到已经可见的分页上界内。迁移前记录在一次 schema 升级时取得固定序号，后续记录延续该序号；旧数据保证稳定遍历，不把迁移分配序号当作原始业务时间。旧二进制忽略新增列，修订/清单不可变约束继续保护 identity。迁移执行由部署流程明确控制，服务默认不自动迁移。
+
+公开资格依据 `knowledge_publications` 的真实发布审计，READY 和冻结清单不构成公开资格。活动指针切换或回滚后，旧发布仍定位原 release/revision；请求的 module/release/revision 必须一致且 revision 属于清单。缺失、未发布或非成员返回 404；模块撤回，或清单任一修订撤回，使该发布读取返回 410。管理员仍可读取审计元数据解释失效原因，但不读已撤回正文。正文/清单对象读取或 hash 校验失败返回 503，取消与超时保留原有分类，不把暂时存储故障当撤回。
+
+新读面先验证当前数据库资格，再在无数据库事务/锁的情况下读取对象，最后复核当前资格。修订正文始终按指定不可变 hash 验证；读取 Wiki 期间其依赖来源被撤回，也不能返回成功。目录分页只传修订元数据，不为列表读取所有正文；正文可用性在打开该修订时验证。`paragraph:N` 仍是 CRLF 转 LF 后以字面 `\n\n` 分块、忽略空块并从 1 编号，不跟随最新修订重新定位。
+
+### H02 读面验收补充（2026-09-14）
+
+- L1/L2：四类列表范围、limit、坏 cursor、跨模块/种类/公开 release 游标拒收；首轮之后插入记录，遍历旧轮仍不重复、不遗漏、不混入新成员；刷新可见新成员。已有数据迁移并重复执行 schema 后，固定正文/hash 不变，identity 与修订/清单仍受不可变约束保护。
+- L2：历史 Wiki v1 发布后切换 v2，旧引用仍返回 v1 的原始正文/hash；READY 尚未发布、非清单成员、跨模块均拒收；撤回历史成员只使包含它的发布失效，当前有效版本仍可读；模块撤回后公开读取均拒收，管理状态仍可查。
+- L2：在正文对象 Get 内触发修订/依赖来源/模块撤回，最终读取拒收；对象返回错误 hash 的字节也不能成功。新读面没有对象 I/O 跨数据库锁。
+- L2：实际 go-zero HTTP 子进程经生成路由/既有 JWT/Administrator、logic、PostgreSQL 16 和本地对象完成全部新路径。验证管理员草稿、四类历史列表与详情、取消后轮询、公开分页/历史正文、404/410/503、缺身份 401，以及不合法数值 limit 的 400；故意损坏真实本地正文文件产生 503，恢复原字节后再验撤回。
+- 生成一致性：固定 goctl 1.9.2 再次运行 `scripts/generate.sh`，DSL、Go types/routes、Swagger 和 TypeScript 的 SHA256 均不改变；消费者同步 `generated/typescript/knowledgeComponents.ts` 与 Swagger。
+- 尚未由本提供方证明：网页/桌宠真实用户旅程、BTW 实际三路算法与生产对象存储。上述历史发布测试仍使用显式结构 READY fixture，不能据此宣称三路检索或全工程验收完成。
+
+可复现命令仍为 `KNOWLEDGE_PG_BIN=/path/to/postgresql@16/bin KNOWLEDGE_KEEP_EVIDENCE=1 bash service/knowledge/scripts/acceptance.sh`。该脚本运行 knowledge 全部包的 race 测试、真实隔离数据库/HTTP 与 go vet，结束仅停止自建的随机端口实例。

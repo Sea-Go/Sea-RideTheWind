@@ -78,7 +78,8 @@ type (
 		RevisionId string `path:"revision_id"`
 	}
 	ListRevisionsResp {
-		Items []Revision `json:"items"`
+		Items      []Revision `json:"items"`
+		NextCursor string     `json:"next_cursor,omitempty"`
 	}
 	RetrievalProfile {
 		Lane        string `json:"lane"`
@@ -297,6 +298,69 @@ type (
 	}
 )
 
+// Product readers use opaque cursors; never send worker credentials to a client.
+type (
+	ModulePageReq {
+		ModuleId string `path:"module_id"`
+		Limit    int    `form:"limit,default=20"`
+		Cursor   string `form:"cursor,optional"`
+	}
+	ModuleRevisionPath {
+		ModuleId   string `path:"module_id"`
+		RevisionId string `path:"revision_id"`
+	}
+	ModuleReleasePath {
+		ModuleId  string `path:"module_id"`
+		ReleaseId string `path:"release_id"`
+	}
+	ModuleBuildPath {
+		ModuleId string `path:"module_id"`
+		BuildId  string `path:"build_id"`
+	}
+	ModuleCompilePath {
+		ModuleId  string `path:"module_id"`
+		CompileId string `path:"compile_id"`
+	}
+	PublishedRevisionsReq {
+		ModuleId  string `path:"module_id"`
+		ReleaseId string `path:"release_id"`
+		Limit     int    `form:"limit,default=20"`
+		Cursor    string `form:"cursor,optional"`
+	}
+	PublishedRevisionPath {
+		ModuleId   string `path:"module_id"`
+		ReleaseId  string `path:"release_id"`
+		RevisionId string `path:"revision_id"`
+	}
+	ListReleasesResp {
+		Items      []Release `json:"items"`
+		NextCursor string    `json:"next_cursor,omitempty"`
+	}
+	ListReleasesRespEnvelope {
+		Code int              `json:"code"`
+		Msg  string           `json:"msg"`
+		Data ListReleasesResp `json:"data"`
+	}
+	ListBuildsResp {
+		Items      []Build `json:"items"`
+		NextCursor string  `json:"next_cursor,omitempty"`
+	}
+	ListBuildsRespEnvelope {
+		Code int            `json:"code"`
+		Msg  string         `json:"msg"`
+		Data ListBuildsResp `json:"data"`
+	}
+	ListCompilesResp {
+		Items      []Compile `json:"items"`
+		NextCursor string    `json:"next_cursor,omitempty"`
+	}
+	ListCompilesRespEnvelope {
+		Code int              `json:"code"`
+		Msg  string           `json:"msg"`
+		Data ListCompilesResp `json:"data"`
+	}
+)
+
 @server (
 	prefix: /v1/knowledge
 	group:  knowledge
@@ -307,6 +371,15 @@ service knowledge-api {
 
 	@handler GetModule
 	get /modules/:module_id (ModulePath) returns (ModuleEnvelope)
+
+	@handler GetHistoricalRelease
+	get /modules/:module_id/published-releases/:release_id (ModuleReleasePath) returns (ReleaseEnvelope)
+
+	@handler ListPublishedRevisions
+	get /modules/:module_id/releases/:release_id/revisions (PublishedRevisionsReq) returns (ListRevisionsRespEnvelope)
+
+	@handler GetPublishedRevision
+	get /modules/:module_id/releases/:release_id/revisions/:revision_id (PublishedRevisionPath) returns (RevisionEnvelope)
 
 	@handler GetPublishedRelease
 	get /modules/:module_id/published (ModulePath) returns (ReleaseEnvelope)
@@ -325,6 +398,30 @@ service knowledge-api {
 	@handler ListDraftModules
 	get /workbench/modules (ListModulesReq) returns (ListModulesRespEnvelope)
 
+	@handler GetDraftModule
+	get /workbench/modules/:module_id (ModulePath) returns (ModuleEnvelope)
+
+	@handler GetModuleRevision
+	get /modules/:module_id/revisions/:revision_id (ModuleRevisionPath) returns (RevisionEnvelope)
+
+	@handler ListReleases
+	get /modules/:module_id/releases (ModulePageReq) returns (ListReleasesRespEnvelope)
+
+	@handler GetModuleRelease
+	get /modules/:module_id/releases/:release_id (ModuleReleasePath) returns (ReleaseEnvelope)
+
+	@handler ListBuilds
+	get /modules/:module_id/builds (ModulePageReq) returns (ListBuildsRespEnvelope)
+
+	@handler GetModuleBuild
+	get /modules/:module_id/builds/:build_id (ModuleBuildPath) returns (BuildEnvelope)
+
+	@handler ListCompiles
+	get /modules/:module_id/compiles (ModulePageReq) returns (ListCompilesRespEnvelope)
+
+	@handler GetModuleCompile
+	get /modules/:module_id/compiles/:compile_id (ModuleCompilePath) returns (CompileEnvelope)
+
 	@handler CreateCompile
 	post /modules/:module_id/compiles (CreateCompileReq) returns (CompileEnvelope)
 
@@ -335,7 +432,7 @@ service knowledge-api {
 	post /modules/:module_id/sources (CreateSourceReq) returns (RevisionEnvelope)
 
 	@handler ListRevisions
-	get /modules/:module_id/revisions (ModulePath) returns (ListRevisionsRespEnvelope)
+	get /modules/:module_id/revisions (ModulePageReq) returns (ListRevisionsRespEnvelope)
 
 	@handler CreateWiki
 	post /modules/:module_id/wiki-pages/:page_id/revisions (CreateWikiReq) returns (RevisionEnvelope)

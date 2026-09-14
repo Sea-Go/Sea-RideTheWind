@@ -27,6 +27,9 @@ func ConfigureResponses() {
 		case errors.Is(err, model.ErrConflict):
 			status = 409
 			msg = err.Error()
+		case errors.Is(err, model.ErrArtifactUnavailable):
+			status = 503
+			msg = model.ErrArtifactUnavailable.Error()
 		case errors.Is(err, model.ErrUnavailable):
 			status = 410
 			msg = err.Error()

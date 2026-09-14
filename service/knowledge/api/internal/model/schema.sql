@@ -53,3 +53,16 @@ CREATE TABLE IF NOT EXISTS knowledge_compiles (
  page_id text NOT NULL, generation bigint NOT NULL, data jsonb NOT NULL,
  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(module_id,page_id,generation)
 );
+
+-- These identities are immutable creation order, not public entity IDs. Creation
+-- paths hold the module lock before INSERT, so a module's committed upper bound
+-- excludes all later inserts even across same-timestamp transactions or UUIDs.
+ALTER TABLE knowledge_revisions ADD COLUMN IF NOT EXISTS list_order bigint GENERATED ALWAYS AS IDENTITY;
+CREATE INDEX IF NOT EXISTS knowledge_revisions_module_page ON knowledge_revisions(module_id,list_order DESC);
+ALTER TABLE knowledge_releases ADD COLUMN IF NOT EXISTS list_order bigint GENERATED ALWAYS AS IDENTITY;
+CREATE INDEX IF NOT EXISTS knowledge_releases_module_page ON knowledge_releases(module_id,list_order DESC);
+ALTER TABLE knowledge_builds ADD COLUMN IF NOT EXISTS list_order bigint GENERATED ALWAYS AS IDENTITY;
+CREATE INDEX IF NOT EXISTS knowledge_builds_module_page ON knowledge_builds(module_id,list_order DESC);
+ALTER TABLE knowledge_compiles ADD COLUMN IF NOT EXISTS list_order bigint GENERATED ALWAYS AS IDENTITY;
+CREATE INDEX IF NOT EXISTS knowledge_compiles_module_page ON knowledge_compiles(module_id,list_order DESC);
+CREATE INDEX IF NOT EXISTS knowledge_publications_release ON knowledge_publications(module_id,release_id);

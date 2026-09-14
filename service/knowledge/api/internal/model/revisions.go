@@ -155,31 +155,6 @@ func (s *Store) GetRevision(ctx context.Context, revisionID string) (types.Revis
 	r.Content = string(b)
 	return r, err
 }
-func (s *Store) ListRevisions(ctx context.Context, moduleID string) (types.ListRevisionsResp, error) {
-	out := types.ListRevisionsResp{Items: []types.Revision{}}
-	if _, err := module(ctx, s.DB, moduleID, false); err != nil {
-		return out, err
-	}
-	rows, err := s.DB.Query(ctx, "SELECT data,withdrawn FROM knowledge_revisions WHERE module_id=$1 ORDER BY created_at,id", moduleID)
-	if err != nil {
-		return out, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var raw []byte
-		var withdrawn bool
-		if err = rows.Scan(&raw, &withdrawn); err != nil {
-			return out, err
-		}
-		var r types.Revision
-		if err = json.Unmarshal(raw, &r); err != nil {
-			return out, err
-		}
-		r.Withdrawn = withdrawn
-		out.Items = append(out.Items, r)
-	}
-	return out, rows.Err()
-}
 func (s *Store) Withdraw(ctx context.Context, actor string, req types.WithdrawReq) (types.Receipt, error) {
 	if strings.TrimSpace(req.Reason) == "" {
 		return types.Receipt{}, invalid("withdrawal reason required")

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"syscall"
 	"testing"
 	"time"
@@ -180,6 +181,10 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 			if envelope.Code != want {
 				t.Fatalf("bad envelope: %s", raw)
 			}
+			// Each HTTP response is a fresh object; omitted optional fields must not
+			// accidentally retain a previous test response (for example next_cursor).
+			value := reflect.ValueOf(out).Elem()
+			value.Set(reflect.Zero(value.Type()))
 			if e = json.Unmarshal(envelope.Data, out); e != nil {
 				t.Fatal(e)
 			}
@@ -238,5 +243,6 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if err = s.DB.QueryRow(context.Background(), "SELECT count(*) FROM knowledge_outbox WHERE event_type='knowledge.release.activated.v1'").Scan(&outbox); err != nil || outbox != 1 {
 		t.Fatalf("publish events=%d err=%v", outbox, err)
 	}
+	verifyProductReaders(t, s, request, token, filepath.Join(dir, "objects"), m, a, w, r, build)
 }
 func fmtInt(n int) string { b, _ := json.Marshal(n); return string(b) }

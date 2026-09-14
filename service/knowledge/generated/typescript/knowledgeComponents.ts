@@ -189,6 +189,28 @@ export interface CreateWikiReq {
 export interface CreateWikiReqParams {
 }
 
+export interface ListBuildsResp {
+	items: Array<Build>
+	next_cursor?: string
+}
+
+export interface ListBuildsRespEnvelope {
+	code: number
+	msg: string
+	data: ListBuildsResp
+}
+
+export interface ListCompilesResp {
+	items: Array<Compile>
+	next_cursor?: string
+}
+
+export interface ListCompilesRespEnvelope {
+	code: number
+	msg: string
+	data: ListCompilesResp
+}
+
 export interface ListModulesReq {
 }
 export interface ListModulesReqParams {
@@ -207,8 +229,20 @@ export interface ListModulesRespEnvelope {
 	data: ListModulesResp
 }
 
+export interface ListReleasesResp {
+	items: Array<Release>
+	next_cursor?: string
+}
+
+export interface ListReleasesRespEnvelope {
+	code: number
+	msg: string
+	data: ListReleasesResp
+}
+
 export interface ListRevisionsResp {
 	items: Array<Revision>
+	next_cursor?: string
 }
 
 export interface ListRevisionsRespEnvelope {
@@ -234,15 +268,54 @@ export interface Module {
 	active_build_id: string
 }
 
+export interface ModuleBuildPath {
+}
+export interface ModuleBuildPathParams {
+}
+
+export interface ModuleCompilePath {
+}
+export interface ModuleCompilePathParams {
+}
+
 export interface ModuleEnvelope {
 	code: number
 	msg: string
 	data: Module
 }
 
+export interface ModulePageReq {
+}
+export interface ModulePageReqParams {
+	limit: number
+	cursor?: string
+}
+
 export interface ModulePath {
 }
 export interface ModulePathParams {
+}
+
+export interface ModuleReleasePath {
+}
+export interface ModuleReleasePathParams {
+}
+
+export interface ModuleRevisionPath {
+}
+export interface ModuleRevisionPathParams {
+}
+
+export interface PublishedRevisionPath {
+}
+export interface PublishedRevisionPathParams {
+}
+
+export interface PublishedRevisionsReq {
+}
+export interface PublishedRevisionsReqParams {
+	limit: number
+	cursor?: string
 }
 
 export interface Receipt {

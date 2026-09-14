@@ -178,6 +178,28 @@ type CreateWikiReq struct {
 	IdempotencyKey string      `json:"idempotency_key"`
 }
 
+type ListBuildsResp struct {
+	Items      []Build `json:"items"`
+	NextCursor string  `json:"next_cursor,omitempty"`
+}
+
+type ListBuildsRespEnvelope struct {
+	Code int            `json:"code"`
+	Msg  string         `json:"msg"`
+	Data ListBuildsResp `json:"data"`
+}
+
+type ListCompilesResp struct {
+	Items      []Compile `json:"items"`
+	NextCursor string    `json:"next_cursor,omitempty"`
+}
+
+type ListCompilesRespEnvelope struct {
+	Code int              `json:"code"`
+	Msg  string           `json:"msg"`
+	Data ListCompilesResp `json:"data"`
+}
+
 type ListModulesReq struct {
 	Limit  int    `form:"limit,default=12"`
 	Cursor string `form:"cursor,optional"`
@@ -194,8 +216,20 @@ type ListModulesRespEnvelope struct {
 	Data ListModulesResp `json:"data"`
 }
 
+type ListReleasesResp struct {
+	Items      []Release `json:"items"`
+	NextCursor string    `json:"next_cursor,omitempty"`
+}
+
+type ListReleasesRespEnvelope struct {
+	Code int              `json:"code"`
+	Msg  string           `json:"msg"`
+	Data ListReleasesResp `json:"data"`
+}
+
 type ListRevisionsResp struct {
-	Items []Revision `json:"items"`
+	Items      []Revision `json:"items"`
+	NextCursor string     `json:"next_cursor,omitempty"`
 }
 
 type ListRevisionsRespEnvelope struct {
@@ -221,14 +255,53 @@ type Module struct {
 	ActiveBuildId   string `json:"active_build_id"`
 }
 
+type ModuleBuildPath struct {
+	ModuleId string `path:"module_id"`
+	BuildId  string `path:"build_id"`
+}
+
+type ModuleCompilePath struct {
+	ModuleId  string `path:"module_id"`
+	CompileId string `path:"compile_id"`
+}
+
 type ModuleEnvelope struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg"`
 	Data Module `json:"data"`
 }
 
+type ModulePageReq struct {
+	ModuleId string `path:"module_id"`
+	Limit    int    `form:"limit,default=20"`
+	Cursor   string `form:"cursor,optional"`
+}
+
 type ModulePath struct {
 	ModuleId string `path:"module_id"`
+}
+
+type ModuleReleasePath struct {
+	ModuleId  string `path:"module_id"`
+	ReleaseId string `path:"release_id"`
+}
+
+type ModuleRevisionPath struct {
+	ModuleId   string `path:"module_id"`
+	RevisionId string `path:"revision_id"`
+}
+
+type PublishedRevisionPath struct {
+	ModuleId   string `path:"module_id"`
+	ReleaseId  string `path:"release_id"`
+	RevisionId string `path:"revision_id"`
+}
+
+type PublishedRevisionsReq struct {
+	ModuleId  string `path:"module_id"`
+	ReleaseId string `path:"release_id"`
+	Limit     int    `form:"limit,default=20"`
+	Cursor    string `form:"cursor,optional"`
 }
 
 type Receipt struct {

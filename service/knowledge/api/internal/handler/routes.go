@@ -31,6 +31,21 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/modules/:module_id/published",
 				Handler: knowledge.GetPublishedReleaseHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/modules/:module_id/published-releases/:release_id",
+				Handler: knowledge.GetHistoricalReleaseHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/modules/:module_id/releases/:release_id/revisions",
+				Handler: knowledge.ListPublishedRevisionsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/modules/:module_id/releases/:release_id/revisions/:revision_id",
+				Handler: knowledge.GetPublishedRevisionHandler(serverCtx),
+			},
 		},
 		rest.WithPrefix("/v1/knowledge"),
 	)
@@ -60,14 +75,44 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Handler: knowledge.ActivateHandler(serverCtx),
 				},
 				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/builds",
+					Handler: knowledge.ListBuildsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/builds/:build_id",
+					Handler: knowledge.GetModuleBuildHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/compiles",
+					Handler: knowledge.ListCompilesHandler(serverCtx),
+				},
+				{
 					Method:  http.MethodPost,
 					Path:    "/modules/:module_id/compiles",
 					Handler: knowledge.CreateCompileHandler(serverCtx),
 				},
 				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/compiles/:compile_id",
+					Handler: knowledge.GetModuleCompileHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/releases",
+					Handler: knowledge.ListReleasesHandler(serverCtx),
+				},
+				{
 					Method:  http.MethodPost,
 					Path:    "/modules/:module_id/releases",
 					Handler: knowledge.CreateReleaseHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/releases/:release_id",
+					Handler: knowledge.GetModuleReleaseHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodGet,
@@ -78,6 +123,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodGet,
 					Path:    "/modules/:module_id/revisions",
 					Handler: knowledge.ListRevisionsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/revisions/:revision_id",
+					Handler: knowledge.GetModuleRevisionHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodPost,
@@ -103,6 +153,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodGet,
 					Path:    "/workbench/modules",
 					Handler: knowledge.ListDraftModulesHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/workbench/modules/:module_id",
+					Handler: knowledge.GetDraftModuleHandler(serverCtx),
 				},
 			}...,
 		),

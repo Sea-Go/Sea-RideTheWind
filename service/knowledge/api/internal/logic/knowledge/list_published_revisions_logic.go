@@ -12,22 +12,22 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-type ListRevisionsLogic struct {
+type ListPublishedRevisionsLogic struct {
 	logx.Logger
 	ctx    context.Context
 	svcCtx *svc.ServiceContext
 }
 
-func NewListRevisionsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListRevisionsLogic {
-	return &ListRevisionsLogic{
+func NewListPublishedRevisionsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListPublishedRevisionsLogic {
+	return &ListPublishedRevisionsLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
 		svcCtx: svcCtx,
 	}
 }
 
-func (l *ListRevisionsLogic) ListRevisions(req *types.ModulePageReq) (resp *types.ListRevisionsRespEnvelope, err error) {
-	result, err := l.svcCtx.Store.ListRevisions(l.ctx, *req)
+func (l *ListPublishedRevisionsLogic) ListPublishedRevisions(req *types.PublishedRevisionsReq) (resp *types.ListRevisionsRespEnvelope, err error) {
+	result, err := l.svcCtx.Store.ListPublishedRevisions(l.ctx, *req)
 	if err != nil {
 		return nil, err
 	}

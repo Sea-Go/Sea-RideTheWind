@@ -29,6 +29,30 @@ export function getPublishedRelease(params: components.ModulePathParams, module_
 /**
  * @description
  * @param params
+ */
+export function getHistoricalRelease(params: components.ModuleReleasePathParams, module_id: string, release_id: string) {
+	return webapi.get<components.ReleaseEnvelope>(`/v1/knowledge/modules/${module_id}/published-releases/${release_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function listPublishedRevisions(params: components.PublishedRevisionsReqParams, module_id: string, release_id: string) {
+	return webapi.get<components.ListRevisionsRespEnvelope>(`/v1/knowledge/modules/${module_id}/releases/${release_id}/revisions`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getPublishedRevision(params: components.PublishedRevisionPathParams, module_id: string, release_id: string, revision_id: string) {
+	return webapi.get<components.RevisionEnvelope>(`/v1/knowledge/modules/${module_id}/releases/${release_id}/revisions/${revision_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
  * @param req
  */
 export function cancelBuild(params: components.CancelBuildReqParams, req: components.CancelBuildReq, build_id: string) {
@@ -64,10 +88,50 @@ export function activate(params: components.ActivateReqParams, req: components.A
 /**
  * @description
  * @param params
+ */
+export function listBuilds(params: components.ModulePageReqParams, module_id: string) {
+	return webapi.get<components.ListBuildsRespEnvelope>(`/v1/knowledge/modules/${module_id}/builds`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getModuleBuild(params: components.ModuleBuildPathParams, module_id: string, build_id: string) {
+	return webapi.get<components.BuildEnvelope>(`/v1/knowledge/modules/${module_id}/builds/${build_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function listCompiles(params: components.ModulePageReqParams, module_id: string) {
+	return webapi.get<components.ListCompilesRespEnvelope>(`/v1/knowledge/modules/${module_id}/compiles`, params)
+}
+
+/**
+ * @description
+ * @param params
  * @param req
  */
 export function createCompile(params: components.CreateCompileReqParams, req: components.CreateCompileReq, module_id: string) {
 	return webapi.post<components.CompileEnvelope>(`/v1/knowledge/modules/${module_id}/compiles`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getModuleCompile(params: components.ModuleCompilePathParams, module_id: string, compile_id: string) {
+	return webapi.get<components.CompileEnvelope>(`/v1/knowledge/modules/${module_id}/compiles/${compile_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function listReleases(params: components.ModulePageReqParams, module_id: string) {
+	return webapi.get<components.ListReleasesRespEnvelope>(`/v1/knowledge/modules/${module_id}/releases`, params)
 }
 
 /**
@@ -83,6 +147,14 @@ export function createRelease(params: components.CreateReleaseReqParams, req: co
  * @description
  * @param params
  */
+export function getModuleRelease(params: components.ModuleReleasePathParams, module_id: string, release_id: string) {
+	return webapi.get<components.ReleaseEnvelope>(`/v1/knowledge/modules/${module_id}/releases/${release_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
 export function currentRelease(params: components.ModulePathParams, module_id: string) {
 	return webapi.get<components.ReleaseStateEnvelope>(`/v1/knowledge/modules/${module_id}/releases/current`, params)
 }
@@ -91,8 +163,16 @@ export function currentRelease(params: components.ModulePathParams, module_id: s
  * @description
  * @param params
  */
-export function listRevisions(params: components.ModulePathParams, module_id: string) {
+export function listRevisions(params: components.ModulePageReqParams, module_id: string) {
 	return webapi.get<components.ListRevisionsRespEnvelope>(`/v1/knowledge/modules/${module_id}/revisions`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getModuleRevision(params: components.ModuleRevisionPathParams, module_id: string, revision_id: string) {
+	return webapi.get<components.RevisionEnvelope>(`/v1/knowledge/modules/${module_id}/revisions/${revision_id}`, params)
 }
 
 /**
@@ -137,6 +217,14 @@ export function createBuild(params: components.CreateBuildReqParams, req: compon
  */
 export function listDraftModules(params: components.ListModulesReqParams) {
 	return webapi.get<components.ListModulesRespEnvelope>(`/v1/knowledge/workbench/modules`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getDraftModule(params: components.ModulePathParams, module_id: string) {
+	return webapi.get<components.ModuleEnvelope>(`/v1/knowledge/workbench/modules/${module_id}`, params)
 }
 
 /**

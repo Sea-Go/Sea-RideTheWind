@@ -15,16 +15,16 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func ListRevisionsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func ListCompilesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.ModulePageReq
 		if err := httpx.Parse(r, &req); err != nil {
-			httpx.ErrorCtx(r.Context(), w, fmt.Errorf("%w: malformed request", model.ErrInvalid))
+			httpx.ErrorCtx(r.Context(), w, fmt.Errorf("%w: %v", model.ErrInvalid, err))
 			return
 		}
 
-		l := knowledge.NewListRevisionsLogic(r.Context(), svcCtx)
-		resp, err := l.ListRevisions(&req)
+		l := knowledge.NewListCompilesLogic(r.Context(), svcCtx)
+		resp, err := l.ListCompiles(&req)
 		if err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 		} else {
