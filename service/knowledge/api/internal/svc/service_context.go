@@ -10,11 +10,14 @@ import (
 	"sea-try-go/service/knowledge/api/internal/model"
 	"sea-try-go/service/knowledge/api/internal/object"
 	"sea-try-go/service/knowledge/api/internal/telemetry"
+	"sea-try-go/service/user/user/identity"
+	"sea-try-go/service/user/user/rpc/userservice"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/zeromicro/go-zero/rest"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
 type ServiceContext struct {
@@ -22,11 +25,16 @@ type ServiceContext struct {
 	Administrator rest.Middleware
 	Worker        rest.Middleware
 	Store         *model.Store
+	UserRpc       identity.UserReader
+	userRpcClient zrpc.Client
 }
 
 func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceContext, error) {
-	if c.Auth.AccessSecret == "" || c.WorkerToken == "" || len(c.AdministratorIDs) == 0 {
-		return nil, fmt.Errorf("auth secret, worker token and administrator identities required")
+	if c.Auth.AccessSecret == "" || c.UserAuth.AccessSecret == "" || c.WorkerToken == "" || len(c.AdministratorIDs) == 0 {
+		return nil, fmt.Errorf("administrator auth, user auth, worker token and administrator identities required")
+	}
+	if _, err := c.UserRpc.BuildTarget(); err != nil {
+		return nil, fmt.Errorf("user RPC configuration: %w", err)
 	}
 	pc, err := pgxpool.ParseConfig(c.Postgres.DSN)
 	if err != nil {
@@ -81,6 +89,17 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 			return fail(err)
 		}
 	}
-	return &ServiceContext{Config: c, Store: store, Administrator: middleware.NewAdministratorMiddleware(c.AdministratorIDs).Handle, Worker: middleware.NewWorkerMiddleware(c.WorkerToken).Handle}, nil
+	userClient, err := zrpc.NewClient(c.UserRpc)
+	if err != nil {
+		return fail(fmt.Errorf("user RPC configuration: %w", err))
+	}
+	return &ServiceContext{Config: c, Store: store, UserRpc: userservice.NewUserService(userClient), userRpcClient: userClient,
+		Administrator: middleware.NewAdministratorMiddleware(c.AdministratorIDs).Handle,
+		Worker:        middleware.NewWorkerMiddleware(c.WorkerToken).Handle}, nil
 }
-func (s *ServiceContext) Close() { s.Store.DB.Close() }
+func (s *ServiceContext) Close() {
+	if s.userRpcClient != nil {
+		_ = s.userRpcClient.Conn().Close()
+	}
+	s.Store.DB.Close()
+}

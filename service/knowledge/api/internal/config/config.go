@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/zeromicro/go-zero/rest"
+	"github.com/zeromicro/go-zero/zrpc"
 	"sea-try-go/service/knowledge/api/internal/telemetry"
 )
 
@@ -18,6 +19,10 @@ type Config struct {
 		AccessSecret string
 		AccessExpire int64
 	}
+	UserAuth struct {
+		AccessSecret string
+	}
+	UserRpc          zrpc.RpcClientConf
 	AdministratorIDs []string
 	WorkerToken      string
 	Postgres         struct {

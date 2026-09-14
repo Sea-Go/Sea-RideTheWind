@@ -335,6 +335,15 @@ type (
 		Msg  string              `json:"msg"`
 		Data AcceptedAnswersPage `json:"data"`
 	}
+	ProductAcceptedAnswersReq {
+		SessionId    string `path:"session_id"`
+		AfterOrdinal int64  `form:"after_ordinal,optional"`
+		Limit        int    `form:"limit,optional,default=50"`
+	}
+	ProductAcceptedAnswerReq {
+		SessionId string `path:"session_id"`
+		AnswerId  string `path:"answer_id"`
+	}
 )
 
 type (
@@ -601,6 +610,21 @@ service knowledge-api {
 
 	@handler Withdraw
 	post /modules/:module_id/withdrawals (WithdrawReq) returns (ReceiptEnvelope)
+}
+
+// Product history accepts only a logical session and pagination from the caller.
+// The subject is resolved from the verified User Center JWT and User RPC.
+@server (
+	prefix: /v1/knowledge
+	group:  product
+	jwt:    UserAuth
+)
+service knowledge-api {
+	@handler ListProductAcceptedAnswers
+	get /answer-sessions/:session_id/accepted-answers (ProductAcceptedAnswersReq) returns (AcceptedAnswersPageEnvelope)
+
+	@handler GetProductAcceptedAnswer
+	get /answer-sessions/:session_id/accepted-answers/:answer_id (ProductAcceptedAnswerReq) returns (AcceptedAnswerEnvelope)
 }
 
 @server (

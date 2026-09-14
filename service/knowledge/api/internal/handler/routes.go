@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	knowledge "sea-try-go/service/knowledge/api/internal/handler/knowledge"
+	product "sea-try-go/service/knowledge/api/internal/handler/product"
 	worker "sea-try-go/service/knowledge/api/internal/handler/worker"
 	"sea-try-go/service/knowledge/api/internal/svc"
 
@@ -162,6 +163,23 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			}...,
 		),
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
+		rest.WithPrefix("/v1/knowledge"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  http.MethodGet,
+				Path:    "/answer-sessions/:session_id/accepted-answers",
+				Handler: product.ListProductAcceptedAnswersHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/answer-sessions/:session_id/accepted-answers/:answer_id",
+				Handler: product.GetProductAcceptedAnswerHandler(serverCtx),
+			},
+		},
+		rest.WithJwt(serverCtx.Config.UserAuth.AccessSecret),
 		rest.WithPrefix("/v1/knowledge"),
 	)
 
