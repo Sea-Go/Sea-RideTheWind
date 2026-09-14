@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -103,6 +104,12 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 		t.Fatal(err)
 	}
 	candidate = testenv.Ready(t, s, candidate, r2)
+	// More than one row in each reader proves both continuation and terminal
+	// responses against the generated schema, including omitted-limit requests.
+	request("POST", modulePath+"/compiles", token, types.CreateCompileReq{PageId: "schema-compile", SourceRevisionIds: []string{a.RevisionId}, Guidance: "Schema boundary fixture", IdempotencyKey: "schema-compile"}, nil, 200)
+	for _, kind := range []string{"revisions", "releases", "builds", "compiles"} {
+		verifyPagedReaderSchema(t, request, token, modulePath+"/"+kind)
+	}
 	for _, path := range []string{modulePath + "/published-releases/" + r2.ReleaseId, modulePath + "/releases/" + r2.ReleaseId + "/revisions", modulePath + "/releases/" + r2.ReleaseId + "/revisions/" + w2.RevisionId} {
 		request("GET", path, "", nil, nil, 404)
 	}
@@ -112,6 +119,7 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 		t.Fatal("historical release followed active pointer")
 	}
 	publicOld := modulePath + "/releases/" + r.ReleaseId + "/revisions"
+	verifyPagedReaderSchema(t, request, "", publicOld)
 	request("GET", publicOld+"?limit=1", "", nil, &revisions, 200)
 	if len(revisions.Items) != 1 || revisions.Items[0].RevisionId != w.RevisionId || revisions.NextCursor == "" {
 		t.Fatal(revisions)
@@ -153,5 +161,36 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 	request("GET", "/v1/knowledge/workbench/modules/"+m.Id, token, nil, &loaded, 200)
 	if loaded.Lifecycle != "WITHDRAWN" {
 		t.Fatal("admin lost withdrawn module details", loaded)
+	}
+}
+
+func verifyPagedReaderSchema(t *testing.T, request httpRequest, token, path string) {
+	t.Helper()
+	var page struct {
+		Items      []json.RawMessage `json:"items"`
+		NextCursor string            `json:"next_cursor"`
+	}
+	request("GET", path, token, nil, &page, 200)
+	if len(page.Items) < 2 || page.NextCursor != "" {
+		t.Fatalf("default limit did not yield bounded complete fixture: %s %+v", path, page)
+	}
+	total := len(page.Items)
+	request("GET", path+"?limit=1", token, nil, &page, 200)
+	if len(page.Items) != 1 || page.NextCursor == "" {
+		t.Fatalf("first page lacks continuation: %s %+v", path, page)
+	}
+	seen := 1
+	for page.NextCursor != "" {
+		request("GET", path+"?limit=1&cursor="+url.QueryEscape(page.NextCursor), token, nil, &page, 200)
+		if len(page.Items) != 1 {
+			t.Fatalf("invalid bounded page: %s %+v", path, page)
+		}
+		seen++
+		if seen > total {
+			t.Fatalf("pagination exceeded fixture members: %s", path)
+		}
+	}
+	if seen != total {
+		t.Fatalf("terminal page omitted members: %s got=%d want=%d", path, seen, total)
 	}
 }

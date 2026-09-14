@@ -44,6 +44,7 @@ func TestHTTPProcessHelper(t *testing.T) {
 	}
 }
 func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
+	contract := loadGeneratedHTTPContract(t)
 	s := testenv.Store(t)
 	dir := t.TempDir()
 	objects, err := object.NewLocal(filepath.Join(dir, "objects"))
@@ -169,6 +170,9 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		}
 		if res.StatusCode != want {
 			t.Fatalf("%s %s status=%d want=%d body=%s", method, path, res.StatusCode, want, raw)
+		}
+		if want == 200 {
+			contract.validateSuccess(t, method, req.URL, raw)
 		}
 		if out != nil {
 			var envelope struct {

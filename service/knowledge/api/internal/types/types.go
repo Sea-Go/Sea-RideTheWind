@@ -180,7 +180,7 @@ type CreateWikiReq struct {
 
 type ListBuildsResp struct {
 	Items      []Build `json:"items"`
-	NextCursor string  `json:"next_cursor,omitempty"`
+	NextCursor string  `json:"next_cursor,optional,omitempty"`
 }
 
 type ListBuildsRespEnvelope struct {
@@ -191,7 +191,7 @@ type ListBuildsRespEnvelope struct {
 
 type ListCompilesResp struct {
 	Items      []Compile `json:"items"`
-	NextCursor string    `json:"next_cursor,omitempty"`
+	NextCursor string    `json:"next_cursor,optional,omitempty"`
 }
 
 type ListCompilesRespEnvelope struct {
@@ -201,13 +201,13 @@ type ListCompilesRespEnvelope struct {
 }
 
 type ListModulesReq struct {
-	Limit  int    `form:"limit,default=12"`
+	Limit  int    `form:"limit,optional,default=12"`
 	Cursor string `form:"cursor,optional"`
 }
 
 type ListModulesResp struct {
 	Items      []Module `json:"items"`
-	NextCursor string   `json:"next_cursor,omitempty"`
+	NextCursor string   `json:"next_cursor,optional,omitempty"`
 }
 
 type ListModulesRespEnvelope struct {
@@ -218,7 +218,7 @@ type ListModulesRespEnvelope struct {
 
 type ListReleasesResp struct {
 	Items      []Release `json:"items"`
-	NextCursor string    `json:"next_cursor,omitempty"`
+	NextCursor string    `json:"next_cursor,optional,omitempty"`
 }
 
 type ListReleasesRespEnvelope struct {
@@ -229,7 +229,7 @@ type ListReleasesRespEnvelope struct {
 
 type ListRevisionsResp struct {
 	Items      []Revision `json:"items"`
-	NextCursor string     `json:"next_cursor,omitempty"`
+	NextCursor string     `json:"next_cursor,optional,omitempty"`
 }
 
 type ListRevisionsRespEnvelope struct {
@@ -273,7 +273,7 @@ type ModuleEnvelope struct {
 
 type ModulePageReq struct {
 	ModuleId string `path:"module_id"`
-	Limit    int    `form:"limit,default=20"`
+	Limit    int    `form:"limit,optional,default=20"`
 	Cursor   string `form:"cursor,optional"`
 }
 
@@ -300,7 +300,7 @@ type PublishedRevisionPath struct {
 type PublishedRevisionsReq struct {
 	ModuleId  string `path:"module_id"`
 	ReleaseId string `path:"release_id"`
-	Limit     int    `form:"limit,default=20"`
+	Limit     int    `form:"limit,optional,default=20"`
 	Cursor    string `form:"cursor,optional"`
 }
 
@@ -373,7 +373,7 @@ type Revision struct {
 	MediaType      string      `json:"media_type"`
 	ObjectKey      string      `json:"object_key"`
 	ContentHash    string      `json:"content_hash"`
-	Content        string      `json:"content,omitempty"`
+	Content        string      `json:"content,optional,omitempty"`
 	SourceRefs     []SourceRef `json:"source_refs"`
 	Provenance     string      `json:"provenance"`
 	CreatedBy      string      `json:"created_by"`

@@ -21,12 +21,12 @@ type (
 		ModuleId string `path:"module_id"`
 	}
 	ListModulesReq {
-		Limit  int    `form:"limit,default=12"`
+		Limit  int    `form:"limit,optional,default=12"`
 		Cursor string `form:"cursor,optional"`
 	}
 	ListModulesResp {
 		Items      []Module `json:"items"`
-		NextCursor string   `json:"next_cursor,omitempty"`
+		NextCursor string   `json:"next_cursor,optional,omitempty"`
 	}
 	CreateModuleReq {
 		Title          string `json:"title"`
@@ -48,7 +48,7 @@ type (
 		MediaType      string      `json:"media_type"`
 		ObjectKey      string      `json:"object_key"`
 		ContentHash    string      `json:"content_hash"`
-		Content        string      `json:"content,omitempty"`
+		Content        string      `json:"content,optional,omitempty"`
 		SourceRefs     []SourceRef `json:"source_refs"`
 		Provenance     string      `json:"provenance"`
 		CreatedBy      string      `json:"created_by"`
@@ -79,7 +79,7 @@ type (
 	}
 	ListRevisionsResp {
 		Items      []Revision `json:"items"`
-		NextCursor string     `json:"next_cursor,omitempty"`
+		NextCursor string     `json:"next_cursor,optional,omitempty"`
 	}
 	RetrievalProfile {
 		Lane        string `json:"lane"`
@@ -302,7 +302,7 @@ type (
 type (
 	ModulePageReq {
 		ModuleId string `path:"module_id"`
-		Limit    int    `form:"limit,default=20"`
+		Limit    int    `form:"limit,optional,default=20"`
 		Cursor   string `form:"cursor,optional"`
 	}
 	ModuleRevisionPath {
@@ -324,7 +324,7 @@ type (
 	PublishedRevisionsReq {
 		ModuleId  string `path:"module_id"`
 		ReleaseId string `path:"release_id"`
-		Limit     int    `form:"limit,default=20"`
+		Limit     int    `form:"limit,optional,default=20"`
 		Cursor    string `form:"cursor,optional"`
 	}
 	PublishedRevisionPath {
@@ -334,7 +334,7 @@ type (
 	}
 	ListReleasesResp {
 		Items      []Release `json:"items"`
-		NextCursor string    `json:"next_cursor,omitempty"`
+		NextCursor string    `json:"next_cursor,optional,omitempty"`
 	}
 	ListReleasesRespEnvelope {
 		Code int              `json:"code"`
@@ -343,7 +343,7 @@ type (
 	}
 	ListBuildsResp {
 		Items      []Build `json:"items"`
-		NextCursor string  `json:"next_cursor,omitempty"`
+		NextCursor string  `json:"next_cursor,optional,omitempty"`
 	}
 	ListBuildsRespEnvelope {
 		Code int            `json:"code"`
@@ -352,7 +352,7 @@ type (
 	}
 	ListCompilesResp {
 		Items      []Compile `json:"items"`
-		NextCursor string    `json:"next_cursor,omitempty"`
+		NextCursor string    `json:"next_cursor,optional,omitempty"`
 	}
 	ListCompilesRespEnvelope {
 		Code int              `json:"code"`

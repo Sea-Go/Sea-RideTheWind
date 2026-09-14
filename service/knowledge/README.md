@@ -124,3 +124,12 @@ Delivery.Enabled 默认 false。DC 接入后配置独立 `/v1/events` 接收地�
 - 尚未由本提供方证明：网页/桌宠真实用户旅程、BTW 实际三路算法与生产对象存储。上述历史发布测试仍使用显式结构 READY fixture，不能据此宣称三路检索或全工程验收完成。
 
 可复现命令仍为 `KNOWLEDGE_PG_BIN=/path/to/postgresql@16/bin KNOWLEDGE_KEEP_EVIDENCE=1 bash service/knowledge/scripts/acceptance.sh`。该脚本运行 knowledge 全部包的 race 测试、真实隔离数据库/HTTP 与 go vet，结束仅停止自建的随机端口实例。
+
+
+### H02 生成契约语义更正
+
+独立复审发现 goctl 1.9.2 的 Swagger 生成器只把 DSL `optional` 识别为可选，单独使用 `omitempty` 或 `default` 会误标必填。权威 `api/knowledge.api` 现为 next_cursor、可省正文 content 与带默认值的 limit 明确声明 optional，同时保留运行时 omitempty/default；不手改生成 JSON，也不改变路径和业务行为。TS 中三个分页请求的 limit 同步为可选。
+
+新增 `api/http_schema_test.go` 使用仓内已锁定的 kube-openapi Draft 4 校验器，将真实 go-zero HTTP 的成功响应逐条对照生成 Swagger，并检查实际缺省 query 参数不被 schema 强制要求。覆盖管理员四类列表及公开修订列表的首页、中间页、末页、不传 limit 和元数据无正文；七类列表静态检查 required/default 语义。`testdata/h02-optional-fields.ts` 验证生成客户端可以构造缺省请求、空末页及无 content 的修订元数据类型。
+
+2026-09-14 聚焦验证：在新建的随机端口 PostgreSQL 16 实例运行 `go test -race ./service/knowledge/api -run '^(TestGeneratedReaderOptionality|TestRealHTTPKnowledgeWorkflow)$' -count=1 -v`，两项通过；对应 `go vet`、TS 严格类型检查及重复 codegen hash 一致。新增语义测试在更正前会失败，不能以“重复生成一致”替代 HTTP/schema 语义一致。此项没有重复执行不受影响的其余模型状态机验收。
