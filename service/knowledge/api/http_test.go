@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -23,10 +24,36 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/core/conf"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"sea-try-go/service/knowledge/api/internal/object"
 	"sea-try-go/service/knowledge/api/internal/testenv"
 	"sea-try-go/service/knowledge/api/internal/types"
+	rtwjwt "sea-try-go/service/user/common/jwt"
+	"sea-try-go/service/user/user/rpc/pb"
 )
+
+type productUserRPC struct {
+	pb.UnimplementedUserServiceServer
+	deleted atomic.Bool
+	calls   atomic.Int64
+}
+
+func (s *productUserRPC) GetUser(_ context.Context, req *pb.GetUserReq) (*pb.GetUserResp, error) {
+	s.calls.Add(1)
+	if s.deleted.Load() && req.Uid == 9123 {
+		return nil, status.Error(codes.NotFound, "user deleted")
+	}
+	if req.Uid != 9123 && req.Uid != 7777 && req.Uid != 8888 {
+		return &pb.GetUserResp{Found: false}, nil
+	}
+	uid := req.Uid
+	if uid == 8888 {
+		uid = 7777 // An RPC mismatch must never produce a SubjectRef.
+	}
+	return &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: uid}}, nil
+}
 
 func TestHTTPProcessHelper(t *testing.T) {
 	path := os.Getenv("KNOWLEDGE_TEST_SERVER_CONFIG")
@@ -54,6 +81,15 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.Objects = objects
+	userListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	userRPC := &productUserRPC{}
+	userServer := grpc.NewServer()
+	pb.RegisterUserServiceServer(userServer, userRPC)
+	go func() { _ = userServer.Serve(userListener) }()
+	t.Cleanup(func() { userServer.Stop(); _ = userListener.Close() })
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -77,6 +113,8 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	}
 	c.Auth.AccessSecret = "synthetic-test-jwt-secret-not-a-real-key"
 	c.Auth.AccessExpire = 3600
+	c.UserAuth.AccessSecret = "synthetic-test-user-secret-not-a-real-key"
+	c.UserRpc.Endpoints = []string{userListener.Addr().String()}
 	c.AdministratorIDs = []string{"test-admin"}
 	c.WorkerToken = "synthetic-worker-token"
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
@@ -427,7 +465,7 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		citations.Evidence[0].QuoteHash != quoteHash || citations.Evidence[0].State != "available" {
 		t.Fatalf("HTTP committed mapping differs: %+v", citations)
 	}
-	acceptedSubject := types.AcceptedSubjectRef{AuthorityId: "rtw", TenantId: "single", SubjectId: "http-uid"}
+	acceptedSubject := types.AcceptedSubjectRef{AuthorityId: "rtw.identity", TenantId: "platform", SubjectId: "9123"}
 	answerID := "http-answer-1"
 	acceptedTurn := map[string]any{
 		"Request": map[string]any{"SearchID": searchID, "AnswerID": answerID,
@@ -467,6 +505,68 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if len(history.Items) != 1 || history.Items[0] != accepted {
 		t.Fatalf("HTTP product history missing accepted answer: %+v", history)
 	}
+	productToken, err := rtwjwt.GetToken(c.UserAuth.AccessSecret, time.Now().Unix(), 3600, 9123)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherToken, err := rtwjwt.GetToken(c.UserAuth.AccessSecret, time.Now().Unix(), 3600, 7777)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mismatchToken, err := rtwjwt.GetToken(c.UserAuth.AccessSecret, time.Now().Unix(), 3600, 8888)
+	if err != nil {
+		t.Fatal(err)
+	}
+	productPath := "/v1/knowledge/answer-sessions/" + commitAnswer.SessionId + "/accepted-answers"
+	beforeUnauthorized := userRPC.calls.Load()
+	request("GET", productPath, "", nil, nil, 401)
+	request("GET", productPath, c.WorkerToken, nil, nil, 401)
+	request("GET", productPath, token, nil, nil, 401) // Administrator JWT has a different issuer secret.
+	if userRPC.calls.Load() != beforeUnauthorized {
+		t.Fatal("unauthorized product request reached User RPC")
+	}
+	var ownHistory types.AcceptedAnswersPage
+	request("GET", productPath+"?authority_id=forged&tenant_id=forged&subject_id=7777", productToken, nil, &ownHistory, 200)
+	if len(ownHistory.Items) != 1 || ownHistory.Items[0] != accepted {
+		t.Fatalf("client subject fields changed own history: %+v", ownHistory)
+	}
+	var ownAnswer types.AcceptedAnswer
+	request("GET", productPath+"/"+answerID, productToken, nil, &ownAnswer, 200)
+	if ownAnswer != accepted {
+		t.Fatalf("product AnswerID lookup differs: %+v", ownAnswer)
+	}
+	request("GET", productPath+"/"+answerID, otherToken, nil, nil, 404)
+	request("GET", productPath+"/"+answerID, mismatchToken, nil, nil, 403)
+	var otherHistory types.AcceptedAnswersPage
+	request("GET", productPath, otherToken, nil, &otherHistory, 200)
+	if len(otherHistory.Items) != 0 {
+		t.Fatalf("cross-subject history exposed: %+v", otherHistory)
+	}
+	request("GET", productPath+"?limit=101", productToken, nil, nil, 400)
+	request("GET", productPath+"?after_ordinal=-1", productToken, nil, nil, 400)
+	request("GET", "/v1/knowledge/answer-sessions/other-session/accepted-answers/"+answerID, productToken, nil, nil, 404)
+	second := commitAnswer
+	second.AnswerId = "http-answer-2"
+	second.TurnJson = strings.ReplaceAll(commitAnswer.TurnJson, answerID, second.AnswerId)
+	var secondAccepted types.AcceptedAnswer
+	request("POST", "/internal/v1/knowledge/accepted-answers", c.WorkerToken, second, &secondAccepted, 200)
+	if secondAccepted.AcceptedOrdinal != 2 {
+		t.Fatalf("second accepted answer ordinal=%d", secondAccepted.AcceptedOrdinal)
+	}
+	request("GET", productPath+"?limit=1", productToken, nil, &ownHistory, 200)
+	if len(ownHistory.Items) != 1 || ownHistory.Items[0] != accepted || ownHistory.NextOrdinal != 1 {
+		t.Fatalf("first product page differs: %+v", ownHistory)
+	}
+	request("GET", productPath+"?limit=1&after_ordinal=1", productToken, nil, &ownHistory, 200)
+	if len(ownHistory.Items) != 1 || ownHistory.Items[0] != secondAccepted || ownHistory.NextOrdinal != 0 {
+		t.Fatalf("second product page differs: %+v", ownHistory)
+	}
+	userRPC.deleted.Store(true)
+	request("GET", productPath, productToken, nil, nil, 403)
+	request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
+	userRPC.deleted.Store(false)
+	userServer.Stop()
+	request("GET", productPath, productToken, nil, nil, 503)
 	answerQuery.Set("subject_id", "other-uid")
 	request("GET", "/internal/v1/knowledge/accepted-answers/"+answerID+"?"+answerQuery.Encode(), c.WorkerToken, nil, nil, 404)
 	answerQuery.Set("subject_id", acceptedSubject.SubjectId)
