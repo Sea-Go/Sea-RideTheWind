@@ -1108,6 +1108,17 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if len(ownHistory.Items) != 1 || ownHistory.Items[0] != secondAccepted || ownHistory.NextOrdinal != 0 {
 		t.Fatalf("second product page differs: %+v", ownHistory)
 	}
+	if realUser {
+		var secondCitationState types.ProductAnswerCitationStates
+		request("GET", productPath+"/"+second.AnswerId+"/citations", productToken, nil, &secondCitationState, 200)
+		if len(secondCitationState.Citations) != 1 || secondCitationState.Citations[0].State != "available" ||
+			secondCitationState.Citations[0].EvidenceId != citations.Evidence[0].EvidenceId {
+			t.Fatalf("second accepted answer lacks current citation: %+v", secondCitationState)
+		}
+		waitSharedProductHistory(t, "available", sharedProductHistoryReady(base, productToken, otherToken,
+			commitAnswer.SessionId, answerID, second.AnswerId, accepted.Status, secondAccepted.Status,
+			quote, citations.Evidence[0].EvidenceId, a.RevisionId, quoteHash, "available"))
+	}
 	if !realUser {
 		userRPC.deleted.Store(true)
 		request("GET", productPath, productToken, nil, nil, 403)
@@ -1142,6 +1153,16 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	request("GET", citationStatePath, productToken, nil, &citedStates, 200)
 	if len(citedStates.Citations) != 1 || citedStates.Citations[0].State != "unavailable" {
 		t.Fatalf("product citation state ignored withdrawal: %+v", citedStates)
+	}
+	if realUser {
+		var secondCitationState types.ProductAnswerCitationStates
+		request("GET", productPath+"/"+second.AnswerId+"/citations", productToken, nil, &secondCitationState, 200)
+		if len(secondCitationState.Citations) != 1 || secondCitationState.Citations[0].State != "unavailable" {
+			t.Fatalf("second answer retained withdrawn citation: %+v", secondCitationState)
+		}
+		waitSharedProductHistory(t, "withdrawn", sharedProductHistoryReady(base, productToken, otherToken,
+			commitAnswer.SessionId, answerID, second.AnswerId, accepted.Status, secondAccepted.Status,
+			quote, citations.Evidence[0].EvidenceId, a.RevisionId, quoteHash, "unavailable"))
 	}
 	if realUser {
 		// A disabled account is still returned by today's GetUser handler. This
