@@ -21,14 +21,19 @@ const (
 var ErrFavoriteOwnerMismatch = errors.New("favorite owner mismatch")
 
 type FavoriteFactOutbox struct {
-	EventID          string    `gorm:"primaryKey;type:varchar(128)"`
-	FavoriteID       int64     `gorm:"not null;uniqueIndex:uk_favorite_fact_version"`
-	AggregateVersion int64     `gorm:"not null;uniqueIndex:uk_favorite_fact_version"`
-	Payload          string    `gorm:"type:jsonb;not null"`
-	Status           int32     `gorm:"type:smallint;not null;default:0;index"`
-	RetryCount       int32     `gorm:"not null;default:0"`
-	CreatedAt        time.Time `gorm:"autoCreateTime;not null"`
-	UpdatedAt        time.Time `gorm:"autoUpdateTime;not null"`
+	EventID             string `gorm:"primaryKey;type:varchar(128)"`
+	FavoriteID          int64  `gorm:"not null;uniqueIndex:uk_favorite_fact_version"`
+	AggregateVersion    int64  `gorm:"not null;uniqueIndex:uk_favorite_fact_version"`
+	Payload             string `gorm:"type:jsonb;not null"`
+	Status              int32  `gorm:"type:smallint;not null;default:0;index"`
+	RetryCount          int32  `gorm:"not null;default:0"`
+	TechnicalReceiptID  string `gorm:"type:varchar(128)"`
+	TechnicalInputHash  string `gorm:"type:char(64)"`
+	TechnicalOffset     int64  `gorm:"not null;default:0"`
+	TechnicalReceivedAt *time.Time
+	DeliveredAt         *time.Time
+	CreatedAt           time.Time `gorm:"autoCreateTime;not null"`
+	UpdatedAt           time.Time `gorm:"autoUpdateTime;not null"`
 }
 
 func (FavoriteFactOutbox) TableName() string { return "favorite_fact_outbox" }
