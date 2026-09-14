@@ -50,6 +50,7 @@ func (l *GetUserLogic) GetUser(in *pb.GetUserReq) (*pb.GetUserResp, error) {
 			Username:  user.Username,
 			Email:     user.Email,
 			ExtraInfo: user.ExtraInfo,
+			Status:    &user.Status,
 		},
 		Found: true,
 	}, nil
