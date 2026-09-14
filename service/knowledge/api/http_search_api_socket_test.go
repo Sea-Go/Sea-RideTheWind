@@ -22,10 +22,11 @@ import (
 )
 
 type formalSearchAPI struct {
-	URL        string
-	MetricsURL string
-	modelCalls *atomic.Int64
-	served     atomic.Bool
+	URL         string
+	MetricsURL  string
+	modelCalls  *atomic.Int64
+	liveGateway bool
+	served      atomic.Bool
 }
 
 // AssertServed runs only after RTW has received a cited answer through this
@@ -43,8 +44,11 @@ func (p *formalSearchAPI) AssertServed(t *testing.T) {
 		!bytes.Contains(raw, []byte("sea_btw_operations_total")) {
 		t.Fatalf("formal cmd/api post-search metric missing: status=%d err=%v", response.StatusCode, err)
 	}
-	if p.modelCalls.Load() != 1 {
+	if !p.liveGateway && p.modelCalls.Load() != 1 {
 		t.Fatalf("fixed local OpenAI fixture calls=%d want=1", p.modelCalls.Load())
+	}
+	if p.liveGateway && p.modelCalls.Load() != 0 {
+		t.Fatal("fixed model fixture unexpectedly served the live DataCenter run")
 	}
 }
 
@@ -136,6 +140,30 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 		_ = json.NewEncoder(w).Encode(response)
 	}))
 	t.Cleanup(modelServer.Close)
+	modelURL, modelKey, modelName := modelServer.URL+"/v1", "test-only-fixed-model-key", "fixed-local-citation"
+	liveGateway := false
+	if runtimePath := os.Getenv("SEA_BTW_SUMMARY_DC_RUNTIME_FILE"); runtimePath != "" {
+		info, err := os.Stat(runtimePath)
+		if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
+			t.Fatal("DataCenter local gateway runtime must be a private regular file")
+		}
+		var live struct {
+			SchemaVersion        string `json:"schema_version"`
+			Endpoint             string `json:"endpoint"`
+			AccessToken          string `json:"access_token"`
+			LogicalModel         string `json:"logical_model"`
+			PhysicalModel        string `json:"physical_model"`
+			ModelConfigurationID string `json:"model_configuration_id"`
+		}
+		raw, err := os.ReadFile(runtimePath)
+		if err != nil || json.Unmarshal(raw, &live) != nil ||
+			live.SchemaVersion != "sea.dc.local-chat-consumer.v1" || live.AccessToken == "" ||
+			live.LogicalModel != "agent" || live.PhysicalModel == "" || live.ModelConfigurationID == "" ||
+			!strings.HasPrefix(live.Endpoint, "http://127.0.0.1:") {
+			t.Fatal("DataCenter local gateway runtime contract differs")
+		}
+		modelURL, modelKey, modelName, liveGateway = live.Endpoint, live.AccessToken, live.LogicalModel, true
+	}
 	otlp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/v1/traces" {
 			t.Errorf("unexpected OTLP export route: %s %s", r.Method, r.URL.Path)
@@ -184,7 +212,7 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 	apiAddr := freeSearchSocket(t)
 	metricsAddr := freeSearchSocket(t)
 	process := &formalSearchAPI{URL: "http://" + apiAddr, MetricsURL: "http://" + metricsAddr,
-		modelCalls: &modelCalls}
+		modelCalls: &modelCalls, liveGateway: liveGateway}
 	logPath := filepath.Join(dir, "btw-formal-search-api.jsonl")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
@@ -198,8 +226,8 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 		"BTW_SEARCH_TOOLS_SCOPE_KEY="+toolFixtureScopeKey,
 		"BTW_RTW_URL="+rtwBase, "BTW_RTW_TOKEN="+workerToken,
 		"BTW_DC_URL="+dc.Endpoint, "BTW_DC_TOKEN="+dc.Token,
-		"BTW_SEARCH_MODEL_URL="+modelServer.URL+"/v1",
-		"BTW_SEARCH_MODEL_KEY=test-only-fixed-model-key", "BTW_SEARCH_MODEL_NAME=fixed-local-citation",
+		"BTW_SEARCH_MODEL_URL="+modelURL,
+		"BTW_SEARCH_MODEL_KEY="+modelKey, "BTW_SEARCH_MODEL_NAME="+modelName,
 		"BTW_ARTIFACT_DIR="+filepath.Join(dir, "objects"), "BTW_SEARCH_INDEX_FILE="+indexFile,
 		"BTW_SEARCH_POLICY_FILE="+policyFile, "BTW_SEARCH_MAX_QUOTE_RUNES=1024",
 		"BTW_SEARCH_HTTP_TIMEOUT=90s", "BTW_SEARCH_REPRESENTATION_MAX_IN_FLIGHT=1",
@@ -237,8 +265,11 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 		if process.served.Load() && !nativeRoot.Load() {
 			t.Error("formal cmd/api OTLP export lacks framework-native search_summary_root span")
 		}
-		if process.served.Load() && modelCalls.Load() != 1 {
+		if process.served.Load() && !liveGateway && modelCalls.Load() != 1 {
 			t.Errorf("fixed local model calls=%d want=1", modelCalls.Load())
+		}
+		if process.served.Load() && liveGateway && modelCalls.Load() != 0 {
+			t.Error("fixed model server was used instead of DataCenter gateway")
 		}
 		if t.Failed() {
 			t.Logf("formal cmd/api log: %s", logs)
