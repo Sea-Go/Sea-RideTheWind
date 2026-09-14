@@ -2,7 +2,8 @@ package model
 
 import (
 	"context"
-	"strings"
+	"fmt"
+	"strconv"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -16,8 +17,6 @@ type LikeRecordModel interface {
 	GetUserBatchLikeState(ctx context.Context, userId int64, targetType string, targetIds []string) (map[string]int32, error)
 	GetUserLikeList(ctx context.Context, userId int64, targetType string, cursor int64, limit int) ([]UserLikeListResult, error)
 	GetTargetLikerList(ctx context.Context, targetType string, targetId string, cursor int64, limit int64) ([]TargetLikerListResult, error)
-	BatchUpsert(ctx context.Context, data []*LikeRecord) error
-	BatchUpsertTx(ctx context.Context, tx *gorm.DB, data []*LikeRecord) error
 	ProcessLikeMessageBatch(ctx context.Context, payloads []*LikeProcessPayload) error
 }
 
@@ -36,9 +35,11 @@ func NewLikeRecordModel(db *gorm.DB) LikeRecordModel {
 }
 
 type LikeProcessPayload struct {
-	Inbox  *LikeConsumeInbox
-	Record *LikeRecord
-	Outbox *LikeOutboxEvent
+	Inbox      *LikeConsumeInbox
+	Record     *LikeRecord
+	Outbox     *LikeOutboxEvent
+	OccurredAt int64
+	IsFirst    bool
 }
 
 func (m *defaultLikeRecordModel) GetTotalLikeCount(ctx context.Context, authorId int64) (int64, error) {
@@ -144,87 +145,101 @@ func (m *defaultLikeRecordModel) GetTargetLikerList(ctx context.Context, targetT
 	return results, err
 }
 
-func (m *defaultLikeRecordModel) BatchUpsert(ctx context.Context, data []*LikeRecord) error {
-	if len(data) == 0 {
-		return nil
-	}
-	return m.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "user_id"},
-			{Name: "target_type"},
-			{Name: "target_id"},
-		},
-		DoUpdates: clause.AssignmentColumns([]string{"state"}),
-	}).Create(&data).Error
-}
-
-func (m *defaultLikeRecordModel) BatchUpsertTx(ctx context.Context, tx *gorm.DB, data []*LikeRecord) error {
-	if len(data) == 0 {
-		return nil
-	}
-	return tx.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "user_id"},
-			{Name: "target_type"},
-			{Name: "target_id"},
-		},
-		DoUpdates: clause.AssignmentColumns([]string{"state"}),
-	}).Create(&data).Error
-}
-
-func isDuplicateKeyErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "duplicate") || strings.Contains(msg, "duplicated")
-}
-
 func (m *defaultLikeRecordModel) ProcessLikeMessageBatch(ctx context.Context, payloads []*LikeProcessPayload) error {
 	return m.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var recordsToUpsert []*LikeRecord
-		var outboxesToInsert []*LikeOutboxEvent
-		var msgIDsToMarkDone []string
-
 		for _, p := range payloads {
+			if p == nil || p.Inbox == nil || p.Record == nil || p.Record.UserID <= 0 ||
+				p.Record.TargetType == "" || p.Record.TargetID == "" || p.Record.State < 1 || p.Record.State > 4 {
+				return fmt.Errorf("invalid like message payload")
+			}
+			operationID, err := strconv.ParseInt(p.Inbox.MsgId, 10, 64)
+			if err != nil || operationID <= 0 {
+				return fmt.Errorf("invalid like operation id: %q", p.Inbox.MsgId)
+			}
+			payloadHash, err := likeMessageHash(p)
+			if err != nil {
+				return err
+			}
+			p.Inbox.PayloadHash = payloadHash
 			res := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(p.Inbox)
 			if res.Error != nil {
 				return res.Error
 			}
-
 			if res.RowsAffected == 0 {
-				continue
+				var prior LikeConsumeInbox
+				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("msg_id = ?", p.Inbox.MsgId).First(&prior).Error; err != nil {
+					return err
+				}
+				if prior.PayloadHash != "" && prior.PayloadHash != payloadHash {
+					return fmt.Errorf("like message %s reused with conflicting payload", p.Inbox.MsgId)
+				}
+				if prior.Status == 1 {
+					continue
+				}
 			}
-
-			recordsToUpsert = append(recordsToUpsert, p.Record)
-			if p.Outbox != nil {
-				outboxesToInsert = append(outboxesToInsert, p.Outbox)
-			}
-			msgIDsToMarkDone = append(msgIDsToMarkDone, p.Inbox.MsgId)
-		}
-
-		if len(recordsToUpsert) == 0 {
-			return nil
-		}
-
-		if err := m.BatchUpsertTx(ctx, tx, recordsToUpsert); err != nil {
-			return err
-		}
-
-		if len(outboxesToInsert) > 0 {
-			if err := tx.Create(&outboxesToInsert).Error; err != nil {
+			if err := m.applyLikeMessage(tx, p, operationID); err != nil {
 				return err
 			}
 		}
-
-		if len(msgIDsToMarkDone) > 0 {
-			if err := tx.Model(&LikeConsumeInbox{}).
-				Where("msg_id IN ?", msgIDsToMarkDone).
-				Update("status", 1).Error; err != nil {
-				return err
-			}
-		}
-
 		return nil
 	})
+}
+
+func (m *defaultLikeRecordModel) applyLikeMessage(tx *gorm.DB, p *LikeProcessPayload, operationID int64) error {
+	seed := LikeRecord{UserID: p.Record.UserID, TargetType: p.Record.TargetType,
+		TargetID: p.Record.TargetID, AuthorID: p.Record.AuthorID, State: 0}
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&seed).Error; err != nil {
+		return err
+	}
+	var current LikeRecord
+	if err := tx.Unscoped().Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("user_id = ? AND target_type = ? AND target_id = ?", p.Record.UserID, p.Record.TargetType, p.Record.TargetID).
+		First(&current).Error; err != nil {
+		return err
+	}
+	if current.DeleteAt.Valid {
+		return fmt.Errorf("like record is soft deleted")
+	}
+	if current.State < 0 || current.State > 2 || (current.State == 2 && current.LastOperationID == 0) {
+		return fmt.Errorf("legacy like state %d requires reconciliation before fact emission", current.State)
+	}
+	if operationID <= current.LastOperationID {
+		return markLikeMessageDone(tx, p.Inbox.MsgId)
+	}
+	oldState := current.State
+	newState := oldState
+	switch p.Record.State {
+	case 1: // like
+		newState = 1
+	case 2: // unlike
+		if oldState == 1 {
+			newState = 0
+		}
+	case 3: // dislike
+		newState = 2
+	case 4: // undislike
+		if oldState == 2 {
+			newState = 0
+		}
+	}
+	if err := tx.Model(&current).Updates(map[string]any{
+		"state": newState, "last_operation_id": operationID, "author_id": p.Record.AuthorID,
+	}).Error; err != nil {
+		return err
+	}
+	if newState != oldState {
+		if err := appendLikeFact(tx, p, oldState, newState); err != nil {
+			return err
+		}
+		if p.Outbox != nil && oldState == 0 && newState == 1 {
+			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(p.Outbox).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return markLikeMessageDone(tx, p.Inbox.MsgId)
+}
+
+func markLikeMessageDone(tx *gorm.DB, msgID string) error {
+	return tx.Model(&LikeConsumeInbox{}).Where("msg_id = ?", msgID).Update("status", 1).Error
 }
