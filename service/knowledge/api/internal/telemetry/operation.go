@@ -38,6 +38,12 @@ var operations = map[string]bool{
 	"knowledge.release.activate": true, "knowledge.content.withdraw": true, "knowledge.outbox.deliver": true,
 	"knowledge.outbox.poll":        true,
 	"knowledge.search.source.read": true, "knowledge.search.citations.accept": true, "knowledge.search.citations.get": true,
+	"knowledge.answer.accept": true, "knowledge.answer.get": true, "knowledge.answer.list": true,
+}
+
+var readOnlyOperations = map[string]bool{
+	"knowledge.search.source.read": true, "knowledge.search.citations.get": true,
+	"knowledge.answer.get": true, "knowledge.answer.list": true, "knowledge.outbox.poll": true,
 }
 
 func (r *Runtime) PollFailure(ctx context.Context, err error) {
@@ -165,7 +171,7 @@ func (r *Runtime) Begin(ctx context.Context, operation, operationID string, fiel
 		s.fields["duration_ms"] = float64(elapsed.Microseconds()) / 1000
 		r.operations.WithLabelValues(operation, outcome, code).Inc()
 		r.duration.WithLabelValues(operation, outcome).Observe(elapsed.Seconds())
-		if err == nil && !s.replay {
+		if err == nil && !s.replay && !readOnlyOperations[operation] {
 			r.committed.WithLabelValues(operation).Inc()
 		}
 		for key, value := range s.fields {

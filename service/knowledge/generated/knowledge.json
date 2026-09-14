@@ -14,6 +14,391 @@
   },
   "basePath": "/",
   "paths": {
+    "/internal/v1/knowledge/accepted-answers": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ListAcceptedAnswers",
+        "operationId": "workerListAcceptedAnswers",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "authority_id",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "tenant_id",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "subject_id",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "name": "after_ordinal",
+            "in": "query",
+            "allowEmptyValue": true
+          },
+          {
+            "type": "integer",
+            "default": 50,
+            "name": "limit",
+            "in": "query",
+            "allowEmptyValue": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "answer_id",
+                          "search_id",
+                          "subject",
+                          "session_id",
+                          "status",
+                          "accepted_ordinal",
+                          "accepted_at",
+                          "turn_json"
+                        ],
+                        "properties": {
+                          "accepted_at": {
+                            "type": "string"
+                          },
+                          "accepted_ordinal": {
+                            "type": "integer"
+                          },
+                          "answer_id": {
+                            "type": "string"
+                          },
+                          "search_id": {
+                            "type": "string"
+                          },
+                          "session_id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "subject": {
+                            "type": "object",
+                            "required": [
+                              "authority_id",
+                              "tenant_id",
+                              "subject_id"
+                            ],
+                            "properties": {
+                              "authority_id": {
+                                "type": "string"
+                              },
+                              "subject_id": {
+                                "type": "string"
+                              },
+                              "tenant_id": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "turn_json": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "next_ordinal": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "CommitAcceptedAnswer",
+        "operationId": "workerCommitAcceptedAnswer",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "answer_id",
+                "search_id",
+                "subject",
+                "session_id",
+                "turn_json"
+              ],
+              "properties": {
+                "answer_id": {
+                  "type": "string"
+                },
+                "search_id": {
+                  "type": "string"
+                },
+                "session_id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "object",
+                  "required": [
+                    "authority_id",
+                    "tenant_id",
+                    "subject_id"
+                  ],
+                  "properties": {
+                    "authority_id": {
+                      "type": "string"
+                    },
+                    "subject_id": {
+                      "type": "string"
+                    },
+                    "tenant_id": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "turn_json": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "answer_id",
+                    "search_id",
+                    "subject",
+                    "session_id",
+                    "status",
+                    "accepted_ordinal",
+                    "accepted_at",
+                    "turn_json"
+                  ],
+                  "properties": {
+                    "accepted_at": {
+                      "type": "string"
+                    },
+                    "accepted_ordinal": {
+                      "type": "integer"
+                    },
+                    "answer_id": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "object",
+                      "required": [
+                        "authority_id",
+                        "tenant_id",
+                        "subject_id"
+                      ],
+                      "properties": {
+                        "authority_id": {
+                          "type": "string"
+                        },
+                        "subject_id": {
+                          "type": "string"
+                        },
+                        "tenant_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "turn_json": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/knowledge/accepted-answers/{answer_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetAcceptedAnswer",
+        "operationId": "workerGetAcceptedAnswer",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "answer_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "authority_id",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "tenant_id",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "subject_id",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "answer_id",
+                    "search_id",
+                    "subject",
+                    "session_id",
+                    "status",
+                    "accepted_ordinal",
+                    "accepted_at",
+                    "turn_json"
+                  ],
+                  "properties": {
+                    "accepted_at": {
+                      "type": "string"
+                    },
+                    "accepted_ordinal": {
+                      "type": "integer"
+                    },
+                    "answer_id": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "object",
+                      "required": [
+                        "authority_id",
+                        "tenant_id",
+                        "subject_id"
+                      ],
+                      "properties": {
+                        "authority_id": {
+                          "type": "string"
+                        },
+                        "subject_id": {
+                          "type": "string"
+                        },
+                        "tenant_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "turn_json": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/knowledge/builds/{build_id}": {
       "get": {
         "produces": [

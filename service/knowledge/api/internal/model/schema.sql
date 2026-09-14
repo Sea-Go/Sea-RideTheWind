@@ -80,3 +80,35 @@ CREATE INDEX IF NOT EXISTS knowledge_search_citations_module ON knowledge_search
 DROP TRIGGER IF EXISTS knowledge_search_citation_immutable ON knowledge_search_citations;
 CREATE TRIGGER knowledge_search_citation_immutable BEFORE UPDATE OR DELETE ON knowledge_search_citations
  FOR EACH ROW EXECUTE FUNCTION knowledge_immutable_payload();
+
+-- RTW owns accepted product turns. A session row serializes its acceptance
+-- order; framework Agent events remain in BTW's private runtime Session.
+CREATE TABLE IF NOT EXISTS knowledge_answer_sessions (
+ authority_id text NOT NULL, tenant_id text NOT NULL, subject_id text NOT NULL,
+ session_id text NOT NULL, last_ordinal bigint NOT NULL DEFAULT 0,
+ PRIMARY KEY(authority_id,tenant_id,subject_id,session_id)
+);
+CREATE TABLE IF NOT EXISTS knowledge_accepted_answers (
+ answer_id text PRIMARY KEY, authority_id text NOT NULL, tenant_id text NOT NULL,
+ subject_id text NOT NULL, session_id text NOT NULL, accepted_ordinal bigint NOT NULL,
+ search_id text NOT NULL, status text NOT NULL CHECK(status IN ('succeeded','insufficient')),
+ turn_hash text NOT NULL, turn_json text NOT NULL, accepted_at timestamptz NOT NULL DEFAULT now(),
+ FOREIGN KEY(authority_id,tenant_id,subject_id,session_id) REFERENCES knowledge_answer_sessions(authority_id,tenant_id,subject_id,session_id),
+ UNIQUE(authority_id,tenant_id,subject_id,session_id,accepted_ordinal)
+);
+CREATE INDEX IF NOT EXISTS knowledge_accepted_answers_session_order ON knowledge_accepted_answers
+ (authority_id,tenant_id,subject_id,session_id,accepted_ordinal);
+CREATE TABLE IF NOT EXISTS knowledge_answer_citations (
+ answer_id text NOT NULL REFERENCES knowledge_accepted_answers(answer_id),
+ search_id text NOT NULL REFERENCES knowledge_search_citations(search_id),
+ citation_order integer NOT NULL, evidence_id text NOT NULL,
+ source_kind text NOT NULL, content_id text NOT NULL, revision_id text NOT NULL,
+ chunk_id text NOT NULL, locator jsonb NOT NULL, quote_hash text NOT NULL,
+ PRIMARY KEY(answer_id,evidence_id), UNIQUE(answer_id,citation_order)
+);
+DROP TRIGGER IF EXISTS knowledge_accepted_answer_immutable ON knowledge_accepted_answers;
+CREATE TRIGGER knowledge_accepted_answer_immutable BEFORE UPDATE OR DELETE ON knowledge_accepted_answers
+ FOR EACH ROW EXECUTE FUNCTION knowledge_immutable_payload();
+DROP TRIGGER IF EXISTS knowledge_answer_citation_immutable ON knowledge_answer_citations;
+CREATE TRIGGER knowledge_answer_citation_immutable BEFORE UPDATE OR DELETE ON knowledge_answer_citations
+ FOR EACH ROW EXECUTE FUNCTION knowledge_immutable_payload();

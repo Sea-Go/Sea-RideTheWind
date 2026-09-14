@@ -37,6 +37,40 @@ export interface AcceptSearchCitationsReq {
 	pack_hash: string
 }
 
+export interface AcceptedAnswer {
+	answer_id: string
+	search_id: string
+	subject: AcceptedSubjectRef
+	session_id: string
+	status: string
+	accepted_ordinal: number
+	accepted_at: string
+	turn_json: string
+}
+
+export interface AcceptedAnswerEnvelope {
+	code: number
+	msg: string
+	data: AcceptedAnswer
+}
+
+export interface AcceptedAnswersPage {
+	items: Array<AcceptedAnswer>
+	next_ordinal?: number
+}
+
+export interface AcceptedAnswersPageEnvelope {
+	code: number
+	msg: string
+	data: AcceptedAnswersPage
+}
+
+export interface AcceptedSubjectRef {
+	authority_id: string
+	tenant_id: string
+	subject_id: string
+}
+
 export interface ActivateReq {
 	release_id: string
 	build_id: string
@@ -145,6 +179,14 @@ export interface ClaimCompileReq {
 export interface ClaimCompileReqParams {
 }
 
+export interface CommitAcceptedAnswerReq {
+	answer_id: string
+	search_id: string
+	subject: AcceptedSubjectRef
+	session_id: string
+	turn_json: string
+}
+
 export interface Compile {
 	error_code: string
 	lease_expires_at: string
@@ -228,6 +270,26 @@ export interface CreateWikiReq {
 	idempotency_key: string
 }
 export interface CreateWikiReqParams {
+}
+
+export interface GetAcceptedAnswerReq {
+}
+export interface GetAcceptedAnswerReqParams {
+	authority_id: string
+	tenant_id: string
+	subject_id: string
+	session_id: string
+}
+
+export interface ListAcceptedAnswersReq {
+}
+export interface ListAcceptedAnswersReqParams {
+	authority_id: string
+	tenant_id: string
+	subject_id: string
+	session_id: string
+	after_ordinal?: number
+	limit?: number
 }
 
 export interface ListBuildsResp {

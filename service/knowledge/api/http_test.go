@@ -343,6 +343,52 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		citations.Evidence[0].QuoteHash != quoteHash || citations.Evidence[0].State != "available" {
 		t.Fatalf("HTTP committed mapping differs: %+v", citations)
 	}
+	acceptedSubject := types.AcceptedSubjectRef{AuthorityId: "rtw", TenantId: "single", SubjectId: "http-uid"}
+	answerID := "http-answer-1"
+	acceptedTurn := map[string]any{
+		"Request": map[string]any{"SearchID": searchID, "AnswerID": answerID,
+			"Subject": acceptedSubject, "SessionID": "http-learning-session",
+			"Search": map[string]any{"Query": "What does this source say?", "Depth": "fast",
+				"Intelligence": "low", "Snapshot": pack["snapshot"]}},
+		"result": map[string]any{"search": map[string]any{"evidence_pack": json.RawMessage(packRaw),
+			"citation_receipt": citation}, "answer_id": answerID, "answer": "Evidence is cited.",
+			"citations": []string{citations.Evidence[0].EvidenceId}, "summary_status": "succeeded"},
+	}
+	turnJSON, err := json.Marshal(acceptedTurn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitAnswer := types.CommitAcceptedAnswerReq{AnswerId: answerID, SearchId: searchID,
+		Subject: acceptedSubject, SessionId: "http-learning-session", TurnJson: string(turnJSON)}
+	var accepted types.AcceptedAnswer
+	request("POST", "/internal/v1/knowledge/accepted-answers", "", commitAnswer, nil, 401)
+	request("POST", "/internal/v1/knowledge/accepted-answers", c.WorkerToken, commitAnswer, &accepted, 200)
+	if accepted.Status != "succeeded" || accepted.AcceptedOrdinal != 1 || accepted.TurnJson != string(turnJSON) {
+		t.Fatalf("HTTP accepted answer differs: %+v", accepted)
+	}
+	var acceptedReplay types.AcceptedAnswer
+	request("POST", "/internal/v1/knowledge/accepted-answers", c.WorkerToken, commitAnswer, &acceptedReplay, 200)
+	if acceptedReplay != accepted {
+		t.Fatalf("HTTP answer replay changed projection: %+v %+v", accepted, acceptedReplay)
+	}
+	answerQuery := url.Values{"authority_id": {acceptedSubject.AuthorityId}, "tenant_id": {acceptedSubject.TenantId},
+		"subject_id": {acceptedSubject.SubjectId}, "session_id": {commitAnswer.SessionId}}
+	request("GET", "/internal/v1/knowledge/accepted-answers/"+answerID+"?"+answerQuery.Encode(),
+		c.WorkerToken, nil, &acceptedReplay, 200)
+	if acceptedReplay != accepted {
+		t.Fatalf("HTTP uncertain commit recovery differs: %+v %+v", accepted, acceptedReplay)
+	}
+	var history types.AcceptedAnswersPage
+	request("GET", "/internal/v1/knowledge/accepted-answers?"+answerQuery.Encode(), c.WorkerToken, nil, &history, 200)
+	if len(history.Items) != 1 || history.Items[0] != accepted {
+		t.Fatalf("HTTP product history missing accepted answer: %+v", history)
+	}
+	answerQuery.Set("subject_id", "other-uid")
+	request("GET", "/internal/v1/knowledge/accepted-answers/"+answerID+"?"+answerQuery.Encode(), c.WorkerToken, nil, nil, 404)
+	answerQuery.Set("subject_id", acceptedSubject.SubjectId)
+	conflictingAnswer := commitAnswer
+	conflictingAnswer.TurnJson = strings.Replace(commitAnswer.TurnJson, "Evidence is cited.", "Different answer.", 1)
+	request("POST", "/internal/v1/knowledge/accepted-answers", c.WorkerToken, conflictingAnswer, nil, 409)
 	var stored types.Revision
 	request("GET", "/internal/v1/knowledge/revisions/"+a.RevisionId, c.WorkerToken, nil, &stored, 200)
 	if stored.Content != "Book A\n\nEvidence" {
