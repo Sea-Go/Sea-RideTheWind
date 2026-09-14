@@ -7,8 +7,8 @@ import (
 
 	"sea-try-go/service/common/response"
 	"sea-try-go/service/knowledge/api/internal/model"
+	"sea-try-go/service/knowledge/api/internal/telemetry"
 
-	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
@@ -37,8 +37,9 @@ func ConfigureResponses() {
 			status = 504
 		case errors.Is(err, context.Canceled):
 			status = 499
-		default:
-			logx.WithContext(ctx).Errorf("knowledge request failed: %v", err)
+		}
+		if !telemetry.ErrorRecorded(ctx) {
+			telemetry.Failure(ctx, err, model.ClassifyError(err))
 		}
 		return status, response.Response{Code: status, Msg: msg}
 	})

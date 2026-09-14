@@ -26,8 +26,10 @@ CREATE TABLE IF NOT EXISTS knowledge_operations (
 );
 CREATE TABLE IF NOT EXISTS knowledge_outbox (
  event_id text PRIMARY KEY, event_type text NOT NULL, aggregate_id text NOT NULL,
- payload jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), delivered_at timestamptz
+ payload jsonb NOT NULL, correlation jsonb NOT NULL DEFAULT '{}'::jsonb,
+ created_at timestamptz NOT NULL DEFAULT now(), delivered_at timestamptz
 );
+ALTER TABLE knowledge_outbox ADD COLUMN IF NOT EXISTS correlation jsonb NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS knowledge_outbox_pending ON knowledge_outbox(created_at,event_id) WHERE delivered_at IS NULL;
 CREATE TABLE IF NOT EXISTS knowledge_publications (
  module_id text NOT NULL REFERENCES knowledge_modules(id), pointer_revision bigint NOT NULL,

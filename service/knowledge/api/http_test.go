@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -68,7 +69,11 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	c.Port = port
 	c.Timeout = 15000
 	c.Log.Mode = "console"
-	c.Log.Level = "error"
+	c.Log.Level = "info"
+	c.Observability.Version = os.Getenv("KNOWLEDGE_TEST_VERSION")
+	if c.Observability.Version == "" {
+		c.Observability.Version = "knowledge-http-test-binary"
+	}
 	c.Auth.AccessSecret = "synthetic-test-jwt-secret-not-a-real-key"
 	c.Auth.AccessExpire = 3600
 	c.AdministratorIDs = []string{"test-admin"}
@@ -114,6 +119,24 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 			<-exited
 		}
 		logFile.Close()
+		if evidence := os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"); evidence != "" {
+			if err := os.MkdirAll(evidence, 0700); err == nil {
+				if raw, err := os.ReadFile(filepath.Join(dir, "http.log")); err == nil {
+					var runtimeLines [][]byte
+					for _, line := range bytes.Split(bytes.TrimSpace(raw), []byte("\n")) {
+						if bytes.Equal(line, []byte("PASS")) {
+							continue // go test's helper-process epilogue, not service output.
+						}
+						if !json.Valid(line) {
+							t.Errorf("non-JSON shutdown output: %q", line)
+							continue
+						}
+						runtimeLines = append(runtimeLines, line)
+					}
+					_ = os.WriteFile(filepath.Join(evidence, "knowledge-http.jsonl"), append(bytes.Join(runtimeLines, []byte("\n")), '\n'), 0600)
+				}
+			}
+		}
 		if t.Failed() {
 			log, _ := os.ReadFile(filepath.Join(dir, "http.log"))
 			t.Log(string(log))
@@ -195,6 +218,7 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		}
 	}
 	request("POST", "/v1/knowledge/modules", "", map[string]any{"title": "No auth", "idempotency_key": "no-auth"}, nil, 401)
+	request("POST", "/v1/knowledge/no-such-route", "", nil, nil, 404)
 	request("POST", "/v1/knowledge/modules", token, map[string]any{"title": "missing key"}, nil, 400)
 	var m types.Module
 	request("POST", "/v1/knowledge/modules", token, types.CreateModuleReq{Title: "HTTP book", IdempotencyKey: "http-module"}, &m, 200)
@@ -247,6 +271,105 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if err = s.DB.QueryRow(context.Background(), "SELECT count(*) FROM knowledge_outbox WHERE event_type='knowledge.release.activated.v1'").Scan(&outbox); err != nil || outbox != 1 {
 		t.Fatalf("publish events=%d err=%v", outbox, err)
 	}
+	var traceparent, originRequestID string
+	if err = s.DB.QueryRow(context.Background(), "SELECT correlation->>'traceparent',correlation->>'request_id' FROM knowledge_outbox WHERE event_type='knowledge.release.activated.v1'").Scan(&traceparent, &originRequestID); err != nil || !strings.HasPrefix(traceparent, "00-") || originRequestID == "" {
+		t.Fatalf("durable outbox correlation missing: traceparent=%q request_id=%q err=%v", traceparent, originRequestID, err)
+	}
 	verifyProductReaders(t, s, request, token, filepath.Join(dir, "objects"), m, a, w, r, build)
+	metrics, err := client.Get(base + "/metrics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	metricBody, err := io.ReadAll(metrics.Body)
+	metrics.Body.Close()
+	if err != nil || metrics.StatusCode != 200 {
+		t.Fatalf("metrics status=%d err=%v", metrics.StatusCode, err)
+	}
+	for _, name := range []string{"sea_knowledge_operations_total", "sea_knowledge_commits_total", "sea_knowledge_http_requests_total", "sea_knowledge_outbox_pending"} {
+		if !bytes.Contains(metricBody, []byte(name)) {
+			t.Fatalf("missing real metric %s", name)
+		}
+	}
+	if evidence := os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"); evidence != "" {
+		if err := os.MkdirAll(evidence, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(evidence, "knowledge-metrics.prom"), metricBody, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var committedPublications int
+	if err := s.DB.QueryRow(context.Background(), "SELECT count(*) FROM knowledge_publications").Scan(&committedPublications); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(metricBody), `sea_knowledge_commits_total{operation="knowledge.release.activate"} `+fmtInt(committedPublications)) {
+		var activationMetrics []string
+		for _, line := range strings.Split(string(metricBody), "\n") {
+			if strings.Contains(line, "sea_knowledge_commits_total") && strings.Contains(line, "knowledge.release.activate") {
+				activationMetrics = append(activationMetrics, line)
+			}
+		}
+		t.Fatalf("activation replay or conflict counted as another committed publication: %v", activationMetrics)
+	}
+	var records []map[string]any
+	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		raw, e := os.ReadFile(filepath.Join(dir, "http.log"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		records = records[:0]
+		for _, line := range bytes.Split(bytes.TrimSpace(raw), []byte("\n")) {
+			if len(line) == 0 {
+				continue
+			}
+			var record map[string]any
+			if e = json.Unmarshal(line, &record); e != nil {
+				t.Fatalf("non-JSON runtime log: %q: %v", line, e)
+			}
+			records = append(records, record)
+		}
+		found := map[string]bool{}
+		for _, record := range records {
+			if event, ok := record["event"].(string); ok {
+				found[event] = true
+			}
+		}
+		if found["knowledge.service.started"] && found["knowledge.module.create.succeeded"] && found["knowledge.release.activate.rejected"] && found["http.request.completed"] {
+			break
+		}
+	}
+	seen := map[string]bool{}
+	seenUnmatchedPost := false
+	for _, record := range records {
+		event, _ := record["event"].(string)
+		seen[event] = true
+		for _, field := range []string{"timestamp", "level", "service", "environment", "service_version", "instance_id", "component", "log_source", "event", "message"} {
+			if record[field] == nil || record[field] == "" {
+				t.Fatalf("event %s missing %s: %#v", event, field, record)
+			}
+		}
+		if record["service_version"] != c.Observability.Version {
+			t.Fatalf("unexpected service version: %#v", record)
+		}
+		if record["log_source"] == "framework" && strings.Contains(record["message"].(string), `"title":"No auth"`) {
+			t.Fatalf("framework request dump entered application log: %#v", record)
+		}
+		if strings.HasPrefix(event, "knowledge.module.create.") || strings.HasPrefix(event, "knowledge.release.activate.") || event == "http.request.completed" {
+			if record["trace_id"] == nil || record["span_id"] == nil || record["request_id"] == nil {
+				t.Fatalf("request correlation missing: %#v", record)
+			}
+		}
+		if event == "http.request.completed" && record["route"] == "unmatched" && record["method"] == "POST" && record["status"] == float64(404) {
+			seenUnmatchedPost = true
+		}
+	}
+	if !seenUnmatchedPost {
+		t.Fatal("unmatched POST lost its bounded actual HTTP method")
+	}
+	for _, event := range []string{"knowledge.service.starting", "knowledge.service.started", "knowledge.module.create.succeeded", "knowledge.release.activate.rejected", "http.request.completed"} {
+		if !seen[event] {
+			t.Fatalf("missing runtime event %s in %d records", event, len(records))
+		}
+	}
 }
 func fmtInt(n int) string { b, _ := json.Marshal(n); return string(b) }

@@ -30,6 +30,10 @@ PY
 "$knowledge_pg_bin/pg_ctl" -D "$knowledge_tmp/pg" -l "$knowledge_tmp/postgres.log" -o "-h 127.0.0.1 -p $knowledge_port -k $knowledge_tmp" start
 knowledge_started=true
 export KNOWLEDGE_TEST_DSN="postgres://sea_knowledge_test@127.0.0.1:$knowledge_port/postgres?sslmode=disable"
+export KNOWLEDGE_TEST_VERSION="$(git -C "$knowledge_repo" rev-parse HEAD)"
+if [[ "${KNOWLEDGE_KEEP_EVIDENCE:-0}" == 1 ]]; then
+  export KNOWLEDGE_OBS_EVIDENCE_DIR="$knowledge_tmp/observability"
+fi
 cd "$knowledge_repo"
 go test -race ./service/knowledge/... -count=1 -v | tee "$knowledge_tmp/test.log"
 go vet ./service/knowledge/...

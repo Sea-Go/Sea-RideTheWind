@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"sea-try-go/service/knowledge/api/internal/object"
+	"sea-try-go/service/knowledge/api/internal/telemetry"
 	"sea-try-go/service/knowledge/api/internal/types"
 
 	"github.com/google/uuid"
@@ -28,17 +29,36 @@ var (
 )
 
 type Store struct {
-	DB      *pgxpool.Pool
-	Objects object.Store
+	DB            *pgxpool.Pool
+	Objects       object.Store
+	Observability *telemetry.Runtime
 }
 
-func New(db *pgxpool.Pool, objects object.Store) *Store { return &Store{DB: db, Objects: objects} }
-func (s *Store) Migrate(ctx context.Context) error      { _, err := s.DB.Exec(ctx, schema); return err }
-func id(prefix string) string                           { return prefix + "_" + uuid.NewString() }
-func now() string                                       { return time.Now().UTC().Format(time.RFC3339Nano) }
-func invalid(why string) error                          { return fmt.Errorf("%w: %s", ErrInvalid, why) }
-func conflict(why string) error                         { return fmt.Errorf("%w: %s", ErrConflict, why) }
-func encode(v any) ([]byte, error)                      { return json.Marshal(v) }
+func New(db *pgxpool.Pool, objects object.Store, options ...Option) *Store {
+	s := &Store{DB: db, Objects: objects}
+	for _, option := range options {
+		option(s)
+	}
+	return s
+}
+func (s *Store) Migrate(ctx context.Context) error { _, err := s.DB.Exec(ctx, schema); return err }
+func id(prefix string) string                      { return prefix + "_" + uuid.NewString() }
+func now() string                                  { return time.Now().UTC().Format(time.RFC3339Nano) }
+func invalid(why string) error                     { return fmt.Errorf("%w: %s", ErrInvalid, why) }
+func conflict(why string) error                    { return fmt.Errorf("%w: %s", ErrConflict, why) }
+
+type reasonError struct {
+	Cause   error
+	Code    string
+	Message string
+}
+
+func (e *reasonError) Error() string { return e.Cause.Error() + ": " + e.Message }
+func (e *reasonError) Unwrap() error { return e.Cause }
+func conflictCode(code, why string) error {
+	return &reasonError{Cause: ErrConflict, Code: code, Message: why}
+}
+func encode(v any) ([]byte, error) { return json.Marshal(v) }
 func hashInput(v any) (string, error) {
 	b, err := encode(v)
 	if err != nil {
@@ -93,7 +113,7 @@ func saveExecutionResult(ctx context.Context, tx pgx.Tx, table, id string, v any
 		return err
 	}
 	if tag.RowsAffected() != 1 {
-		return conflict("execution lease expired at result submission")
+		return conflictCode("LEASE_EXPIRED", "execution lease expired at result submission")
 	}
 	return nil
 }
@@ -121,11 +141,12 @@ func command[T any](ctx context.Context, s *Store, scope, key string, input any,
 	err = tx.QueryRow(ctx, "SELECT input_hash,response FROM knowledge_operations WHERE scope=$1 AND operation_key=$2", scope, key).Scan(&previousHash, &raw)
 	if err == nil {
 		if previousHash != h {
-			return zero, conflict("idempotency key reused with different input")
+			return zero, conflictCode("IDEMPOTENCY_CONFLICT", "idempotency key reused with different input")
 		}
 		if err = json.Unmarshal(raw, &zero); err != nil {
 			return zero, err
 		}
+		telemetry.Replay(ctx)
 		return zero, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -184,16 +205,29 @@ func emit(ctx context.Context, tx pgx.Tx, eventType, aggregate string, payload a
 		return err
 	}
 	event := Event{EventID: id("evt"), EventType: eventType, SchemaVersion: 1, Producer: "ridethewind.knowledge", AggregateID: aggregate, AggregateVersion: sequence, OperationID: operationID, OccurredAt: now(), Payload: raw}
-	return saveJSON(ctx, tx, "INSERT INTO knowledge_outbox(event_id,event_type,aggregate_id,payload) VALUES($1,$2,$3,$4)", event, event.EventID, eventType, aggregate)
+	eventJSON, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	correlation := telemetry.Capture(ctx)
+	encoded, err := json.Marshal(correlation)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, "INSERT INTO knowledge_outbox(event_id,event_type,aggregate_id,payload,correlation) VALUES($1,$2,$3,$4,$5)", event.EventID, eventType, aggregate, eventJSON, encoded)
+	return err
 }
 func (s *Store) CreateModule(ctx context.Context, actor string, req types.CreateModuleReq) (types.Module, error) {
-	if strings.TrimSpace(req.Title) == "" {
-		return types.Module{}, invalid("title required")
-	}
-	return command(ctx, s, "module/create/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Module, error) {
-		m := types.Module{Id: id("module"), Title: req.Title, Description: req.Description, Category: req.Category, Image: "mountain", Lifecycle: "ENABLED", Updated: now(), Release: "未发布"}
-		err := saveJSON(ctx, tx, "INSERT INTO knowledge_modules(id,data) VALUES($1,$2)", m, m.Id)
-		return m, err
+	return observe(ctx, s, "knowledge.module.create", operationID("module/create/"+actor, req.IdempotencyKey), req, func(ctx context.Context) (types.Module, error) {
+		if strings.TrimSpace(req.Title) == "" {
+			return types.Module{}, invalid("title required")
+		}
+		return command(ctx, s, "module/create/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Module, error) {
+			m := types.Module{Id: id("module"), Title: req.Title, Description: req.Description, Category: req.Category, Image: "mountain", Lifecycle: "ENABLED", Updated: now(), Release: "未发布"}
+			err := saveJSON(ctx, tx, "INSERT INTO knowledge_modules(id,data) VALUES($1,$2)", m, m.Id)
+			return m, err
+		})
+
 	})
 }
 func (s *Store) GetModule(ctx context.Context, moduleID string, publishedOnly bool) (types.Module, error) {

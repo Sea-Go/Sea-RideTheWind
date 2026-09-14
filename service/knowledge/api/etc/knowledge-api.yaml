@@ -7,6 +7,12 @@ MaxBytes: 16777216
 Log:
   Mode: console
   Level: info
+Observability:
+  Version: ${KNOWLEDGE_SERVICE_VERSION}
+  LogQueueSize: 512
+  QueueSize: 512
+  SampleRatio: 1
+  ShutdownTimeoutMillis: 3000
 Auth:
   AccessSecret: ${KNOWLEDGE_AUTH_SECRET}
   AccessExpire: 3600

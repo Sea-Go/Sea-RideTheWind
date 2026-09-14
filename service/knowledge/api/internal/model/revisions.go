@@ -19,13 +19,19 @@ type revisionInput struct {
 }
 
 func (s *Store) CreateSource(ctx context.Context, actor string, req types.CreateSourceReq) (types.Revision, error) {
-	return s.createRevision(ctx, req.IdempotencyKey, revisionInput{ModuleID: req.ModuleId, EntityID: req.EntityId, Kind: "source", BaseRevisionID: req.BaseRevisionId, Title: req.Title, Content: req.Content, MediaType: req.MediaType, Provenance: req.Provenance, Actor: actor})
+	return observe(ctx, s, "knowledge.source.create", operationID("revision/"+req.ModuleId+"/"+actor, req.IdempotencyKey), req, func(ctx context.Context) (types.Revision, error) {
+		return s.createRevision(ctx, req.IdempotencyKey, revisionInput{ModuleID: req.ModuleId, EntityID: req.EntityId, Kind: "source", BaseRevisionID: req.BaseRevisionId, Title: req.Title, Content: req.Content, MediaType: req.MediaType, Provenance: req.Provenance, Actor: actor})
+
+	})
 }
 func (s *Store) CreateWiki(ctx context.Context, actor string, req types.CreateWikiReq) (types.Revision, error) {
-	if req.PageId == "" {
-		return types.Revision{}, invalid("page id required")
-	}
-	return s.createRevision(ctx, req.IdempotencyKey, revisionInput{ModuleID: req.ModuleId, EntityID: req.PageId, Kind: "wiki", BaseRevisionID: req.BaseRevisionId, Title: req.Title, Content: req.Content, MediaType: "text/markdown", SourceRefs: req.SourceRefs, Actor: actor})
+	return observe(ctx, s, "knowledge.wiki.create", operationID("revision/"+req.ModuleId+"/"+actor, req.IdempotencyKey), req, func(ctx context.Context) (types.Revision, error) {
+		if req.PageId == "" {
+			return types.Revision{}, invalid("page id required")
+		}
+		return s.createRevision(ctx, req.IdempotencyKey, revisionInput{ModuleID: req.ModuleId, EntityID: req.PageId, Kind: "wiki", BaseRevisionID: req.BaseRevisionId, Title: req.Title, Content: req.Content, MediaType: "text/markdown", SourceRefs: req.SourceRefs, Actor: actor})
+
+	})
 }
 func validText(in revisionInput) error {
 	if !utf8.ValidString(in.Content) || strings.TrimSpace(in.Content) == "" || strings.TrimSpace(in.Title) == "" {
@@ -156,41 +162,44 @@ func (s *Store) GetRevision(ctx context.Context, revisionID string) (types.Revis
 	return r, err
 }
 func (s *Store) Withdraw(ctx context.Context, actor string, req types.WithdrawReq) (types.Receipt, error) {
-	if strings.TrimSpace(req.Reason) == "" {
-		return types.Receipt{}, invalid("withdrawal reason required")
-	}
-	return command(ctx, s, "withdraw/"+req.ModuleId+"/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Receipt, error) {
-		m, err := module(ctx, tx, req.ModuleId, true)
-		if err != nil {
-			return types.Receipt{}, err
+	return observe(ctx, s, "knowledge.content.withdraw", operationID("withdraw/"+req.ModuleId+"/"+actor, req.IdempotencyKey), req, func(ctx context.Context) (types.Receipt, error) {
+		if strings.TrimSpace(req.Reason) == "" {
+			return types.Receipt{}, invalid("withdrawal reason required")
 		}
-		switch req.TargetKind {
-		case "module":
-			if req.TargetId != m.Id {
-				return types.Receipt{}, invalid("target module mismatch")
+		return command(ctx, s, "withdraw/"+req.ModuleId+"/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Receipt, error) {
+			m, err := module(ctx, tx, req.ModuleId, true)
+			if err != nil {
+				return types.Receipt{}, err
 			}
-			m.Lifecycle = "WITHDRAWN"
-			m.Updated = now()
-			err = saveJSON(ctx, tx, "UPDATE knowledge_modules SET data=$2 WHERE id=$1", m, m.Id)
-		case "revision":
-			r, e := revision(ctx, tx, req.TargetId)
-			if e != nil {
-				return types.Receipt{}, e
+			switch req.TargetKind {
+			case "module":
+				if req.TargetId != m.Id {
+					return types.Receipt{}, invalid("target module mismatch")
+				}
+				m.Lifecycle = "WITHDRAWN"
+				m.Updated = now()
+				err = saveJSON(ctx, tx, "UPDATE knowledge_modules SET data=$2 WHERE id=$1", m, m.Id)
+			case "revision":
+				r, e := revision(ctx, tx, req.TargetId)
+				if e != nil {
+					return types.Receipt{}, e
+				}
+				if r.ModuleId != m.Id {
+					return types.Receipt{}, invalid("revision module mismatch")
+				}
+				_, err = tx.Exec(ctx, "UPDATE knowledge_revisions SET withdrawn=true WHERE id=$1", r.RevisionId)
+			default:
+				return types.Receipt{}, invalid("target_kind must be module or revision")
 			}
-			if r.ModuleId != m.Id {
-				return types.Receipt{}, invalid("revision module mismatch")
+			if err != nil {
+				return types.Receipt{}, err
 			}
-			_, err = tx.Exec(ctx, "UPDATE knowledge_revisions SET withdrawn=true WHERE id=$1", r.RevisionId)
-		default:
-			return types.Receipt{}, invalid("target_kind must be module or revision")
-		}
-		if err != nil {
-			return types.Receipt{}, err
-		}
-		err = emit(ctx, tx, "knowledge.content.withdrawn.v1", m.Id, struct {
-			Request types.WithdrawReq `json:"request"`
-			Actor   string            `json:"actor"`
-		}{req, actor})
-		return types.Receipt{Accepted: true}, err
+			err = emit(ctx, tx, "knowledge.content.withdrawn.v1", m.Id, struct {
+				Request types.WithdrawReq `json:"request"`
+				Actor   string            `json:"actor"`
+			}{req, actor})
+			return types.Receipt{Accepted: true}, err
+		})
+
 	})
 }

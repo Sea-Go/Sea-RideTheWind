@@ -1,6 +1,9 @@
 package config
 
-import "github.com/zeromicro/go-zero/rest"
+import (
+	"github.com/zeromicro/go-zero/rest"
+	"sea-try-go/service/knowledge/api/internal/telemetry"
+)
 
 type Config struct {
 	Delivery struct {
@@ -10,7 +13,8 @@ type Config struct {
 		IntervalMillis int    `json:",default=1000"`
 	}
 	rest.RestConf
-	Auth struct {
+	Observability telemetry.Config
+	Auth          struct {
 		AccessSecret string
 		AccessExpire int64
 	}

@@ -50,48 +50,51 @@ func validateProfiles(profiles []types.RetrievalProfile) error {
 	return nil
 }
 func (s *Store) CreateRelease(ctx context.Context, actor string, req types.CreateReleaseReq) (types.Release, error) {
-	if err := validateProfiles(req.RetrievalProfiles); err != nil {
-		return types.Release{}, err
-	}
-	if len(req.SourceRevisionIds) == 0 || req.ChunkingProfile == "" {
-		return types.Release{}, invalid("sources and chunking profile required")
-	}
-	sort.Strings(req.SourceRevisionIds)
-	sort.Strings(req.WikiRevisionIds)
-	sort.Slice(req.RetrievalProfiles, func(i, j int) bool { return req.RetrievalProfiles[i].Lane < req.RetrievalProfiles[j].Lane })
-	return command(ctx, s, "release/"+req.ModuleId+"/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Release, error) {
-		m, err := module(ctx, tx, req.ModuleId, true)
-		if err != nil {
+	return observe(ctx, s, "knowledge.release.create", operationID("release/"+req.ModuleId+"/"+actor, req.IdempotencyKey), req, func(ctx context.Context) (types.Release, error) {
+		if err := validateProfiles(req.RetrievalProfiles); err != nil {
 			return types.Release{}, err
 		}
-		if err = enabled(m); err != nil {
-			return types.Release{}, err
+		if len(req.SourceRevisionIds) == 0 || req.ChunkingProfile == "" {
+			return types.Release{}, invalid("sources and chunking profile required")
 		}
-		releaseID := id("release")
-		manifest := ReleaseManifest{1, m.Id, releaseID, req.SourceRevisionIds, req.WikiRevisionIds, req.ChunkingProfile, req.RetrievalProfiles}
-		if manifest.WikiRevisionIDs == nil {
-			manifest.WikiRevisionIDs = []string{}
-		}
-		if err = s.validateRevisions(ctx, tx, manifest); err != nil {
-			return types.Release{}, err
-		}
-		raw, err := encode(manifest)
-		if err != nil {
-			return types.Release{}, err
-		}
-		ref, hash, err := s.Objects.Put(ctx, raw)
-		if err != nil {
-			return types.Release{}, err
-		}
-		var ordinal int64
-		if err = tx.QueryRow(ctx, "SELECT COALESCE(MAX(ordinal),0)+1 FROM knowledge_releases WHERE module_id=$1", m.Id).Scan(&ordinal); err != nil {
-			return types.Release{}, err
-		}
-		r := types.Release{ReleaseId: releaseID, ModuleId: m.Id, Ordinal: ordinal, SourceRevisionIds: manifest.SourceRevisionIDs, WikiRevisionIds: manifest.WikiRevisionIDs, ChunkingProfile: manifest.ChunkingProfile, RetrievalProfiles: manifest.RetrievalProfiles, ManifestHash: hash, ManifestRef: ref, CreatedAt: now()}
-		if err = saveJSON(ctx, tx, "INSERT INTO knowledge_releases(id,module_id,ordinal,data) VALUES($1,$2,$3,$4)", r, r.ReleaseId, r.ModuleId, r.Ordinal); err != nil {
-			return r, err
-		}
-		return r, emit(ctx, tx, "knowledge.release.frozen.v1", m.Id, r)
+		sort.Strings(req.SourceRevisionIds)
+		sort.Strings(req.WikiRevisionIds)
+		sort.Slice(req.RetrievalProfiles, func(i, j int) bool { return req.RetrievalProfiles[i].Lane < req.RetrievalProfiles[j].Lane })
+		return command(ctx, s, "release/"+req.ModuleId+"/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Release, error) {
+			m, err := module(ctx, tx, req.ModuleId, true)
+			if err != nil {
+				return types.Release{}, err
+			}
+			if err = enabled(m); err != nil {
+				return types.Release{}, err
+			}
+			releaseID := id("release")
+			manifest := ReleaseManifest{1, m.Id, releaseID, req.SourceRevisionIds, req.WikiRevisionIds, req.ChunkingProfile, req.RetrievalProfiles}
+			if manifest.WikiRevisionIDs == nil {
+				manifest.WikiRevisionIDs = []string{}
+			}
+			if err = s.validateRevisions(ctx, tx, manifest); err != nil {
+				return types.Release{}, err
+			}
+			raw, err := encode(manifest)
+			if err != nil {
+				return types.Release{}, err
+			}
+			ref, hash, err := s.Objects.Put(ctx, raw)
+			if err != nil {
+				return types.Release{}, err
+			}
+			var ordinal int64
+			if err = tx.QueryRow(ctx, "SELECT COALESCE(MAX(ordinal),0)+1 FROM knowledge_releases WHERE module_id=$1", m.Id).Scan(&ordinal); err != nil {
+				return types.Release{}, err
+			}
+			r := types.Release{ReleaseId: releaseID, ModuleId: m.Id, Ordinal: ordinal, SourceRevisionIds: manifest.SourceRevisionIDs, WikiRevisionIds: manifest.WikiRevisionIDs, ChunkingProfile: manifest.ChunkingProfile, RetrievalProfiles: manifest.RetrievalProfiles, ManifestHash: hash, ManifestRef: ref, CreatedAt: now()}
+			if err = saveJSON(ctx, tx, "INSERT INTO knowledge_releases(id,module_id,ordinal,data) VALUES($1,$2,$3,$4)", r, r.ReleaseId, r.ModuleId, r.Ordinal); err != nil {
+				return r, err
+			}
+			return r, emit(ctx, tx, "knowledge.release.frozen.v1", m.Id, r)
+		})
+
 	})
 }
 func (s *Store) validateRevisions(ctx context.Context, q queryer, m ReleaseManifest) error {
@@ -187,60 +190,60 @@ func (s *Store) Published(ctx context.Context, moduleID string) (types.Release, 
 	return r, tx.Commit(ctx)
 }
 func (s *Store) Activate(ctx context.Context, actor string, req types.ActivateReq) (types.ReleaseState, error) {
-	if req.ExpectedPointerRevision < 0 || strings.TrimSpace(req.Reason) == "" {
-		return types.ReleaseState{}, invalid("expected pointer revision and reason required")
-	}
-	key := req.IdempotencyKey
-	// Existing H02 clients do not send a key. The compare-and-swap precondition is their stable operation identity.
-	if key == "" {
-		key = fmt.Sprintf("pointer:%d", req.ExpectedPointerRevision)
-	}
-	return command(ctx, s, "activation/"+req.ModuleId+"/"+actor, key, req, func(tx pgx.Tx) (types.ReleaseState, error) {
-		m, err := module(ctx, tx, req.ModuleId, true)
-		if err != nil {
-			return types.ReleaseState{}, err
+	return observe(ctx, s, "knowledge.release.activate", operationID("activation/"+req.ModuleId+"/"+actor, activationKey(req)), req, func(ctx context.Context) (types.ReleaseState, error) {
+		if req.ExpectedPointerRevision < 0 || strings.TrimSpace(req.Reason) == "" {
+			return types.ReleaseState{}, invalid("expected pointer revision and reason required")
 		}
-		if err = enabled(m); err != nil {
-			return types.ReleaseState{}, err
-		}
-		if m.PointerRevision != req.ExpectedPointerRevision {
-			return types.ReleaseState{}, conflict("pointer revision changed")
-		}
-		r, err := readJSON[types.Release](ctx, tx, "SELECT data FROM knowledge_releases WHERE id=$1", req.ReleaseId)
-		if err != nil {
-			return types.ReleaseState{}, err
-		}
-		b, err := readJSON[types.Build](ctx, tx, "SELECT data FROM knowledge_builds WHERE id=$1", req.BuildId)
-		if err != nil {
-			return types.ReleaseState{}, err
-		}
-		if r.ModuleId != m.Id || b.ReleaseId != r.ReleaseId || b.ManifestHash != r.ManifestHash || b.State != "READY" {
-			return types.ReleaseState{}, conflict("release and READY build must match")
-		}
-		if err = s.validateRevisions(ctx, tx, manifestOf(r)); err != nil {
-			return types.ReleaseState{}, err
-		}
-		if _, err = s.Objects.Get(ctx, r.ManifestRef, r.ManifestHash); err != nil {
-			return types.ReleaseState{}, ErrUnavailable
-		}
-		if err = s.verifyIndex(ctx, r, b, b.IndexManifestRef, b.IndexManifestHash); err != nil {
-			return types.ReleaseState{}, err
-		}
-		m.ActiveReleaseId = r.ReleaseId
-		m.ActiveBuildId = b.BuildId
-		m.PointerRevision++
-		m.Release = fmt.Sprintf("v%d", r.Ordinal)
-		m.Sources = len(r.SourceRevisionIds)
-		m.Pages = len(r.WikiRevisionIds)
-		m.Updated = now()
-		if err = saveJSON(ctx, tx, "UPDATE knowledge_modules SET data=$2 WHERE id=$1", m, m.Id); err != nil {
-			return types.ReleaseState{}, err
-		}
-		if _, err = tx.Exec(ctx, "INSERT INTO knowledge_publications(module_id,pointer_revision,release_id,build_id,actor,reason) VALUES($1,$2,$3,$4,$5,$6)", m.Id, m.PointerRevision, r.ReleaseId, b.BuildId, actor, req.Reason); err != nil {
-			return types.ReleaseState{}, err
-		}
-		state := types.ReleaseState{ActiveReleaseId: r.ReleaseId, ActiveBuildId: b.BuildId, PointerRevision: m.PointerRevision, CandidateReleaseId: r.ReleaseId, BuildId: b.BuildId, BuildState: b.State, ManifestHash: r.ManifestHash}
-		return state, emit(ctx, tx, "knowledge.release.activated.v1", m.Id, state)
+		key := activationKey(req)
+		return command(ctx, s, "activation/"+req.ModuleId+"/"+actor, key, req, func(tx pgx.Tx) (types.ReleaseState, error) {
+			m, err := module(ctx, tx, req.ModuleId, true)
+			if err != nil {
+				return types.ReleaseState{}, err
+			}
+			if err = enabled(m); err != nil {
+				return types.ReleaseState{}, err
+			}
+			actualFields(ctx, m)
+			if m.PointerRevision != req.ExpectedPointerRevision {
+				return types.ReleaseState{}, conflictCode("CAS_CONFLICT", "pointer revision changed")
+			}
+			r, err := readJSON[types.Release](ctx, tx, "SELECT data FROM knowledge_releases WHERE id=$1", req.ReleaseId)
+			if err != nil {
+				return types.ReleaseState{}, err
+			}
+			b, err := readJSON[types.Build](ctx, tx, "SELECT data FROM knowledge_builds WHERE id=$1", req.BuildId)
+			if err != nil {
+				return types.ReleaseState{}, err
+			}
+			if r.ModuleId != m.Id || b.ReleaseId != r.ReleaseId || b.ManifestHash != r.ManifestHash || b.State != "READY" {
+				return types.ReleaseState{}, conflict("release and READY build must match")
+			}
+			if err = s.validateRevisions(ctx, tx, manifestOf(r)); err != nil {
+				return types.ReleaseState{}, err
+			}
+			if _, err = s.Objects.Get(ctx, r.ManifestRef, r.ManifestHash); err != nil {
+				return types.ReleaseState{}, ErrUnavailable
+			}
+			if err = s.verifyIndex(ctx, r, b, b.IndexManifestRef, b.IndexManifestHash); err != nil {
+				return types.ReleaseState{}, err
+			}
+			m.ActiveReleaseId = r.ReleaseId
+			m.ActiveBuildId = b.BuildId
+			m.PointerRevision++
+			m.Release = fmt.Sprintf("v%d", r.Ordinal)
+			m.Sources = len(r.SourceRevisionIds)
+			m.Pages = len(r.WikiRevisionIds)
+			m.Updated = now()
+			if err = saveJSON(ctx, tx, "UPDATE knowledge_modules SET data=$2 WHERE id=$1", m, m.Id); err != nil {
+				return types.ReleaseState{}, err
+			}
+			if _, err = tx.Exec(ctx, "INSERT INTO knowledge_publications(module_id,pointer_revision,release_id,build_id,actor,reason) VALUES($1,$2,$3,$4,$5,$6)", m.Id, m.PointerRevision, r.ReleaseId, b.BuildId, actor, req.Reason); err != nil {
+				return types.ReleaseState{}, err
+			}
+			state := types.ReleaseState{ActiveReleaseId: r.ReleaseId, ActiveBuildId: b.BuildId, PointerRevision: m.PointerRevision, CandidateReleaseId: r.ReleaseId, BuildId: b.BuildId, BuildState: b.State, ManifestHash: r.ManifestHash}
+			return state, emit(ctx, tx, "knowledge.release.activated.v1", m.Id, state)
+		})
+
 	})
 }
 func (s *Store) Current(ctx context.Context, moduleID string) (types.ReleaseState, error) {

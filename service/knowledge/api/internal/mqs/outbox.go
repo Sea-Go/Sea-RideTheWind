@@ -11,7 +11,8 @@ import (
 
 	"sea-try-go/service/knowledge/api/internal/model"
 
-	"github.com/zeromicro/go-zero/core/logx"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 // HTTPSender implements the proposed H04 event handoff. Endpoint must be configured
@@ -37,6 +38,7 @@ func (s *HTTPSender) Send(ctx context.Context, event model.Event) (model.Technic
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", event.EventID)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 	if s.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+s.Token)
 	}
@@ -59,13 +61,20 @@ func Run(ctx context.Context, store *model.Store, sender model.Sender, interval 
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			if store.Observability != nil {
+				var pending int64
+				if err := store.DB.QueryRow(ctx, "SELECT count(*) FROM knowledge_outbox WHERE delivered_at IS NULL").Scan(&pending); err == nil {
+					store.Observability.Backlog(pending)
+				} else {
+					store.Observability.PollFailure(ctx, err)
+				}
+			}
 			// A bounded batch shares the receiver and DB pool with the API.
 			for i := 0; i < 16; i++ {
 				attempt, cancel := context.WithTimeout(ctx, 10*time.Second)
 				sent, err := store.DispatchOne(attempt, sender)
 				cancel()
 				if err != nil {
-					logx.WithContext(ctx).Errorf("knowledge outbox delivery failed: %v", err)
 					break
 				}
 				if !sent {

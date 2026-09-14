@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sea-try-go/service/knowledge/api/internal/telemetry"
 	"strings"
 
 	"sea-try-go/service/knowledge/api/internal/types"
@@ -80,38 +81,41 @@ func (s *Store) verifyIndex(ctx context.Context, r types.Release, b types.Build,
 	return nil
 }
 func (s *Store) CreateBuild(ctx context.Context, actor string, req types.CreateBuildReq) (types.Build, error) {
-	r, err := s.GetRelease(ctx, req.ReleaseId)
-	if err != nil {
-		return types.Build{}, err
-	}
-	return command(ctx, s, "build/create/"+r.ReleaseId+"/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Build, error) {
-		m, err := module(ctx, tx, r.ModuleId, true)
+	return observe(ctx, s, "knowledge.build.create", operationID("build/create/"+req.ReleaseId+"/"+actor, req.IdempotencyKey), req, func(ctx context.Context) (types.Build, error) {
+		r, err := s.GetRelease(ctx, req.ReleaseId)
 		if err != nil {
 			return types.Build{}, err
 		}
-		if err = enabled(m); err != nil {
-			return types.Build{}, err
-		}
-		if err = s.validateRevisions(ctx, tx, manifestOf(r)); err != nil {
-			return types.Build{}, err
-		}
-		var generation int64
-		if err = tx.QueryRow(ctx, "SELECT COALESCE(MAX(generation),0)+1 FROM knowledge_builds WHERE release_id=$1", r.ReleaseId).Scan(&generation); err != nil {
-			return types.Build{}, err
-		}
-		// READY historical builds remain eligible for rollback; only unfinished generations are superseded.
-		if _, err = tx.Exec(ctx, "UPDATE knowledge_builds SET data=jsonb_set(data,'{state}','\"SUPERSEDED\"'::jsonb) WHERE release_id=$1 AND data->>'state'='BUILDING'", r.ReleaseId); err != nil {
-			return types.Build{}, err
-		}
-		b := types.Build{BuildId: id("build"), ReleaseId: r.ReleaseId, ModuleId: r.ModuleId, ManifestHash: r.ManifestHash, Generation: generation, State: "BUILDING"}
-		if err = saveJSON(ctx, tx, "INSERT INTO knowledge_builds(id,release_id,module_id,generation,data) VALUES($1,$2,$3,$4,$5)", b, b.BuildId, b.ReleaseId, b.ModuleId, b.Generation); err != nil {
-			return b, err
-		}
-		payload := struct {
-			Build       types.Build `json:"build"`
-			ManifestRef string      `json:"manifest_ref"`
-		}{b, r.ManifestRef}
-		return b, emit(ctx, tx, "knowledge.index.build.requested.v1", r.ModuleId, payload)
+		return command(ctx, s, "build/create/"+r.ReleaseId+"/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Build, error) {
+			m, err := module(ctx, tx, r.ModuleId, true)
+			if err != nil {
+				return types.Build{}, err
+			}
+			if err = enabled(m); err != nil {
+				return types.Build{}, err
+			}
+			if err = s.validateRevisions(ctx, tx, manifestOf(r)); err != nil {
+				return types.Build{}, err
+			}
+			var generation int64
+			if err = tx.QueryRow(ctx, "SELECT COALESCE(MAX(generation),0)+1 FROM knowledge_builds WHERE release_id=$1", r.ReleaseId).Scan(&generation); err != nil {
+				return types.Build{}, err
+			}
+			// READY historical builds remain eligible for rollback; only unfinished generations are superseded.
+			if _, err = tx.Exec(ctx, "UPDATE knowledge_builds SET data=jsonb_set(data,'{state}','\"SUPERSEDED\"'::jsonb) WHERE release_id=$1 AND data->>'state'='BUILDING'", r.ReleaseId); err != nil {
+				return types.Build{}, err
+			}
+			b := types.Build{BuildId: id("build"), ReleaseId: r.ReleaseId, ModuleId: r.ModuleId, ManifestHash: r.ManifestHash, Generation: generation, State: "BUILDING"}
+			if err = saveJSON(ctx, tx, "INSERT INTO knowledge_builds(id,release_id,module_id,generation,data) VALUES($1,$2,$3,$4,$5)", b, b.BuildId, b.ReleaseId, b.ModuleId, b.Generation); err != nil {
+				return b, err
+			}
+			payload := struct {
+				Build       types.Build `json:"build"`
+				ManifestRef string      `json:"manifest_ref"`
+			}{b, r.ManifestRef}
+			return b, emit(ctx, tx, "knowledge.index.build.requested.v1", r.ModuleId, payload)
+		})
+
 	})
 }
 func (s *Store) GetBuild(ctx context.Context, buildID string) (types.Build, error) {
@@ -141,6 +145,8 @@ func (s *Store) mutateBuild(ctx context.Context, buildID string, fn func(pgx.Tx,
 	if err = setOperation(ctx, tx, "result:"+buildID); err != nil {
 		return initial, err
 	}
+	actualFields(ctx, b)
+	previous := b
 	previousState := b.State
 	if err = fn(tx, &b); err != nil {
 		return b, err
@@ -149,104 +155,116 @@ func (s *Store) mutateBuild(ctx context.Context, buildID string, fn func(pgx.Tx,
 	if err = saveExecutionResult(ctx, tx, "knowledge_builds", b.BuildId, b, liveLeaseRequired); err != nil {
 		return b, err
 	}
+	if reflect.DeepEqual(previous, b) {
+		telemetry.Replay(ctx)
+	}
 	return b, tx.Commit(ctx)
 }
 func sameFence(b types.Build, generation, cancel int64, hash string) bool {
 	return b.Generation == generation && b.CancelVersion == cancel && b.ManifestHash == hash
 }
 func (s *Store) ClaimBuild(ctx context.Context, req types.ClaimBuildReq) (types.Build, error) {
-	if req.AttemptId == "" || req.LeaseEpoch <= 0 {
-		return types.Build{}, invalid("attempt and positive lease_epoch required")
-	}
-	return s.mutateBuild(ctx, req.BuildId, func(tx pgx.Tx, b *types.Build) error {
-		if b.State != "BUILDING" || !sameFence(*b, req.Generation, req.CancelVersion, req.ManifestHash) {
-			return conflict("build is terminal, superseded or cancelled")
+	return observe(ctx, s, "knowledge.build.claim", "result:"+req.BuildId, req, func(ctx context.Context) (types.Build, error) {
+		if req.AttemptId == "" || req.LeaseEpoch <= 0 {
+			return types.Build{}, invalid("attempt and positive lease_epoch required")
 		}
-		if req.LeaseEpoch < b.LeaseEpoch || (req.LeaseEpoch == b.LeaseEpoch && req.AttemptId != b.AttemptId) {
-			return conflict("stale attempt lease")
-		}
-		if !leaseValid(req.LeaseExpiresAt) {
-			return invalid("lease expiry must be a future RFC3339 timestamp")
-		}
-		b.LeaseExpiresAt = req.LeaseExpiresAt
-		b.AttemptId = req.AttemptId
-		b.LeaseEpoch = req.LeaseEpoch
-		return nil
+		return s.mutateBuild(ctx, req.BuildId, func(tx pgx.Tx, b *types.Build) error {
+			if b.State != "BUILDING" || !sameFence(*b, req.Generation, req.CancelVersion, req.ManifestHash) {
+				return conflict("build is terminal, superseded or cancelled")
+			}
+			if req.LeaseEpoch < b.LeaseEpoch || (req.LeaseEpoch == b.LeaseEpoch && req.AttemptId != b.AttemptId) {
+				return conflictCode("FENCE_CONFLICT", "stale attempt lease")
+			}
+			if !leaseValid(req.LeaseExpiresAt) {
+				return invalid("lease expiry must be a future RFC3339 timestamp")
+			}
+			b.LeaseExpiresAt = req.LeaseExpiresAt
+			b.AttemptId = req.AttemptId
+			b.LeaseEpoch = req.LeaseEpoch
+			return nil
+		})
+
 	})
 }
 func (s *Store) AcceptBuild(ctx context.Context, req types.AcceptBuildReq) (types.Build, error) {
-	if req.State != "READY" && req.State != "FAILED" {
-		return types.Build{}, invalid("result state must be READY or FAILED")
-	}
-	return s.mutateBuild(ctx, req.BuildId, func(tx pgx.Tx, b *types.Build) error {
-		if !sameFence(*b, req.Generation, req.CancelVersion, req.ManifestHash) || b.AttemptId == "" || b.AttemptId != req.AttemptId || b.LeaseEpoch != req.LeaseEpoch {
-			return conflict("result attempt, generation, cancellation or input mismatch")
+	return observe(ctx, s, "knowledge.build.accept", "result:"+req.BuildId, req, func(ctx context.Context) (types.Build, error) {
+		if req.State != "READY" && req.State != "FAILED" {
+			return types.Build{}, invalid("result state must be READY or FAILED")
 		}
-		if b.State == req.State {
-			if b.IndexManifestRef == req.IndexManifestRef && b.IndexManifestHash == req.IndexManifestHash && b.ErrorCode == req.ErrorCode {
-				return nil
+		return s.mutateBuild(ctx, req.BuildId, func(tx pgx.Tx, b *types.Build) error {
+			if !sameFence(*b, req.Generation, req.CancelVersion, req.ManifestHash) || b.AttemptId == "" || b.AttemptId != req.AttemptId || b.LeaseEpoch != req.LeaseEpoch {
+				return conflictCode("FENCE_CONFLICT", "result attempt, generation, cancellation or input mismatch")
 			}
-			return conflict("terminal result payload differs")
-		}
-		if b.State != "BUILDING" {
-			return conflict("build no longer accepts results")
-		}
-		if !leaseValid(b.LeaseExpiresAt) {
-			return conflict("result lease expired")
-		}
-		if req.State == "READY" {
-			if req.ErrorCode != "" {
-				return invalid("READY cannot carry an error")
+			if b.State == req.State {
+				if b.IndexManifestRef == req.IndexManifestRef && b.IndexManifestHash == req.IndexManifestHash && b.ErrorCode == req.ErrorCode {
+					return nil
+				}
+				return conflict("terminal result payload differs")
 			}
-			r, err := readJSON[types.Release](ctx, tx, "SELECT data FROM knowledge_releases WHERE id=$1", b.ReleaseId)
-			if err != nil {
-				return err
+			if b.State != "BUILDING" {
+				return conflict("build no longer accepts results")
 			}
-			if err = s.validateRevisions(ctx, tx, manifestOf(r)); err != nil {
-				return err
+			if !leaseValid(b.LeaseExpiresAt) {
+				return conflictCode("LEASE_EXPIRED", "result lease expired")
 			}
-			if err = s.verifyIndex(ctx, r, *b, req.IndexManifestRef, req.IndexManifestHash); err != nil {
-				return err
+			if req.State == "READY" {
+				if req.ErrorCode != "" {
+					return invalid("READY cannot carry an error")
+				}
+				r, err := readJSON[types.Release](ctx, tx, "SELECT data FROM knowledge_releases WHERE id=$1", b.ReleaseId)
+				if err != nil {
+					return err
+				}
+				if err = s.validateRevisions(ctx, tx, manifestOf(r)); err != nil {
+					return err
+				}
+				if err = s.verifyIndex(ctx, r, *b, req.IndexManifestRef, req.IndexManifestHash); err != nil {
+					return err
+				}
+			} else if strings.TrimSpace(req.ErrorCode) == "" || req.IndexManifestHash != "" || req.IndexManifestRef != "" {
+				return invalid("FAILED requires error_code and no READY manifest")
 			}
-		} else if strings.TrimSpace(req.ErrorCode) == "" || req.IndexManifestHash != "" || req.IndexManifestRef != "" {
-			return invalid("FAILED requires error_code and no READY manifest")
-		}
-		b.State = req.State
-		b.IndexManifestRef = req.IndexManifestRef
-		b.IndexManifestHash = req.IndexManifestHash
-		b.ErrorCode = req.ErrorCode
-		return emit(ctx, tx, "knowledge.index.build.accepted.v1", b.ModuleId, *b)
+			b.State = req.State
+			b.IndexManifestRef = req.IndexManifestRef
+			b.IndexManifestHash = req.IndexManifestHash
+			b.ErrorCode = req.ErrorCode
+			return emit(ctx, tx, "knowledge.index.build.accepted.v1", b.ModuleId, *b)
+		})
+
 	})
 }
 func (s *Store) CancelBuild(ctx context.Context, actor string, req types.CancelBuildReq) (types.Build, error) {
-	if strings.TrimSpace(req.Reason) == "" {
-		return types.Build{}, invalid("cancellation reason required")
-	}
-	initial, err := s.GetBuild(ctx, req.BuildId)
-	if err != nil {
-		return initial, err
-	}
-	return command(ctx, s, "build/cancel/"+req.BuildId+"/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Build, error) {
-		if _, err := module(ctx, tx, initial.ModuleId, true); err != nil {
-			return types.Build{}, err
+	return observe(ctx, s, "knowledge.build.cancel", operationID("build/cancel/"+req.BuildId+"/"+actor, req.IdempotencyKey), req, func(ctx context.Context) (types.Build, error) {
+		if strings.TrimSpace(req.Reason) == "" {
+			return types.Build{}, invalid("cancellation reason required")
 		}
-		b, err := readJSON[types.Build](ctx, tx, "SELECT data FROM knowledge_builds WHERE id=$1 FOR UPDATE", req.BuildId)
+		initial, err := s.GetBuild(ctx, req.BuildId)
 		if err != nil {
-			return b, err
+			return initial, err
 		}
-		if b.State != "BUILDING" {
-			return b, conflict("only unfinished builds can be cancelled")
-		}
-		b.State = "CANCELLED"
-		b.CancelVersion++
-		b.ErrorCode = "CANCELLED"
-		if err = saveJSON(ctx, tx, "UPDATE knowledge_builds SET data=$2 WHERE id=$1", b, b.BuildId); err != nil {
-			return b, err
-		}
-		return b, emit(ctx, tx, "knowledge.index.build.cancelled.v1", b.ModuleId, struct {
-			Build  types.Build `json:"build"`
-			Reason string      `json:"reason"`
-		}{b, req.Reason})
+		return command(ctx, s, "build/cancel/"+req.BuildId+"/"+actor, req.IdempotencyKey, req, func(tx pgx.Tx) (types.Build, error) {
+			if _, err := module(ctx, tx, initial.ModuleId, true); err != nil {
+				return types.Build{}, err
+			}
+			b, err := readJSON[types.Build](ctx, tx, "SELECT data FROM knowledge_builds WHERE id=$1 FOR UPDATE", req.BuildId)
+			if err != nil {
+				return b, err
+			}
+			if b.State != "BUILDING" {
+				return b, conflict("only unfinished builds can be cancelled")
+			}
+			b.State = "CANCELLED"
+			b.CancelVersion++
+			b.ErrorCode = "CANCELLED"
+			if err = saveJSON(ctx, tx, "UPDATE knowledge_builds SET data=$2 WHERE id=$1", b, b.BuildId); err != nil {
+				return b, err
+			}
+			return b, emit(ctx, tx, "knowledge.index.build.cancelled.v1", b.ModuleId, struct {
+				Build  types.Build `json:"build"`
+				Reason string      `json:"reason"`
+			}{b, req.Reason})
+		})
+
 	})
 }
 

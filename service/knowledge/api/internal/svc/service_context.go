@@ -9,6 +9,7 @@ import (
 	"sea-try-go/service/knowledge/api/internal/middleware"
 	"sea-try-go/service/knowledge/api/internal/model"
 	"sea-try-go/service/knowledge/api/internal/object"
+	"sea-try-go/service/knowledge/api/internal/telemetry"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/minio/minio-go/v7"
@@ -23,7 +24,7 @@ type ServiceContext struct {
 	Store         *model.Store
 }
 
-func NewServiceContext(c config.Config) (*ServiceContext, error) {
+func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceContext, error) {
 	if c.Auth.AccessSecret == "" || c.WorkerToken == "" || len(c.AdministratorIDs) == 0 {
 		return nil, fmt.Errorf("auth secret, worker token and administrator identities required")
 	}
@@ -74,7 +75,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	if err != nil {
 		return fail(err)
 	}
-	store := model.New(pool, objects)
+	store := model.New(pool, objects, model.WithObservability(observer))
 	if c.Postgres.Migrate {
 		if err = store.Migrate(ctx); err != nil {
 			return fail(err)

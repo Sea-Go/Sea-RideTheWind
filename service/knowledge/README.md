@@ -51,7 +51,7 @@ goctl api ts --api api/knowledge.api --dir service/knowledge/generated/typescrip
 
 ## 启动与存储
 
-示例配置在 `api/etc/knowledge-api.yaml`。通过环境提供 KNOWLEDGE_AUTH_SECRET、KNOWLEDGE_ADMIN_ID、KNOWLEDGE_WORKER_TOKEN、KNOWLEDGE_POSTGRES_DSN、KNOWLEDGE_OBJECT_DIRECTORY。在**空的隔离数据库**先执行 `api/internal/model/schema.sql`，或把本地测试配置 Postgres.Migrate 显式设为 true；默认不自动迁移。然后在仓根执行：
+示例配置在 `api/etc/knowledge-api.yaml`。通过环境提供 KNOWLEDGE_AUTH_SECRET、KNOWLEDGE_ADMIN_ID、KNOWLEDGE_WORKER_TOKEN、KNOWLEDGE_POSTGRES_DSN、KNOWLEDGE_OBJECT_DIRECTORY，以及实际构建修订 `KNOWLEDGE_SERVICE_VERSION`。未显式设置版本时，入口尝试读取 Go 构建信息中的 VCS revision；仍无法解析则拒绝启动并输出结构化失败日志。在**空的隔离数据库**先执行 `api/internal/model/schema.sql`，或把本地测试配置 Postgres.Migrate 显式设为 true；默认不自动迁移。然后在仓根执行：
 
 ```sh
 go run ./service/knowledge/api -f service/knowledge/api/etc/knowledge-api.yaml
@@ -62,6 +62,8 @@ PostgreSQL 保存修订、清单、状态、操作回放和 Outbox。数据库 t
 Objects.Backend=local 是开发适配器，pro 模式拒绝使用；S3 配置 Endpoint/Bucket/AccessKey/SecretKey/Secure 使用既有 minio-go 客户端、启动探测已存在的 bucket。S3 适配代码已编译，但本轮尚未完成真实 S3 服务验收。没有生产数据迁移或部署。
 
 Delivery.Enabled 默认 false。DC 接入后配置独立 `/v1/events` 接收地址，不使用旧桌面 events/batch 路径。Outbox、索引 worker 与对象基础设施故障不能自动替换当前正式版本。
+
+观测入口在 `api/knowledge.go`：go-zero `logx` 通过唯一 JSON Writer 输出到 stdout，领域命令仅在事务结果确定后记录终态；`GET /metrics` 暴露模板化 HTTP、命令、提交、Outbox 积压及日志/Trace 导出计数。`Observability.Endpoint` 配置 OTLP gRPC Trace 导出地址；Outbox 在数据库额外保存 W3C 关联，并在投递时建立新 Trace 的 Link。关闭时先停 worker、再关闭 Trace Provider、最后有界刷写日志。当前本地链路未接入 DC 查询和真实 Collector，下钻与整体 OBS 验收仍未完成。
 
 ## 本地验收结果（2026-09-14）
 
