@@ -22,4 +22,6 @@ BTW HTTP 200 返回**裸 JSON，不是最终答案**：`search_id,status,stop_re
 
 ## 当前验收边界
 
-本分支包含 RTW schema/API/迁移、独立 PG 幂等与预算测试、已发布引用及同版重读测试、真实 User Center HTTP 身份门禁。BTW Tools HTTP 消费者、WhaleHall Bun Port 和真实跨仓父 Agent 运行还需各自 writer 对此冻结线格式实现和联验；此前不能将 H02 Tools 产品链标为 `ACCEPTED`。测试进程中的 BTW 夹具只证明 RTW 签发/拒绝伪造响应，不等同于 BTW 生产进程。
+本分支包含 RTW schema/API/迁移、独立 PG 幂等与预算测试、已发布引用及同版重读测试、真实 User Center HTTP 身份门禁。提交 `5043c31` 后运行 `KNOWLEDGE_REAL_USER_GATE=1 KNOWLEDGE_KEEP_EVIDENCE=1 bash service/knowledge/scripts/acceptance.sh`，退出码 0：`service/knowledge/...` 和 User Center 相关 Go 测试均以 race 模式通过，两个范围的 `go vet` 通过，`git diff --check` 通过。单独 `go mod verify` 返回 `all modules verified`；goctl 1.9.2 生成脚本复跑后未引入额外生成差异。生成的 TypeScript 契约尚未在 WhaleHall 消费端类型检查。
+
+真实 User Center 用例验证活跃 JWT 创建父操作、同键回放、跨用户 404、停用旧 JWT 403、RPC 缺失/不可用 503；隔离真 PG 用例验证新父固定人工发布、并发同键唯一子 ID、不同键锁下不可超支、失败原键重试、完成时按验证用量只退款一次、伪造引文拒绝、同版原文重读幂等及撤回后不再公开。HTTP 夹具返回伪造带引文 200 时，RTW 仅回 503 且没有证据；夹具返回真实空结构时，RTW 公开空证据但不产生引用收据。这些证明 **RTW 提供端 `LOCAL_VERIFIED`**；夹具不等同于 BTW 生产进程。BTW Tools HTTP 消费者、WhaleHall Bun Port 和真实跨仓父 Agent 运行还需各自 writer 对此冻结线格式实现和联验；此前不能将 H02 Tools 产品链标为 `ACCEPTED`。
