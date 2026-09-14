@@ -666,6 +666,107 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	}
 	request("GET", productPath, productToken, nil, nil, 503)
 	request("GET", citationStatePath, productToken, nil, nil, 503)
+	if btwRoot := os.Getenv("SEA_BTW_INDEX_CONSUMER_ROOT"); btwRoot != "" {
+		// A separate unpublished module gives BTW an actual, unclaimed RTW
+		// build. BTW must construct the three lanes and submit its own READY.
+		var indexModule types.Module
+		request("POST", "/v1/knowledge/modules", token,
+			types.CreateModuleReq{Title: "Cross-repository index handoff", IdempotencyKey: "http-index-module"}, &indexModule, 200)
+		var indexSource types.Revision
+		request("POST", "/v1/knowledge/modules/"+indexModule.Id+"/sources", token,
+			types.CreateSourceReq{Title: "Index source", Content: "east\n\nnorth", MediaType: "text/markdown",
+				Provenance: "synthetic", IdempotencyKey: "http-index-source"}, &indexSource, 200)
+		profiles := []types.RetrievalProfile{
+			{Lane: "dense", Encoder: "fixture_model", Tokenizer: "tokens_v1", Space: "dense_space", Dimensions: 2},
+			{Lane: "sparse", Encoder: "fixture_model", Tokenizer: "tokens_v1", Space: "sparse_space", Dimensions: 100},
+			{Lane: "multivector", Encoder: "fixture_model", Tokenizer: "tokens_v1", Space: "multi_space",
+				Dimensions: 2, Mask: "valid", Aggregation: "sum_maxsim"},
+		}
+		var indexRelease types.Release
+		request("POST", "/v1/knowledge/modules/"+indexModule.Id+"/releases", token,
+			types.CreateReleaseReq{SourceRevisionIds: []string{indexSource.RevisionId}, WikiRevisionIds: []string{},
+				ChunkingProfile: "index-paragraph-v1", RetrievalProfiles: profiles,
+				IdempotencyKey: "http-index-release"}, &indexRelease, 200)
+		var indexBuild types.Build
+		request("POST", "/v1/knowledge/releases/"+indexRelease.ReleaseId+"/index-builds", token,
+			types.CreateBuildReq{IdempotencyKey: "http-index-build"}, &indexBuild, 200)
+		if indexBuild.State != "BUILDING" || indexBuild.AttemptId != "" || indexBuild.LeaseEpoch != 0 {
+			t.Fatalf("cross-repository input was not an unclaimed build: %+v", indexBuild)
+		}
+		resultPath := filepath.Join(dir, "btw-real-index-result.json")
+		fixtureRaw, marshalErr := json.Marshal(map[string]any{
+			"base_url": base, "worker_token": c.WorkerToken, "objects_dir": filepath.Join(dir, "objects"),
+			"build_id": indexBuild.BuildId, "release_id": indexRelease.ReleaseId, "module_id": indexModule.Id,
+			"source_revision_ids": []string{indexSource.RevisionId}, "wiki_revision_ids": []string{},
+			"chunk_profile": indexRelease.ChunkingProfile, "chunk_size": 64, "chunk_overlap": 0,
+			"result_path": resultPath,
+		})
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		fixturePath := filepath.Join(dir, "btw-real-index-fixture.json")
+		if err := os.WriteFile(fixturePath, fixtureRaw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		consumer := exec.Command("bash", "cmd/worker/acceptance.sh")
+		consumer.Dir = btwRoot
+		consumer.Env = append(os.Environ(), "SEA_RTW_REAL_INDEX_FIXTURE="+fixturePath,
+			"GOFLAGS=-run=^TestRTWRealProviderIndexDispatch$")
+		output, runErr := consumer.CombinedOutput()
+		if runErr != nil {
+			t.Fatalf("BTW index consumer did not hand off real RTW READY: %v\n%s", runErr, output)
+		}
+		if testing.Verbose() {
+			t.Logf("BTW real RTW index consumer: %s", strings.TrimSpace(string(output)))
+		}
+		resultRaw, readErr := os.ReadFile(resultPath)
+		if readErr != nil {
+			t.Fatalf("BTW did not emit its independently verified result: %v", readErr)
+		}
+		var handoff struct {
+			BuildID           string `json:"build_id"`
+			IndexManifestRef  string `json:"index_manifest_ref"`
+			IndexManifestHash string `json:"index_manifest_hash"`
+			DCAckRef          string `json:"dc_ack_ref"`
+			DCAckHash         string `json:"dc_ack_hash"`
+			RTWState          string `json:"rtw_state"`
+			RTWGeneration     int64  `json:"rtw_generation"`
+		}
+		if err := json.Unmarshal(resultRaw, &handoff); err != nil || handoff.BuildID != indexBuild.BuildId ||
+			handoff.RTWGeneration != indexBuild.Generation || handoff.RTWState != "READY" ||
+			handoff.IndexManifestRef != "sha256/"+handoff.IndexManifestHash ||
+			handoff.DCAckRef != "sha256:"+handoff.IndexManifestHash ||
+			handoff.DCAckHash != handoff.IndexManifestHash {
+			t.Fatalf("BTW result does not tie READY to DC ACK: %+v err=%v", handoff, err)
+		}
+		var acceptedBuild types.Build
+		request("GET", "/internal/v1/knowledge/builds/"+indexBuild.BuildId, c.WorkerToken, nil, &acceptedBuild, 200)
+		if acceptedBuild.State != "READY" || acceptedBuild.IndexManifestRef != handoff.IndexManifestRef ||
+			acceptedBuild.IndexManifestHash != handoff.IndexManifestHash ||
+			acceptedBuild.Generation != indexBuild.Generation {
+			t.Fatalf("RTW HTTP returned a different accepted build: %+v", acceptedBuild)
+		}
+		var storedBuildRaw []byte
+		if err := s.DB.QueryRow(context.Background(), "SELECT data FROM knowledge_builds WHERE id=$1", indexBuild.BuildId).
+			Scan(&storedBuildRaw); err != nil {
+			t.Fatal(err)
+		}
+		var storedBuild types.Build
+		if err := json.Unmarshal(storedBuildRaw, &storedBuild); err != nil || !reflect.DeepEqual(storedBuild, acceptedBuild) {
+			t.Fatalf("RTW PostgreSQL differs from HTTP accepted READY: %+v err=%v", storedBuild, err)
+		}
+		var acceptedEvents, indexPublications int
+		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_outbox
+	WHERE event_type='knowledge.index.build.accepted.v1' AND aggregate_id=$1
+	AND payload->'payload'->>'build_id'=$2`, indexModule.Id, indexBuild.BuildId).Scan(&acceptedEvents); err != nil || acceptedEvents != 1 {
+			t.Fatalf("RTW acceptance outbox was not exactly once: count=%d err=%v", acceptedEvents, err)
+		}
+		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_publications WHERE module_id=$1`,
+			indexModule.Id).Scan(&indexPublications); err != nil || indexPublications != 0 {
+			t.Fatalf("index READY moved the manual publication pointer: count=%d err=%v", indexPublications, err)
+		}
+		request("GET", "/internal/v1/knowledge/modules/"+indexModule.Id+"/search-snapshot", c.WorkerToken, nil, nil, 404)
+	}
 	metrics, err := client.Get(base + "/metrics")
 	if err != nil {
 		t.Fatal(err)
