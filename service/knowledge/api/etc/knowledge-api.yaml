@@ -30,6 +30,14 @@ SearchSummary:
   DetailedTimeoutMillis: 90000
   AllowPartial: false
   AllowLowerIntelligence: false
+# Enable after migrate-tool-search.sql and the BTW Tools consumer are deployed.
+SearchTools:
+  Endpoint: ""
+  ScopeKey: ""
+  FastTimeoutMillis: 30000
+  DetailedTimeoutMillis: 90000
+  AllowPartial: false
+  AllowLowerIntelligence: false
 AdministratorIDs:
   - ${KNOWLEDGE_ADMIN_ID}
 WorkerToken: ${KNOWLEDGE_WORKER_TOKEN}

@@ -632,6 +632,122 @@ type SourceRef struct {
 	Locator    string `json:"locator"`
 }
 
+type ToolBudget struct {
+	SearchCalls            int `json:"search_calls"`
+	ReadCalls              int `json:"read_calls"`
+	QuoteRunes             int `json:"quote_runes"`
+	MaxReadsPerSearch      int `json:"max_reads_per_search"`
+	MaxQuoteRunesPerSearch int `json:"max_quote_runes_per_search"`
+}
+
+type ToolEvidence struct {
+	EvidenceId string `json:"evidence_id"`
+	RevisionId string `json:"revision_id"`
+	Locator    string `json:"locator"`
+	Quote      string `json:"quote"`
+	QuoteHash  string `json:"quote_hash"`
+	SourceKind string `json:"source_kind"`
+}
+
+type ToolParentEnvelope struct {
+	Code int              `json:"code"`
+	Msg  string           `json:"msg"`
+	Data ToolParentResult `json:"data"`
+}
+
+type ToolParentPath struct {
+	SessionId   string `path:"session_id"`
+	OperationId string `path:"operation_id"`
+}
+
+type ToolParentReq struct {
+	SessionId      string `path:"session_id"`
+	ModuleId       string `json:"module_id"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+type ToolParentResult struct {
+	OperationId            string     `json:"operation_id"`
+	ScopeRef               string     `json:"scope_ref"`
+	SnapshotRef            string     `json:"snapshot_ref"`
+	BudgetRef              string     `json:"budget_ref"`
+	ModuleId               string     `json:"module_id"`
+	DeadlineAtMs           int64      `json:"deadline_at_ms"`
+	AllowLowerIntelligence bool       `json:"allow_lower_intelligence"`
+	Budget                 ToolBudget `json:"budget"`
+}
+
+type ToolReadEnvelope struct {
+	Code int            `json:"code"`
+	Msg  string         `json:"msg"`
+	Data ToolReadResult `json:"data"`
+}
+
+type ToolReadReq struct {
+	SessionId      string `path:"session_id"`
+	OperationId    string `path:"operation_id"`
+	SearchId       string `json:"search_id"`
+	EvidenceId     string `json:"evidence_id"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+type ToolReadResult struct {
+	SearchId        string       `json:"search_id"`
+	SnapshotRef     string       `json:"snapshot_ref"`
+	Evidence        ToolEvidence `json:"evidence"`
+	CitationReceipt ToolReceipt  `json:"citation_receipt"`
+}
+
+type ToolReceipt struct {
+	SearchId   string `json:"search_id"`
+	PackHash   string `json:"pack_hash"`
+	DurableRef string `json:"durable_ref"`
+}
+
+type ToolSearchEnvelope struct {
+	Code int              `json:"code"`
+	Msg  string           `json:"msg"`
+	Data ToolSearchResult `json:"data"`
+}
+
+type ToolSearchPath struct {
+	SessionId   string `path:"session_id"`
+	OperationId string `path:"operation_id"`
+	SearchId    string `path:"search_id"`
+}
+
+type ToolSearchReq struct {
+	SessionId        string `path:"session_id"`
+	OperationId      string `path:"operation_id"`
+	Query            string `json:"query"`
+	Depth            string `json:"depth"`
+	Intelligence     string `json:"intelligence"`
+	ContinueSearchId string `json:"continue_search_id,optional,omitempty"`
+	ReadCalls        int    `json:"read_calls"`
+	QuoteRunes       int    `json:"quote_runes"`
+	IdempotencyKey   string `json:"idempotency_key"`
+}
+
+type ToolSearchResult struct {
+	SearchId              string         `json:"search_id"`
+	Status                string         `json:"status"`
+	StopReason            string         `json:"stop_reason"`
+	SnapshotRef           string         `json:"snapshot_ref"`
+	RequestedIntelligence string         `json:"requested_intelligence"`
+	EffectiveIntelligence string         `json:"effective_intelligence"`
+	Evidence              []ToolEvidence `json:"evidence"`
+	Gaps                  []string       `json:"gaps"`
+	Conflicts             []string       `json:"conflicts"`
+	PackHash              string         `json:"pack_hash,optional,omitempty"`
+	CitationReceipt       *ToolReceipt   `json:"citation_receipt,optional,omitempty"`
+	Usage                 ToolUsage      `json:"usage"`
+}
+
+type ToolUsage struct {
+	ReadCalls  int `json:"read_calls"`
+	QuoteRunes int `json:"quote_runes"`
+}
+
 type WithdrawReq struct {
 	ModuleId       string `path:"module_id"`
 	TargetKind     string `json:"target_kind"`

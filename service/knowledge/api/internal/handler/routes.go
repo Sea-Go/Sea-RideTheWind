@@ -193,6 +193,31 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/answer-sessions/:session_id/searches/:search_id",
 				Handler: product.GetProductSearchHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/answer-sessions/:session_id/tool-runs",
+				Handler: product.CreateToolParentHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/answer-sessions/:session_id/tool-runs/:operation_id",
+				Handler: product.GetToolParentHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/answer-sessions/:session_id/tool-runs/:operation_id/evidence-reads",
+				Handler: product.ReadToolEvidenceHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/answer-sessions/:session_id/tool-runs/:operation_id/searches",
+				Handler: product.CreateToolSearchHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/answer-sessions/:session_id/tool-runs/:operation_id/searches/:search_id",
+				Handler: product.GetToolSearchHandler(serverCtx),
+			},
 		},
 		rest.WithJwt(serverCtx.Config.UserAuth.AccessSecret),
 		rest.WithPrefix("/v1/knowledge"),
