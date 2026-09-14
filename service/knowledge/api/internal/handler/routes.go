@@ -178,6 +178,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/answer-sessions/:session_id/accepted-answers/:answer_id",
 				Handler: product.GetProductAcceptedAnswerHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/answer-sessions/:session_id/accepted-answers/:answer_id/citations",
+				Handler: product.GetProductAnswerCitationStatesHandler(serverCtx),
+			},
 		},
 		rest.WithJwt(serverCtx.Config.UserAuth.AccessSecret),
 		rest.WithPrefix("/v1/knowledge"),

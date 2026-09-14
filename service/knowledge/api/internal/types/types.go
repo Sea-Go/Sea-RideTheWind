@@ -402,6 +402,22 @@ type ProductAcceptedAnswersReq struct {
 	Limit        int    `form:"limit,optional,default=50"`
 }
 
+type ProductAnswerCitationStates struct {
+	AnswerId            string                    `json:"answer_id"`
+	SearchId            string                    `json:"search_id"`
+	Status              string                    `json:"status"`
+	ModuleId            string                    `json:"module_id"`
+	ReleaseId           string                    `json:"release_id"`
+	PublicationRevision string                    `json:"publication_revision"`
+	Citations           []SearchCitationReference `json:"citations"`
+}
+
+type ProductAnswerCitationStatesEnvelope struct {
+	Code int                         `json:"code"`
+	Msg  string                      `json:"msg"`
+	Data ProductAnswerCitationStates `json:"data"`
+}
+
 type PublishedRevisionPath struct {
 	ModuleId   string `path:"module_id"`
 	ReleaseId  string `path:"release_id"`

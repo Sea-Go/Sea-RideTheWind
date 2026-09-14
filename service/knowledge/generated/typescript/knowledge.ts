@@ -245,6 +245,14 @@ export function getProductAcceptedAnswer(params: components.ProductAcceptedAnswe
 
 /**
  * @description
+ * @param params
+ */
+export function getProductAnswerCitationStates(params: components.ProductAcceptedAnswerReqParams, session_id: string, answer_id: string) {
+	return webapi.get<components.ProductAnswerCitationStatesEnvelope>(`/v1/knowledge/answer-sessions/${session_id}/accepted-answers/${answer_id}/citations`, params)
+}
+
+/**
+ * @description
  * @param req
  */
 export function commitAcceptedAnswer(req: components.CommitAcceptedAnswerReq) {

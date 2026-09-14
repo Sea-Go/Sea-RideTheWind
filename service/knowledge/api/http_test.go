@@ -518,10 +518,12 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	productPath := "/v1/knowledge/answer-sessions/" + commitAnswer.SessionId + "/accepted-answers"
+	citationStatePath := productPath + "/" + answerID + "/citations"
 	beforeUnauthorized := userRPC.calls.Load()
 	request("GET", productPath, "", nil, nil, 401)
 	request("GET", productPath, c.WorkerToken, nil, nil, 401)
 	request("GET", productPath, token, nil, nil, 401) // Administrator JWT has a different issuer secret.
+	request("GET", citationStatePath, "", nil, nil, 401)
 	if userRPC.calls.Load() != beforeUnauthorized {
 		t.Fatal("unauthorized product request reached User RPC")
 	}
@@ -535,7 +537,15 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if ownAnswer != accepted {
 		t.Fatalf("product AnswerID lookup differs: %+v", ownAnswer)
 	}
+	var citedStates types.ProductAnswerCitationStates
+	request("GET", citationStatePath, productToken, nil, &citedStates, 200)
+	if citedStates.AnswerId != answerID || citedStates.SearchId != searchID ||
+		len(citedStates.Citations) != 1 || citedStates.Citations[0].State != "available" ||
+		citedStates.Citations[0].EvidenceId != citations.Evidence[0].EvidenceId {
+		t.Fatalf("product citation state differs from accepted answer: %+v", citedStates)
+	}
 	request("GET", productPath+"/"+answerID, otherToken, nil, nil, 404)
+	request("GET", citationStatePath, otherToken, nil, nil, 404)
 	request("GET", productPath+"/"+answerID, mismatchToken, nil, nil, 403)
 	var otherHistory types.AcceptedAnswersPage
 	request("GET", productPath, otherToken, nil, &otherHistory, 200)
@@ -564,9 +574,8 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	userRPC.deleted.Store(true)
 	request("GET", productPath, productToken, nil, nil, 403)
 	request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
+	request("GET", citationStatePath, productToken, nil, nil, 403)
 	userRPC.deleted.Store(false)
-	userServer.Stop()
-	request("GET", productPath, productToken, nil, nil, 503)
 	answerQuery.Set("subject_id", "other-uid")
 	request("GET", "/internal/v1/knowledge/accepted-answers/"+answerID+"?"+answerQuery.Encode(), c.WorkerToken, nil, nil, 404)
 	answerQuery.Set("subject_id", acceptedSubject.SubjectId)
@@ -591,6 +600,13 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if len(citations.Evidence) != 1 || citations.Evidence[0].State != "unavailable" {
 		t.Fatalf("withdrawal did not invalidate historical citation: %+v", citations)
 	}
+	request("GET", citationStatePath, productToken, nil, &citedStates, 200)
+	if len(citedStates.Citations) != 1 || citedStates.Citations[0].State != "unavailable" {
+		t.Fatalf("product citation state ignored withdrawal: %+v", citedStates)
+	}
+	userServer.Stop()
+	request("GET", productPath, productToken, nil, nil, 503)
+	request("GET", citationStatePath, productToken, nil, nil, 503)
 	metrics, err := client.Get(base + "/metrics")
 	if err != nil {
 		t.Fatal(err)

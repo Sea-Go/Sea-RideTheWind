@@ -344,6 +344,20 @@ type (
 		SessionId string `path:"session_id"`
 		AnswerId  string `path:"answer_id"`
 	}
+	ProductAnswerCitationStates {
+		AnswerId            string                    `json:"answer_id"`
+		SearchId            string                    `json:"search_id"`
+		Status              string                    `json:"status"`
+		ModuleId            string                    `json:"module_id"`
+		ReleaseId           string                    `json:"release_id"`
+		PublicationRevision string                    `json:"publication_revision"`
+		Citations           []SearchCitationReference `json:"citations"`
+	}
+	ProductAnswerCitationStatesEnvelope {
+		Code int                         `json:"code"`
+		Msg  string                      `json:"msg"`
+		Data ProductAnswerCitationStates `json:"data"`
+	}
 )
 
 type (
@@ -625,6 +639,9 @@ service knowledge-api {
 
 	@handler GetProductAcceptedAnswer
 	get /answer-sessions/:session_id/accepted-answers/:answer_id (ProductAcceptedAnswerReq) returns (AcceptedAnswerEnvelope)
+
+	@handler GetProductAnswerCitationStates
+	get /answer-sessions/:session_id/accepted-answers/:answer_id/citations (ProductAcceptedAnswerReq) returns (ProductAnswerCitationStatesEnvelope)
 }
 
 @server (

@@ -421,6 +421,22 @@ export interface ProductAcceptedAnswersReqParams {
 	limit?: number
 }
 
+export interface ProductAnswerCitationStates {
+	answer_id: string
+	search_id: string
+	status: string
+	module_id: string
+	release_id: string
+	publication_revision: string
+	citations: Array<SearchCitationReference>
+}
+
+export interface ProductAnswerCitationStatesEnvelope {
+	code: number
+	msg: string
+	data: ProductAnswerCitationStates
+}
+
 export interface PublishedRevisionPath {
 }
 export interface PublishedRevisionPathParams {
