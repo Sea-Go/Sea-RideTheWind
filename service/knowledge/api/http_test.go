@@ -73,6 +73,10 @@ func TestHTTPProcessHelper(t *testing.T) {
 	}
 }
 func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
+	runRealHTTPKnowledgeWorkflow(t, false)
+}
+
+func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	contract := loadGeneratedHTTPContract(t)
 	s := testenv.Store(t)
 	dir := t.TempDir()
@@ -81,15 +85,31 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.Objects = objects
-	userListener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
+	const userSecret = "synthetic-test-user-secret-not-a-real-key"
+	var userRPC *productUserRPC
+	var userServer *grpc.Server
+	var realUsers *realUserServices
+	var userEndpoint string
+	productUID := int64(9123)
+	otherUID := int64(7777)
+	var productToken, otherToken string
+	if realUser {
+		realUsers = startRealUserServices(t, s, userSecret)
+		productUID, productToken = realUsers.registerAndLogin(t, "knowledge-history-owner")
+		otherUID, otherToken = realUsers.registerAndLogin(t, "knowledge-history-other")
+		userEndpoint = realUsers.conn.Target()
+	} else {
+		userListener, listenErr := net.Listen("tcp", "127.0.0.1:0")
+		if listenErr != nil {
+			t.Fatal(listenErr)
+		}
+		userRPC = &productUserRPC{}
+		userServer = grpc.NewServer()
+		pb.RegisterUserServiceServer(userServer, userRPC)
+		go func() { _ = userServer.Serve(userListener) }()
+		t.Cleanup(func() { userServer.Stop(); _ = userListener.Close() })
+		userEndpoint = userListener.Addr().String()
 	}
-	userRPC := &productUserRPC{}
-	userServer := grpc.NewServer()
-	pb.RegisterUserServiceServer(userServer, userRPC)
-	go func() { _ = userServer.Serve(userListener) }()
-	t.Cleanup(func() { userServer.Stop(); _ = userListener.Close() })
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -113,8 +133,8 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	}
 	c.Auth.AccessSecret = "synthetic-test-jwt-secret-not-a-real-key"
 	c.Auth.AccessExpire = 3600
-	c.UserAuth.AccessSecret = "synthetic-test-user-secret-not-a-real-key"
-	c.UserRpc.Endpoints = []string{userListener.Addr().String()}
+	c.UserAuth.AccessSecret = userSecret
+	c.UserRpc.Endpoints = []string{userEndpoint}
 	c.AdministratorIDs = []string{"test-admin"}
 	c.WorkerToken = "synthetic-worker-token"
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
@@ -465,7 +485,7 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		citations.Evidence[0].QuoteHash != quoteHash || citations.Evidence[0].State != "available" {
 		t.Fatalf("HTTP committed mapping differs: %+v", citations)
 	}
-	acceptedSubject := types.AcceptedSubjectRef{AuthorityId: "rtw.identity", TenantId: "platform", SubjectId: "9123"}
+	acceptedSubject := types.AcceptedSubjectRef{AuthorityId: "rtw.identity", TenantId: "platform", SubjectId: fmt.Sprintf("%d", productUID)}
 	answerID := "http-answer-1"
 	acceptedTurn := map[string]any{
 		"Request": map[string]any{"SearchID": searchID, "AnswerID": answerID,
@@ -505,30 +525,36 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if len(history.Items) != 1 || history.Items[0] != accepted {
 		t.Fatalf("HTTP product history missing accepted answer: %+v", history)
 	}
-	productToken, err := rtwjwt.GetToken(c.UserAuth.AccessSecret, time.Now().Unix(), 3600, 9123)
-	if err != nil {
-		t.Fatal(err)
-	}
-	otherToken, err := rtwjwt.GetToken(c.UserAuth.AccessSecret, time.Now().Unix(), 3600, 7777)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mismatchToken, err := rtwjwt.GetToken(c.UserAuth.AccessSecret, time.Now().Unix(), 3600, 8888)
-	if err != nil {
-		t.Fatal(err)
+	var mismatchToken string
+	if !realUser {
+		productToken, err = rtwjwt.GetToken(c.UserAuth.AccessSecret, time.Now().Unix(), 3600, productUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		otherToken, err = rtwjwt.GetToken(c.UserAuth.AccessSecret, time.Now().Unix(), 3600, otherUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mismatchToken, err = rtwjwt.GetToken(c.UserAuth.AccessSecret, time.Now().Unix(), 3600, 8888)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	productPath := "/v1/knowledge/answer-sessions/" + commitAnswer.SessionId + "/accepted-answers"
 	citationStatePath := productPath + "/" + answerID + "/citations"
-	beforeUnauthorized := userRPC.calls.Load()
+	var beforeUnauthorized int64
+	if userRPC != nil {
+		beforeUnauthorized = userRPC.calls.Load()
+	}
 	request("GET", productPath, "", nil, nil, 401)
 	request("GET", productPath, c.WorkerToken, nil, nil, 401)
 	request("GET", productPath, token, nil, nil, 401) // Administrator JWT has a different issuer secret.
 	request("GET", citationStatePath, "", nil, nil, 401)
-	if userRPC.calls.Load() != beforeUnauthorized {
+	if userRPC != nil && userRPC.calls.Load() != beforeUnauthorized {
 		t.Fatal("unauthorized product request reached User RPC")
 	}
 	var ownHistory types.AcceptedAnswersPage
-	request("GET", productPath+"?authority_id=forged&tenant_id=forged&subject_id=7777", productToken, nil, &ownHistory, 200)
+	request("GET", productPath+"?authority_id=forged&tenant_id=forged&subject_id="+fmt.Sprintf("%d", otherUID), productToken, nil, &ownHistory, 200)
 	if len(ownHistory.Items) != 1 || ownHistory.Items[0] != accepted {
 		t.Fatalf("client subject fields changed own history: %+v", ownHistory)
 	}
@@ -546,7 +572,9 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	}
 	request("GET", productPath+"/"+answerID, otherToken, nil, nil, 404)
 	request("GET", citationStatePath, otherToken, nil, nil, 404)
-	request("GET", productPath+"/"+answerID, mismatchToken, nil, nil, 403)
+	if !realUser {
+		request("GET", productPath+"/"+answerID, mismatchToken, nil, nil, 403)
+	}
 	var otherHistory types.AcceptedAnswersPage
 	request("GET", productPath, otherToken, nil, &otherHistory, 200)
 	if len(otherHistory.Items) != 0 {
@@ -571,11 +599,13 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if len(ownHistory.Items) != 1 || ownHistory.Items[0] != secondAccepted || ownHistory.NextOrdinal != 0 {
 		t.Fatalf("second product page differs: %+v", ownHistory)
 	}
-	userRPC.deleted.Store(true)
-	request("GET", productPath, productToken, nil, nil, 403)
-	request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
-	request("GET", citationStatePath, productToken, nil, nil, 403)
-	userRPC.deleted.Store(false)
+	if !realUser {
+		userRPC.deleted.Store(true)
+		request("GET", productPath, productToken, nil, nil, 403)
+		request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
+		request("GET", citationStatePath, productToken, nil, nil, 403)
+		userRPC.deleted.Store(false)
+	}
 	answerQuery.Set("subject_id", "other-uid")
 	request("GET", "/internal/v1/knowledge/accepted-answers/"+answerID+"?"+answerQuery.Encode(), c.WorkerToken, nil, nil, 404)
 	answerQuery.Set("subject_id", acceptedSubject.SubjectId)
@@ -604,7 +634,20 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 	if len(citedStates.Citations) != 1 || citedStates.Citations[0].State != "unavailable" {
 		t.Fatalf("product citation state ignored withdrawal: %+v", citedStates)
 	}
-	userServer.Stop()
+	if realUser {
+		// A disabled account is still returned by today's GetUser handler. This
+		// observed counterexample keeps the H02 disable gate open.
+		realUsers.markDisabled(t, productUID)
+		request("GET", productPath, productToken, nil, &ownHistory, 200)
+		t.Log("H02 gap: real User RPC GetUser returns status=1 users; product history remains readable")
+		realUsers.delete(t, productUID)
+		request("GET", productPath, productToken, nil, nil, 403)
+		request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
+		request("GET", citationStatePath, productToken, nil, nil, 403)
+		realUsers.stopRPC(t)
+	} else {
+		userServer.Stop()
+	}
 	request("GET", productPath, productToken, nil, nil, 503)
 	request("GET", citationStatePath, productToken, nil, nil, 503)
 	metrics, err := client.Get(base + "/metrics")
