@@ -1,6 +1,6 @@
 # 已接受学习问答历史：RTW 权威存储验收
 
-状态：**RTW 权威 Commit / Get / List 与已登录用户产品读面局部实现；WS02-D / H02 / H07 整体仍为 PARTIAL**。本记录只描述隔离开发分支和本地 PostgreSQL 16 的结果，不代表公开学习流、真实用户库或生产部署。
+状态：**RTW 权威 Commit / Get / List 与已登录用户产品读面局部实现；WS02-D / H02 / H07 整体仍为 PARTIAL**。本记录只描述隔离开发分支和本地 PostgreSQL 16 的结果，末段已加入独立真实 User Center 进程与用户数据库联验；不代表公开学习流、共享用户库或生产部署。
 
 ## 归属与提交点
 
@@ -40,4 +40,14 @@
 
 产品新增 `GET /v1/knowledge/answer-sessions/:session_id/accepted-answers/:answer_id/citations`。它复用同一 UserAuth JWT→User RPC同UID→完整SubjectRef，先确认本用户/会话的AnswerID，再从不可变`knowledge_answer_citations`按citation_order取**该答案实际引用的证据ID**，以已提交search_id回查RTW引用表的固定release状态并只返回对应元数据。响应含`available/unavailable`、固定module/release/发布指针版本和quote_hash/定位，**不返回旧quote正文**；`insufficient`答案返回空引用。这个状态是查询时刻的判断，历史`turn_json`仍作为不可变产品记录保存，客户端不可把它当作当前来源。
 
-同一隔离PG16和真实go-zero HTTP测试通过：已登录UID可读当前可用引用，另一UID的同AnswerID为404，未认证401，已删除用户403、RPC停服503；撤回来源后同接口把已引用条目标为`unavailable`。模型测试另证明空证据不伪造引用、跨主体拒读，JSON投影不含quote文本；全知识服务race/vet和goctl 1.9.2二次生成hash一致。它仍没有真实用户数据库、网页/桌宠消费者、刷新通知或生产部署；H02/H07整体继续PARTIAL。
+同一隔离PG16和真实go-zero HTTP测试通过：已登录UID可读当前可用引用，另一UID的同AnswerID为404，未认证401，已删除用户403、RPC停服503；撤回来源后同接口把已引用条目标为`unavailable`。模型测试另证明空证据不伪造引用、跨主体拒读，JSON投影不含quote文本；全知识服务race/vet和goctl 1.9.2二次生成hash一致。该固定提交当时还没有真实用户数据库、网页/桌宠消费者、刷新通知或生产部署；H02/H07整体继续PARTIAL。
+
+## 已登录历史与引用状态：真实 User RPC / User Center 增量验收
+
+2026-09-14 在本独立 RTW 开发分支，把上述固定 `GetUser` 桩旁的同一完整 HTTP 工作流再运行一次，改由**真实 `service/user/user/rpc` 进程、真实 `service/user/user/api` 进程和独立用户数据库**提供身份。运行 `KNOWLEDGE_REAL_USER_GATE=1 bash service/knowledge/scripts/acceptance.sh`：脚本自建并停止隔离 PostgreSQL 16 集群，在其中另建 `rtw_user_*` 数据库；以 race 插桩构建两个真实服务二进制到同一临时目录。User RPC 使用自己的 GORM `AutoMigrate(users)`；User Center 调用真实 RPC `Register` 写入两个用户，再调用真实 RPC `Login` 校验凭据并由自己的 API 逻辑签发两个 User Center JWT。知识 go-zero HTTP 进程持同一测试发行密钥，直连该 User RPC 的 `GetUser`，由服务端生成 `rtw.identity/platform/<实际注册 UID>`。测试没有直接在用户表里伪造注册或在测试侧自行签用户令牌。
+
+这次真实进程/PG 联验覆盖：本 UID 的 accepted-answer 列表、AnswerID 和该答案引用状态；参数中伪造另一个**实际注册** UID 仍只读到自己；另一用户 JWT 对同会话得空列表、对 AnswerID/引用为 404；第一页和续页 ordinal 顺序；来源撤回后引用状态变 `unavailable`；真实 `DeleteUser` 删除后持旧 JWT 的三个产品读接口均为 403；真实 User RPC 停止后为 503。管理员和 worker token 仍不能访问产品读面，JWT 缺失在 RPC 前为 401。`TestRealHTTPKnowledgeWorkflowWithUserCenter` 与原桩版测试、全部 `service/knowledge/...` race、`go vet` 和 diff-check 均通过。Redis/Etcd 未启动：服务使用直连 RPC，测试 Redis 为非阻塞占位，注册和登录公开路由没有使用 Redis；因此这次**没有验证**登出黑名单或生产服务发现。
+
+发现一个 H02 明确反例：把用户库 `users.status` 更新为 `1` 后，真实 User Center 再登录返回封禁码 `1011`，但真实 User RPC `GetUser` 仍返回 `Found=true`，知识产品历史 GET 仍返回 200。`GetUser` 当前不检查该状态；因本切片的 `[W1]` 仅限知识 API 测试、验收脚本及本文，没有修改 User RPC 生产逻辑。**停用后的历史/引用禁止读取未通过，WS02-D/H02 整体保持 PARTIAL**；后续应由用户身份权威层决定并返回可供消费者拒绝的状态，再重跑这条真实服务反例。
+
+本次区域：`[W0:ROOT]` 独立 RTW 工作树；`[W1:WRITE]` `service/knowledge/api/http_test.go`、`http_real_user_test.go`、`service/knowledge/scripts/acceptance.sh`、本文；`[R1:READ_ONLY]` User RPC、User Center 生产实现、BTW/Docs；`[D1:DEPENDENCY]` go-zero 1.10.2、pgx 5.10.0；`[G1:GENERATED]` 无修改；`[X1:EXTERNAL]` 只写脚本自建自停的本地 PG16 与子进程；`[N1:OUT_OF_SCOPE]` 用户原工作树、生产用户库、生产身份逻辑；`[T1:TEMP]` 脚本 mktemp 目录和测试专属对象目录。主职责 `[C8:VERIFY]`，跨 `[C1:TRANSPORT]` JWT/HTTP/gRPC 与 `[C4:PERSISTENCE]` 真实 User/Knowledge 隔离数据库。现有前述“真实用户数据库未验”文字是较早固定提交的结果；本段更新了本地证据层级，不表示正式搜索入口、客户端或线上部署完成。
