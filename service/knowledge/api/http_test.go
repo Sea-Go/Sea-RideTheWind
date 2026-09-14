@@ -85,6 +85,10 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 }
 
 func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
+	publishNewRelease := os.Getenv("SEA_BGE_WORKER_PUBLISH_SEARCH") == "1"
+	if publishNewRelease && realUser {
+		t.Fatal("signed publication search fixture currently requires the local active user RPC")
+	}
 	contract := loadGeneratedHTTPContract(t)
 	s := testenv.Store(t)
 	dir := t.TempDir()
@@ -1286,21 +1290,29 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
 		request("GET", citationStatePath, productToken, nil, nil, 403)
 		realUsers.stopRPC(t)
-	} else {
+	} else if !publishNewRelease {
 		userServer.Stop()
 	}
-	request("GET", productPath, productToken, nil, nil, 503)
-	request("GET", parentPath, productToken, nil, nil, 503)
-	request("POST", searchPath, productToken, searchBody, nil, 503)
-	request("GET", searchPath+"/"+productSearchID, productToken, nil, nil, 503)
-	request("GET", citationStatePath, productToken, nil, nil, 503)
+	if !publishNewRelease {
+		request("GET", productPath, productToken, nil, nil, 503)
+		request("GET", parentPath, productToken, nil, nil, 503)
+		request("POST", searchPath, productToken, searchBody, nil, 503)
+		request("GET", searchPath+"/"+productSearchID, productToken, nil, nil, 503)
+		request("GET", citationStatePath, productToken, nil, nil, 503)
+	}
 	if btwRoot := os.Getenv("SEA_BTW_INDEX_CONSUMER_ROOT"); btwRoot != "" {
 		// The ordinary fixture uses an unpublished module. Cancellation keeps
 		// the already published module's active pointer while new candidates build.
 		cancelNewRelease := os.Getenv("SEA_BGE_WORKER_CANCEL_RELEASE") == "1"
+		if publishNewRelease && !cancelNewRelease {
+			t.Fatal("publication search requires the cancelled candidate and new Build generation")
+		}
 		var indexModule types.Module
 		var publishedBefore types.ReleaseState
 		var publicationCountBefore int
+		var h06Baseline h06PublishedBaseline
+		var newReleaseForPublish types.Release
+		bgeRuntimeFile := os.Getenv("SEA_BGE_RUNTIME_FILE")
 		if cancelNewRelease {
 			// The main workflow later withdraws its original source. A separate
 			// task-owned module keeps a valid published baseline for CAS checks.
@@ -1312,18 +1324,33 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 					MediaType: "text/markdown", Provenance: "synthetic", IdempotencyKey: "http-cancel-baseline-source"},
 				&baselineSource, 200)
 			var baselineRelease types.Release
+			baselineProfiles := testenv.Profiles()
+			if publishNewRelease {
+				if bgeRuntimeFile == "" {
+					t.Fatal("formal publication search requires actual locked BGE runtime")
+				}
+				baselineProfiles = liveBGEIndexProfiles(t, bgeRuntimeFile)
+			}
 			request("POST", "/v1/knowledge/modules/"+indexModule.Id+"/releases", token,
 				types.CreateReleaseReq{SourceRevisionIds: []string{baselineSource.RevisionId},
 					WikiRevisionIds: []string{}, ChunkingProfile: "index-paragraph-v1",
-					RetrievalProfiles: testenv.Profiles(), IdempotencyKey: "http-cancel-baseline-release"},
+					RetrievalProfiles: baselineProfiles, IdempotencyKey: "http-cancel-baseline-release"},
 				&baselineRelease, 200)
 			var baselineBuild types.Build
 			request("POST", "/v1/knowledge/releases/"+baselineRelease.ReleaseId+"/index-builds", token,
 				types.CreateBuildReq{IdempotencyKey: "http-cancel-baseline-build"}, &baselineBuild, 200)
-			baselineBuild = testenv.Ready(t, s, baselineBuild, baselineRelease)
-			request("PUT", "/v1/knowledge/modules/"+indexModule.Id+"/activation", token,
-				types.ActivateReq{ReleaseId: baselineRelease.ReleaseId, BuildId: baselineBuild.BuildId,
-					ExpectedPointerRevision: 0, Reason: "isolated cancellation fixture baseline"}, &publishedBefore, 200)
+			if publishNewRelease {
+				h06Baseline = buildH06PublishedBaseline(t, s, request, dir, btwRoot, base,
+					c.WorkerToken, token, bgeRuntimeFile, indexModule.Id,
+					baselineSource, baselineRelease, baselineBuild)
+				request("GET", "/v1/knowledge/modules/"+indexModule.Id+"/releases/current", token,
+					nil, &publishedBefore, 200)
+			} else {
+				baselineBuild = testenv.Ready(t, s, baselineBuild, baselineRelease)
+				request("PUT", "/v1/knowledge/modules/"+indexModule.Id+"/activation", token,
+					types.ActivateReq{ReleaseId: baselineRelease.ReleaseId, BuildId: baselineBuild.BuildId,
+						ExpectedPointerRevision: 0, Reason: "isolated cancellation fixture baseline"}, &publishedBefore, 200)
+			}
 			if publishedBefore.ActiveReleaseId == "" || publishedBefore.ActiveBuildId == "" || publishedBefore.PointerRevision < 1 {
 				t.Fatalf("cancel/new-release fixture requires an already published module: %+v", publishedBefore)
 			}
@@ -1345,7 +1372,6 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			{Lane: "multivector", Encoder: "fixture_model", Tokenizer: "tokens_v1", Space: "multi_space",
 				Dimensions: 2, Mask: "valid", Aggregation: "sum_maxsim"},
 		}
-		bgeRuntimeFile := os.Getenv("SEA_BGE_RUNTIME_FILE")
 		if bgeRuntimeFile != "" {
 			profiles = liveBGEIndexProfiles(t, bgeRuntimeFile)
 		}
@@ -1472,6 +1498,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			if newRelease.Ordinal != handoff.NewReleaseOrdinal || newRelease.ManifestHash == indexRelease.ManifestHash {
 				t.Fatalf("new Release was not frozen independently: %+v", newRelease)
 			}
+			newReleaseForPublish = newRelease
 		}
 		var acceptedBuild types.Build
 		request("GET", "/internal/v1/knowledge/builds/"+expectedBuildID, c.WorkerToken, nil, &acceptedBuild, 200)
@@ -1533,6 +1560,35 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		} else {
 			request("GET", "/internal/v1/knowledge/modules/"+indexModule.Id+"/search-snapshot", c.WorkerToken, nil, nil, 404)
 		}
+		if publishNewRelease {
+			var builtNew realIndexResult
+			var identity struct {
+				NewSourceRevisionID string `json:"new_source_revision_id"`
+			}
+			if err := json.Unmarshal(resultRaw, &builtNew); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(resultRaw, &identity); err != nil || identity.NewSourceRevisionID == "" {
+				t.Fatalf("replacement source identity absent: %+v err=%v", identity, err)
+			}
+			var newSource types.Revision
+			request("GET", "/internal/v1/knowledge/revisions/"+identity.NewSourceRevisionID,
+				c.WorkerToken, nil, &newSource, 200)
+			if newSource.Content != "west\n\nsouth" || newSource.ModuleId != indexModule.Id {
+				t.Fatalf("new published candidate source changed: %+v", newSource)
+			}
+			runH06PublishedSearchCycle(t, s, request, searchFixture, dir, btwRoot, base,
+				c.WorkerToken, token, productToken, otherToken, searchPath,
+				"/v1/knowledge/answer-sessions/search-facade-session/accepted-answers",
+				bgeRuntimeFile, indexModule.Id, h06Baseline, newReleaseForPublish,
+				acceptedBuild, newSource, builtNew)
+		}
+	}
+	if publishNewRelease {
+		userServer.Stop()
+		request("GET", productPath, productToken, nil, nil, 503)
+		request("GET", parentPath, productToken, nil, nil, 503)
+		request("GET", citationStatePath, productToken, nil, nil, 503)
 	}
 	metrics, err := client.Get(base + "/metrics")
 	if err != nil {
@@ -1578,6 +1634,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	}
 	if os.Getenv("SEA_BTW_TOOLS_CONSUMER_ROOT") != "" {
 		expectedCitationCommits++ // The signed Tools child accepts one real RTW citation.
+	}
+	if publishNewRelease {
+		expectedCitationCommits += 3 // old, new and rolled-back versions each accept one real citation.
 	}
 	if !strings.Contains(string(metricBody), fmt.Sprintf(`sea_knowledge_commits_total{operation="knowledge.search.citations.accept"} %d`, expectedCitationCommits)) {
 		t.Fatal("citation replay was counted as another durable commit")
