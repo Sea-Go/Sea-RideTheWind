@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -279,6 +281,218 @@ func TestFavoriteDeliveryRealDataCenterTechnicalReceipt(t *testing.T) {
 		batch.FromOffset != 1 || batch.ToOffset != 2 || len(batch.Events) != 2 {
 		t.Fatalf("DC batch after source replay: status=%d batch=%+v", response.StatusCode, batch)
 	}
+}
+
+func TestFavoriteDeliveryRealDataCenterSnowflakeIDs(t *testing.T) {
+	baseURL, token := os.Getenv("FAVORITE_DC_URL"), os.Getenv("FAVORITE_DC_TOKEN")
+	if baseURL == "" || token == "" {
+		t.Skip("set FAVORITE_DC_URL/TOKEN via acceptance-dc.sh for real cmd/platform")
+	}
+	store := favoriteFactStore(t)
+	ctx := context.Background()
+	const folderID, favoriteID int64 = 9007199254740993, 9007199254740995
+	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: folderID, UserId: 1001, Name: "snowflake"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InsertFavorite(ctx, &FavoriteItem{FavoriteId: favoriteID, FolderId: folderID,
+		UserId: 1001, TargetType: "article", TargetId: "article-snowflake"}); err != nil {
+		t.Fatal(err)
+	}
+	rows := favoriteOutboxRows(t, store)
+	var frozen favoriteEvent
+	if len(rows) != 1 || json.Unmarshal([]byte(rows[0].Payload), &frozen) != nil ||
+		frozen.Payload.FavoriteID != "9007199254740995" || frozen.Payload.FolderID != "9007199254740993" ||
+		frozen.AggregateID != frozen.Payload.FavoriteID || frozen.Payload.SourceRef != "rtw.favorite/9007199254740995" {
+		t.Fatalf("Snowflake ID lost exact decimal form: rows=%+v event=%+v", rows, frozen)
+	}
+	endpoint := baseURL + "/v1/events"
+	authorityURL, authorityToken := startFavoriteAuthorityProcess(t, store)
+	if status, _ := readFavoriteAuthority(t, authorityURL, authorityToken, "rtw.community.favorite", "favorite.9007199254740995.v1"); status != 404 {
+		t.Fatalf("undelivered source became authoritative: %d", status)
+	}
+	if err := runFavoriteDispatchProcess(t, store, endpoint, token); err != nil {
+		t.Fatalf("real DC rejected assert with Snowflake-range IDs: %v", err)
+	}
+	first := readFavoriteDCReceipt(t, &http.Client{Timeout: 3 * time.Second}, baseURL, token,
+		"favorite.9007199254740995.v1")
+	if first.Offset < 1 {
+		t.Fatalf("invalid assert receipt: %+v", first)
+	}
+	status, acceptedAssert := readFavoriteAuthority(t, authorityURL, authorityToken,
+		"rtw.community.favorite", "favorite.9007199254740995.v1")
+	if status != 200 || acceptedAssert.SubjectRef.SubjectID != "1001" ||
+		acceptedAssert.Event.EventID != first.EventID || acceptedAssert.SourceEventHash != first.InputHash ||
+		acceptedAssert.TechnicalReceipt.InputHash != first.InputHash ||
+		acceptedAssert.TechnicalReceipt.ReceiptID != first.ReceiptID ||
+		acceptedAssert.TechnicalReceipt.Offset != first.Offset ||
+		acceptedAssert.TechnicalReceipt.ReceivedAt != first.ReceivedAt {
+		t.Fatalf("source and DC assert receipt diverged: status=%d source=%+v DC=%+v", status, acceptedAssert, first)
+	}
+	if status, _ := readFavoriteAuthority(t, authorityURL, "wrong-token", "rtw.community.favorite", first.EventID); status != 401 {
+		t.Fatalf("untrusted caller read source: %d", status)
+	}
+	if status, _ := readFavoriteAuthority(t, authorityURL, authorityToken, "other.producer", first.EventID); status != 404 {
+		t.Fatalf("wrong producer read source: %d", status)
+	}
+	if status, _ := readFavoriteAuthority(t, authorityURL, authorityToken, "rtw.community.favorite", "favorite.unknown.v1"); status != 404 {
+		t.Fatalf("unknown event read source: %d", status)
+	}
+	if err := store.DeleteFavoriteByFavoriteId(ctx, favoriteID, 1001); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := readFavoriteAuthority(t, authorityURL, authorityToken, "rtw.community.favorite", "favorite.9007199254740995.v2"); status != 404 {
+		t.Fatalf("undelivered retract became authoritative: %d", status)
+	}
+	if err := runFavoriteDispatchProcess(t, store, endpoint, token); err != nil {
+		t.Fatalf("real DC rejected retract with Snowflake-range IDs: %v", err)
+	}
+	second := readFavoriteDCReceipt(t, &http.Client{Timeout: 3 * time.Second}, baseURL, token,
+		"favorite.9007199254740995.v2")
+	if second.Offset != first.Offset+1 || second.InputHash == first.InputHash {
+		t.Fatalf("retract receipt not a new fixed event: assert=%+v retract=%+v", first, second)
+	}
+	status, acceptedRetract := readFavoriteAuthority(t, authorityURL, authorityToken,
+		"rtw.community.favorite", "favorite.9007199254740995.v2")
+	if status != 200 || acceptedRetract.PredecessorEventID != first.EventID ||
+		acceptedRetract.SubjectRef != acceptedAssert.SubjectRef ||
+		acceptedRetract.SourceEventHash != second.InputHash ||
+		acceptedRetract.TechnicalReceipt.Offset != second.Offset ||
+		acceptedRetract.TechnicalReceipt.ReceivedAt != second.ReceivedAt {
+		t.Fatalf("source and DC retract receipt diverged: status=%d source=%+v DC=%+v", status, acceptedRetract, second)
+	}
+	if replayStatus, replay := readFavoriteAuthority(t, authorityURL, authorityToken,
+		"rtw.community.favorite", second.EventID); replayStatus != 200 || replay.SourceEventHash != acceptedRetract.SourceEventHash ||
+		replay.TechnicalReceipt.ReceiptID != acceptedRetract.TechnicalReceipt.ReceiptID {
+		t.Fatalf("authority read replay changed: status=%d replay=%+v", replayStatus, replay)
+	}
+	if err := runFavoriteDispatchProcess(t, store, endpoint, token); err != nil {
+		t.Fatalf("fixed replay failed: %v", err)
+	}
+	if err := store.conn.Model(&FavoriteFactOutbox{}).Where("event_id = ?", second.EventID).
+		Update("technical_input_hash", strings.Repeat("b", 64)).Error; err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := readFavoriteAuthority(t, authorityURL, authorityToken, "rtw.community.favorite", second.EventID); status != 404 {
+		t.Fatalf("tampered receipt hash read source: %d", status)
+	}
+	for _, tc := range []struct {
+		id     int64
+		change func(*favoriteEvent)
+	}{
+		{9007199254741011, func(event *favoriteEvent) { event.Payload.Subject.SubjectID = "1002" }},
+		{9007199254741012, func(event *favoriteEvent) { event.Payload.Subject.AuthorityID = "old.identity" }},
+	} {
+		item := FavoriteItem{FavoriteId: tc.id, FolderId: folderID, UserId: 1001,
+			TargetType: "article", TargetId: "article-invalid-source-" + fmt.Sprint(tc.id)}
+		if err := store.conn.Create(&item).Error; err != nil {
+			t.Fatal(err)
+		}
+		row, err := favoriteOutbox(item, 1, "assert", time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wire favoriteEvent
+		if err := json.Unmarshal([]byte(row.Payload), &wire); err != nil {
+			t.Fatal(err)
+		}
+		tc.change(&wire)
+		body, err := json.Marshal(wire)
+		if err != nil {
+			t.Fatal(err)
+		}
+		row.Payload = string(body)
+		// Deliberately inconsistent source fixture: a hash-shaped receipt
+		// alone must not authorize a different business owner or authority.
+		insertAcceptedAuthorityFixture(t, store, row, tc.id)
+		if status, _ := readFavoriteAuthority(t, authorityURL, authorityToken,
+			"rtw.community.favorite", row.EventID); status != 404 {
+			t.Fatalf("cross-user or old-source fixture became authoritative: event=%s status=%d", row.EventID, status)
+		}
+	}
+}
+
+func TestFavoriteAuthorityProcessDefaultClosed(t *testing.T) {
+	bin := os.Getenv("FAVORITE_AUTHORITY_BIN")
+	if bin == "" {
+		t.Skip("build fact-authority via acceptance-dc.sh")
+	}
+	command := exec.Command(bin)
+	command.Env = append(os.Environ(), "FAVORITE_DATABASE_URL=",
+		"FAVORITE_AUTHORITY_LISTEN=", "FAVORITE_AUTHORITY_TOKEN=")
+	if err := command.Run(); err == nil {
+		t.Fatal("unconfigured source authority process stayed available")
+	}
+}
+
+func startFavoriteAuthorityProcess(t *testing.T, store *FavoriteModel) (string, string) {
+	t.Helper()
+	bin := os.Getenv("FAVORITE_AUTHORITY_BIN")
+	if bin == "" {
+		t.Fatal("FAVORITE_AUTHORITY_BIN required for real source HTTP acceptance")
+	}
+	var schema string
+	if err := store.conn.Raw("SELECT current_schema()").Scan(&schema).Error; err != nil {
+		t.Fatal(err)
+	}
+	address, err := url.Parse(os.Getenv("FAVORITE_TEST_DSN"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := address.Query()
+	query.Set("search_path", schema)
+	address.RawQuery = query.Encode()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	listen := listener.Addr().String()
+	listener.Close()
+	const authorityToken = "test-only-rtw-favorite-source-token-123456"
+	command := exec.Command(bin)
+	command.Env = append(os.Environ(), "FAVORITE_DATABASE_URL="+address.String(),
+		"FAVORITE_AUTHORITY_LISTEN="+listen, "FAVORITE_AUTHORITY_TOKEN="+authorityToken)
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = command.Process.Kill()
+		_ = command.Wait()
+	})
+	baseURL := "http://" + listen
+	for i := 0; i < 100; i++ {
+		request, _ := http.NewRequest(http.MethodGet, baseURL+"/internal/v1/favorite/facts/rtw.community.favorite/readiness", nil)
+		response, err := (&http.Client{Timeout: time.Second}).Do(request)
+		if err == nil {
+			response.Body.Close()
+			if response.StatusCode == 401 {
+				return baseURL, authorityToken
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("favorite source HTTP did not become ready")
+	return "", ""
+}
+
+func readFavoriteAuthority(t *testing.T, baseURL, token, producer, eventID string) (int, FavoriteAuthorityFact) {
+	t.Helper()
+	request, err := http.NewRequest(http.MethodGet, baseURL+"/internal/v1/favorite/facts/"+producer+"/"+eventID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	response, err := (&http.Client{Timeout: 3 * time.Second}).Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var fact FavoriteAuthorityFact
+	if response.StatusCode == 200 {
+		if err := json.NewDecoder(response.Body).Decode(&fact); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return response.StatusCode, fact
 }
 
 func runFavoriteDispatchProcess(t *testing.T, store *FavoriteModel, endpoint, token string) error {
