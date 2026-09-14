@@ -9,6 +9,7 @@ message UserInfo {
   string username = 3;
   string email = 4;
   map<string, string> extra_info = 5; //这里对应我们在数据库的json字段
+  optional int64 status = 6; // 0=active; presence is required by JWT identity resolution.
 }
 
 message GetUserReq {
