@@ -39,6 +39,9 @@ type Config struct {
 		AllowPartial           bool   `json:",default=false"`
 		AllowLowerIntelligence bool   `json:",default=false"`
 	}
+	SearchJudgments struct {
+		Enabled bool `json:",default=false"`
+	}
 	AdministratorIDs []string
 	WorkerToken      string
 	Postgres         struct {

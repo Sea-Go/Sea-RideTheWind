@@ -1762,6 +1762,61 @@
         }
       }
     },
+    "/internal/v1/knowledge/search-judgments/events/{event_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetSearchJudgmentEvent",
+        "operationId": "workerGetSearchJudgmentEvent",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "event_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "event_id",
+                    "event_json",
+                    "event_sha256"
+                  ],
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_json": {
+                      "type": "string"
+                    },
+                    "event_sha256": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/knowledge/search-sources/read": {
       "post": {
         "consumes": [
@@ -5988,6 +6043,229 @@
                     },
                     "withdrawn": {
                       "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/search-judgments": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "RecordSearchJudgment",
+        "operationId": "knowledgeRecordSearchJudgment",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "search_id",
+                "content_revision_id",
+                "chunk_id",
+                "grade",
+                "rubric_version",
+                "reason",
+                "idempotency_key"
+              ],
+              "properties": {
+                "base_revision_id": {
+                  "type": "string"
+                },
+                "chunk_id": {
+                  "type": "string"
+                },
+                "content_revision_id": {
+                  "type": "string"
+                },
+                "grade": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "rubric_version": {
+                  "type": "string"
+                },
+                "search_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "judgment_id",
+                    "revision_id",
+                    "search_id",
+                    "chunk_id",
+                    "state",
+                    "event_id",
+                    "event_sha256"
+                  ],
+                  "properties": {
+                    "chunk_id": {
+                      "type": "string"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_sha256": {
+                      "type": "string"
+                    },
+                    "judgment_id": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/search-judgments/withdrawals": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "WithdrawSearchJudgment",
+        "operationId": "knowledgeWithdrawSearchJudgment",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "search_id",
+                "chunk_id",
+                "base_revision_id",
+                "reason",
+                "idempotency_key"
+              ],
+              "properties": {
+                "base_revision_id": {
+                  "type": "string"
+                },
+                "chunk_id": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "search_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "judgment_id",
+                    "revision_id",
+                    "search_id",
+                    "chunk_id",
+                    "state",
+                    "event_id",
+                    "event_sha256"
+                  ],
+                  "properties": {
+                    "chunk_id": {
+                      "type": "string"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_sha256": {
+                      "type": "string"
+                    },
+                    "judgment_id": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
                     }
                   }
                 },

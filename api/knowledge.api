@@ -554,6 +554,52 @@ type (
 		Reason         string `json:"reason"`
 		IdempotencyKey string `json:"idempotency_key"`
 	}
+	RecordSearchJudgmentReq {
+		ModuleId          string `path:"module_id"`
+		SearchId          string `json:"search_id"`
+		ContentRevisionId string `json:"content_revision_id"`
+		ChunkId           string `json:"chunk_id"`
+		Grade             string `json:"grade"`
+		RubricVersion     string `json:"rubric_version"`
+		Reason            string `json:"reason"`
+		BaseRevisionId    string `json:"base_revision_id,optional"`
+		IdempotencyKey    string `json:"idempotency_key"`
+	}
+	WithdrawSearchJudgmentReq {
+		ModuleId       string `path:"module_id"`
+		SearchId       string `json:"search_id"`
+		ChunkId        string `json:"chunk_id"`
+		BaseRevisionId string `json:"base_revision_id"`
+		Reason         string `json:"reason"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	SearchJudgmentReceipt {
+		JudgmentId  string `json:"judgment_id"`
+		RevisionId  string `json:"revision_id"`
+		SearchId    string `json:"search_id"`
+		ChunkId     string `json:"chunk_id"`
+		State       string `json:"state"`
+		EventId     string `json:"event_id"`
+		EventSha256 string `json:"event_sha256"`
+	}
+	SearchJudgmentReceiptEnvelope {
+		Code int                   `json:"code"`
+		Msg  string                `json:"msg"`
+		Data SearchJudgmentReceipt `json:"data"`
+	}
+	SearchJudgmentEventPath {
+		EventId string `path:"event_id"`
+	}
+	SearchJudgmentEventReceipt {
+		EventId     string `json:"event_id"`
+		EventJson   string `json:"event_json"`
+		EventSha256 string `json:"event_sha256"`
+	}
+	SearchJudgmentEventReceiptEnvelope {
+		Code int                        `json:"code"`
+		Msg  string                     `json:"msg"`
+		Data SearchJudgmentEventReceipt `json:"data"`
+	}
 )
 
 type (
@@ -760,6 +806,12 @@ service knowledge-api {
 
 	@handler Withdraw
 	post /modules/:module_id/withdrawals (WithdrawReq) returns (ReceiptEnvelope)
+
+	@handler RecordSearchJudgment
+	post /modules/:module_id/search-judgments (RecordSearchJudgmentReq) returns (SearchJudgmentReceiptEnvelope)
+
+	@handler WithdrawSearchJudgment
+	post /modules/:module_id/search-judgments/withdrawals (WithdrawSearchJudgmentReq) returns (SearchJudgmentReceiptEnvelope)
 }
 
 // Product history accepts only a logical session and pagination from the caller.
@@ -812,6 +864,9 @@ service knowledge-api {
 
 	@handler ReadSearchSource
 	post /search-sources/read (ReadSearchSourceReq) returns (CitationChunkEnvelope)
+
+	@handler GetSearchJudgmentEvent
+	get /search-judgments/events/:event_id (SearchJudgmentEventPath) returns (SearchJudgmentEventReceiptEnvelope)
 
 	@handler AcceptSearchCitations
 	post /search-citations (AcceptSearchCitationsReq) returns (SearchCitationReceiptEnvelope)

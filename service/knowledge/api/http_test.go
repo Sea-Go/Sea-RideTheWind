@@ -152,6 +152,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	toolFixture := newToolSearchFixture(t)
 	c.SearchTools.Endpoint = toolFixture.server.URL + "/v1/search/tools/search"
 	c.SearchTools.ScopeKey = toolFixtureScopeKey
+	c.SearchJudgments.Enabled = true
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
 	if err != nil {
 		t.Fatal(err)
@@ -235,6 +236,11 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		}
 	}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"userId": "test-admin", "exp": time.Now().Add(time.Hour).Unix()}).SignedString([]byte(c.Auth.AccessSecret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonAdminToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256,
+		jwt.MapClaims{"userId": "not-an-admin", "exp": time.Now().Add(time.Hour).Unix()}).SignedString([]byte(c.Auth.AccessSecret))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -864,6 +870,33 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	request("GET", searchPath+"/"+productSearchID, productToken, nil, &productStatus, 200)
 	if !reflect.DeepEqual(productStatus, productSearch) {
 		t.Fatalf("operation GET disagrees with recovered accepted answer: %+v %+v", productStatus, productSearch)
+	}
+	judgmentPath := "/v1/knowledge/modules/" + m.Id + "/search-judgments"
+	judgmentInput := types.RecordSearchJudgmentReq{SearchId: productSearchID,
+		ContentRevisionId: a.RevisionId, ChunkId: chunk.ChunkId, Grade: "2",
+		RubricVersion: "sea.search.relevance.v1", Reason: "synthetic HTTP test judge",
+		IdempotencyKey: "http-qrel-judgment-key"}
+	request("POST", judgmentPath, "", judgmentInput, nil, 401)
+	request("POST", judgmentPath, nonAdminToken, judgmentInput, nil, 403)
+	var judgment types.SearchJudgmentReceipt
+	request("POST", judgmentPath, token, judgmentInput, &judgment, 200)
+	if judgment.SearchId != productSearchID || judgment.ChunkId != chunk.ChunkId || judgment.EventSha256 == "" {
+		t.Fatalf("admin judgment did not capture fixed search and chunk: %+v", judgment)
+	}
+	var judgmentEvent types.SearchJudgmentEventReceipt
+	eventPath := "/internal/v1/knowledge/search-judgments/events/" + judgment.EventId
+	request("GET", eventPath, "", nil, nil, 401)
+	request("GET", eventPath, c.WorkerToken, nil, &judgmentEvent, 200)
+	if judgmentEvent.EventId != judgment.EventId || object.Hash([]byte(judgmentEvent.EventJson)) != judgment.EventSha256 {
+		t.Fatalf("worker event lookup changed emitted bytes: %+v", judgmentEvent)
+	}
+	withdrawJudgment := types.WithdrawSearchJudgmentReq{SearchId: productSearchID,
+		ChunkId: chunk.ChunkId, BaseRevisionId: judgment.RevisionId,
+		Reason: "synthetic HTTP test retraction", IdempotencyKey: "http-qrel-withdraw-key"}
+	var withdrawnJudgment types.SearchJudgmentReceipt
+	request("POST", judgmentPath+"/withdrawals", token, withdrawJudgment, &withdrawnJudgment, 200)
+	if withdrawnJudgment.State != "withdrawn" || withdrawnJudgment.JudgmentId != judgment.JudgmentId {
+		t.Fatalf("admin withdrawal did not append revision: %+v", withdrawnJudgment)
 	}
 	request("POST", searchPath, productToken, searchBody, &productStatus, 200)
 	if !reflect.DeepEqual(productStatus, productSearch) || searchFixture.calls.Load() != 2 {

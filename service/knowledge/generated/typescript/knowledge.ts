@@ -180,6 +180,24 @@ export function getModuleRevision(params: components.ModuleRevisionPathParams, m
  * @param params
  * @param req
  */
+export function recordSearchJudgment(params: components.RecordSearchJudgmentReqParams, req: components.RecordSearchJudgmentReq, module_id: string) {
+	return webapi.post<components.SearchJudgmentReceiptEnvelope>(`/v1/knowledge/modules/${module_id}/search-judgments`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ * @param req
+ */
+export function withdrawSearchJudgment(params: components.WithdrawSearchJudgmentReqParams, req: components.WithdrawSearchJudgmentReq, module_id: string) {
+	return webapi.post<components.SearchJudgmentReceiptEnvelope>(`/v1/knowledge/modules/${module_id}/search-judgments/withdrawals`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ * @param req
+ */
 export function createSource(params: components.CreateSourceReqParams, req: components.CreateSourceReq, module_id: string) {
 	return webapi.post<components.RevisionEnvelope>(`/v1/knowledge/modules/${module_id}/sources`, params, req)
 }
@@ -425,6 +443,14 @@ export function acceptSearchCitations(req: components.AcceptSearchCitationsReq) 
  */
 export function getSearchCitations(params: components.SearchCitationPathParams, search_id: string) {
 	return webapi.get<components.SearchCitationRecordEnvelope>(`/internal/v1/knowledge/search-citations/${search_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getSearchJudgmentEvent(params: components.SearchJudgmentEventPathParams, event_id: string) {
+	return webapi.get<components.SearchJudgmentEventReceiptEnvelope>(`/internal/v1/knowledge/search-judgments/events/${event_id}`, params)
 }
 
 /**
