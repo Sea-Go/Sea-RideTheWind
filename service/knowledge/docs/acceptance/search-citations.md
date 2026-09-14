@@ -17,7 +17,7 @@
 ## 本地证据与限制
 
 - 隔离 PostgreSQL 16 + 真实 HTTP go-zero 子进程验证：未携 Worker token 的读取拒绝；固定源片段返回、错 publication 拒绝、引用提交后 GET 可回查；重投不增加第二次提交；撤回后 GET 标不可用。
-- PG 模型反例验证：错 generation/publication/revision/chunk，伪造 quote/locator/index，search_id 异包冲突，两请求并发只有一个提交，原文对象读取期间撤回不能写入引用；收据返回时数据库已有精确 pack hash/bytes。历史撤回后同输入仍可回查收据。
+- PG 模型反例验证：错 generation/publication/revision/chunk，伪造 quote/locator/index，search_id 异包冲突，两请求并发只有一个提交，原文对象读取期间撤回不能写入引用；收据返回时数据库已有精确 pack hash/bytes。历史撤回后同输入仍可回查收据。独立 race 测试还核对 CRLF 原文字节位置、Unicode 规范化 rune 范围及偏移拒收。
 - 测试构建采用合成发布和结构性 H06 三路 probe 工件，**不证明**真实 Dense/Sparse/Multi-vector 同代构建或实际排序；本切片只验 RTW 原文/引用侧。
 - 尚无 BTW 正式 HTTP SourceReader/CitationAcceptor 适配器、真实搜索请求/首个公开 SSE 引用门禁、Collector→DC 下钻、客户端恢复、`AcceptedRootHistory.Commit/List`。后者需要以完整 SubjectRef、SessionID、AnswerID、SearchID、收据及校验后公开 turn 另行定义权威持久化和历史投影；不能以本引用表代替回答历史。
 
