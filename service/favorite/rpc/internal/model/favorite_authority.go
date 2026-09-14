@@ -83,6 +83,13 @@ func parseAuthorityID(raw json.RawMessage) (int64, bool) {
 	return id, true
 }
 
+func sameFavoriteRevision(left, right *string) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
+}
+
 func authoritativeFavoriteRow(row FavoriteFactOutbox) (FavoriteAuthorityFact, authorityPayload, bool) {
 	if row.Status != FavoriteFactSent || row.DeliveredAt == nil || row.TechnicalReceivedAt == nil ||
 		row.TechnicalReceiptID == "" || row.TechnicalOffset < 1 || !favoriteReceiptHash.MatchString(row.TechnicalInputHash) {
@@ -180,7 +187,8 @@ func (m *FavoriteModel) AuthoritativeFavoriteFact(ctx context.Context, producer,
 			uid, _ := strconv.ParseInt(payload.Subject.SubjectID, 10, 64)
 			folderID, _ := parseAuthorityID(payload.FolderID)
 			if item.UserId != uid || item.FolderId != folderID ||
-				item.TargetType != payload.TargetType || item.TargetId != payload.TargetID {
+				item.TargetType != payload.TargetType || item.TargetId != payload.TargetID ||
+				!sameFavoriteRevision(item.TargetRevision, payload.TargetRevision) {
 				return FavoriteAuthorityFact{}, ErrFavoriteFactUnavailable
 			}
 		} else {
@@ -219,10 +227,7 @@ func (m *FavoriteModel) AuthoritativeFavoriteFact(ctx context.Context, producer,
 		prior.SubjectRef != fact.SubjectRef || priorPayload.TargetType != payload.TargetType ||
 		priorPayload.TargetID != payload.TargetID || priorPayload.SourceRef != payload.SourceRef ||
 		!priorFolderOK || !folderOK || priorFolderID != folderID ||
-		(priorPayload.TargetRevision == nil) != (payload.TargetRevision == nil) {
-		return FavoriteAuthorityFact{}, ErrFavoriteFactUnavailable
-	}
-	if priorPayload.TargetRevision != nil && *priorPayload.TargetRevision != *payload.TargetRevision {
+		!sameFavoriteRevision(priorPayload.TargetRevision, payload.TargetRevision) {
 		return FavoriteAuthorityFact{}, ErrFavoriteFactUnavailable
 	}
 	return fact, nil

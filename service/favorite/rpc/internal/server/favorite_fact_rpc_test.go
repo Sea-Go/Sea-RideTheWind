@@ -2,10 +2,12 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"net/url"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"sea-try-go/service/article/rpc/articleservice"
@@ -36,18 +38,25 @@ func (activeUsers) GetUser(_ context.Context, req *userservice.GetUserReq, _ ...
 		User: &userservice.UserInfo{Uid: req.Uid, Status: &active}}, nil
 }
 
-type publishedArticles struct{ articleservice.ArticleService }
+type publishedArticles struct {
+	articleservice.ArticleService
+	revision *atomic.Int32
+}
 
-func (publishedArticles) GetArticle(_ context.Context, req *articleservice.GetArticleRequest, _ ...grpc.CallOption) (*articleservice.GetArticleResponse, error) {
+func (a publishedArticles) GetArticle(_ context.Context, req *articleservice.GetArticleRequest, _ ...grpc.CallOption) (*articleservice.GetArticleResponse, error) {
 	if !req.PublicOnly || req.IncrView || req.RequesterId != "" {
 		return nil, status.Error(codes.Internal, "favorite bypassed public article projection")
 	}
 	if req.ArticleId != "article-77" {
 		return nil, status.Error(codes.NotFound, "article missing")
 	}
+	revision, title, cover := "article-77:r1", "Published r1", "r1-cover"
+	if a.revision != nil && a.revision.Load() == 2 {
+		revision, title, cover = "article-77:r2", "Published r2", "r2-cover"
+	}
 	return &articleservice.GetArticleResponse{Article: &articleservice.Article{
-		Id: "article-77", Status: articlepb.ArticleStatus_PUBLISHED, Title: "Published r1",
-		CoverImageUrl: "r1-cover", ExtInfo: map[string]string{"published_revision_id": "article-77:r1"}}}, nil
+		Id: "article-77", Status: articlepb.ArticleStatus_PUBLISHED, Title: title,
+		CoverImageUrl: cover, ExtInfo: map[string]string{"published_revision_id": revision}}}, nil
 }
 
 var favoriteRPCLoggerOnce sync.Once
@@ -105,12 +114,20 @@ func favoriteRPCStore(t *testing.T) (*model.FavoriteModel, *gorm.DB) {
 	if err := db.Exec(string(deliveryMigration)).Error; err != nil {
 		t.Fatal(err)
 	}
+	revisionMigration, err := os.ReadFile("../model/003_favorite_target_revision.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(string(revisionMigration)).Error; err != nil {
+		t.Fatal(err)
+	}
 	return model.NewFavoriteModel(db), db
 }
 
 func TestFavoriteGRPCPreservesIDsAndCommitsOutbox(t *testing.T) {
 	store, db := favoriteRPCStore(t)
-	service := &svc.ServiceContext{FavoriteModel: store, UserRpc: activeUsers{}, ArticleRpc: publishedArticles{}}
+	var sourceRevision atomic.Int32
+	service := &svc.ServiceContext{FavoriteModel: store, UserRpc: activeUsers{}, ArticleRpc: publishedArticles{revision: &sourceRevision}}
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -136,7 +153,8 @@ func TestFavoriteGRPCPreservesIDsAndCommitsOutbox(t *testing.T) {
 		t.Fatalf("existing favorite RPC: %+v %v", saved, err)
 	}
 	item, err := store.FindFavoriteByFolderTarget(ctx, folder.FolderId, "article-77", "article")
-	if err != nil || item.Title != "Published r1" || item.Cover != "r1-cover" {
+	if err != nil || item.Title != "Published r1" || item.Cover != "r1-cover" ||
+		item.TargetRevision == nil || *item.TargetRevision != "article-77:r1" {
 		t.Fatalf("favorite cached client or draft metadata: %+v %v", item, err)
 	}
 	if _, err := client.CreateFavorite(ctx, &pb.CreateFavoriteReq{UserId: 1001, FolderId: folder.FolderId,
@@ -151,6 +169,18 @@ func TestFavoriteGRPCPreservesIDsAndCommitsOutbox(t *testing.T) {
 		len(outbox) != 1 || outbox[0].FavoriteID != saved.FavoriteId {
 		t.Fatalf("RPC favorite assert did not commit business outbox: %+v %v", outbox, err)
 	}
+	var asserted struct {
+		Payload struct {
+			TargetRevision *string `json:"target_revision"`
+		} `json:"payload"`
+	}
+	if err := json.Unmarshal([]byte(outbox[0].Payload), &asserted); err != nil ||
+		asserted.Payload.TargetRevision == nil || *asserted.Payload.TargetRevision != "article-77:r1" {
+		t.Fatalf("assert fact did not freeze published r1: %+v %v", asserted, err)
+	}
+	// The source can publish r2 after the favorite is created. Repeated
+	// creation cannot mutate the old favorite or its immutable v1 fact.
+	sourceRevision.Store(2)
 	if _, err := client.CreateFavorite(ctx, &pb.CreateFavoriteReq{UserId: 1001, FolderId: folder.FolderId,
 		TargetType: "article", TargetId: "article-77"}); status.Code(err) != codes.AlreadyExists {
 		t.Fatalf("duplicate existing RPC returned %v", err)
@@ -167,5 +197,17 @@ func TestFavoriteGRPCPreservesIDsAndCommitsOutbox(t *testing.T) {
 		len(outbox) != 2 || outbox[1].FavoriteID != saved.FavoriteId ||
 		outbox[1].AggregateVersion != 2 {
 		t.Fatalf("RPC favorite retract did not retain same object ID: %+v %v", outbox, err)
+	}
+	var retracted struct {
+		Payload struct {
+			TargetRevision *string `json:"target_revision"`
+		} `json:"payload"`
+	}
+	if err := json.Unmarshal([]byte(outbox[1].Payload), &retracted); err != nil ||
+		retracted.Payload.TargetRevision == nil || *retracted.Payload.TargetRevision != "article-77:r1" {
+		t.Fatalf("retract fact followed current r2 instead of frozen r1: %+v %v", retracted, err)
+	}
+	if _, err := store.FindFavoriteByFavoriteId(ctx, saved.FavoriteId); err != model.ErrorNotFound {
+		t.Fatalf("favorite survived retract: %v", err)
 	}
 }

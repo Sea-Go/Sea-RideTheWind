@@ -139,3 +139,44 @@ func TestFavoriteAuthorityLegacyExactIntegerAndUnsafeIDBlock(t *testing.T) {
 		t.Fatalf("next event was not technically accepted: row=%+v err=%v", next, err)
 	}
 }
+
+func TestFavoriteAuthorityChecksStoredPublishedRevision(t *testing.T) {
+	store := favoriteFactStore(t)
+	ctx := context.Background()
+	r1, r2 := "article-920:r1", "article-920:r2"
+	item := FavoriteItem{FavoriteId: 920, FolderId: 90, UserId: 1001,
+		TargetType: "article", TargetId: "article-920", TargetRevision: &r1}
+	if err := store.conn.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	asserted, err := favoriteOutbox(item, 1, "assert", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	insertAcceptedAuthorityFixture(t, store, asserted, 920)
+	if _, err := store.AuthoritativeFavoriteFact(ctx, favoriteProducer, asserted.EventID); err != nil {
+		t.Fatalf("frozen r1 assert rejected: %v", err)
+	}
+	if err := store.conn.Model(&FavoriteItem{}).Where("favorite_id = ?", item.FavoriteId).
+		Update("target_revision", r2).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AuthoritativeFavoriteFact(ctx, favoriteProducer, asserted.EventID); !errors.Is(err, ErrFavoriteFactUnavailable) {
+		t.Fatalf("mutable business row r2 authorized frozen r1: %v", err)
+	}
+	if err := store.conn.Model(&FavoriteItem{}).Where("favorite_id = ?", item.FavoriteId).
+		Update("target_revision", r1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := store.conn.Delete(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	retracted, err := favoriteOutbox(item, 2, "retract", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	insertAcceptedAuthorityFixture(t, store, retracted, 921)
+	if _, err := store.AuthoritativeFavoriteFact(ctx, favoriteProducer, retracted.EventID); err != nil {
+		t.Fatalf("same-revision retract rejected: %v", err)
+	}
+}

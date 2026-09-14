@@ -51,7 +51,7 @@ type favoriteFactPayload struct {
 	Subject        FavoriteSubjectRef `json:"subject_ref"`
 	TargetType     string             `json:"target_type"`
 	TargetID       string             `json:"target_id"`
-	TargetRevision *string            `json:"target_revision"` // unavailable from current Article RPC
+	TargetRevision *string            `json:"target_revision"` // frozen at FavoriteItem creation
 	Operation      string             `json:"operation"`       // assert or retract
 	SourceRef      string             `json:"source_ref"`
 	EventTime      string             `json:"event_time"`
@@ -76,7 +76,8 @@ type favoriteEvent struct {
 
 func favoriteOutbox(item FavoriteItem, version int64, operation string, now time.Time) (FavoriteFactOutbox, error) {
 	if item.FavoriteId <= 0 || item.FolderId <= 0 || item.UserId <= 0 || item.TargetType == "" || item.TargetId == "" ||
-		(version != 1 && version != 2) || (operation != "assert" && operation != "retract") {
+		(version != 1 && version != 2) || (operation != "assert" && operation != "retract") ||
+		(item.TargetRevision != nil && (item.TargetType != "article" || *item.TargetRevision == "")) {
 		return FavoriteFactOutbox{}, errors.New("invalid favorite fact")
 	}
 	eventID := fmt.Sprintf("favorite.%d.v%d", item.FavoriteId, version)
@@ -88,7 +89,7 @@ func favoriteOutbox(item FavoriteItem, version int64, operation string, now time
 		Payload: favoriteFactPayload{
 			SchemaVersion: 1, EventID: eventID,
 			Subject:    FavoriteSubjectRef{"rtw.identity", "platform", strconv.FormatInt(item.UserId, 10)},
-			TargetType: item.TargetType, TargetID: item.TargetId, TargetRevision: nil,
+			TargetType: item.TargetType, TargetID: item.TargetId, TargetRevision: item.TargetRevision,
 			Operation: operation, SourceRef: fmt.Sprintf("rtw.favorite/%d", item.FavoriteId),
 			EventTime: at, AvailableAt: at, FavoriteID: strconv.FormatInt(item.FavoriteId, 10),
 			FolderID: strconv.FormatInt(item.FolderId, 10),

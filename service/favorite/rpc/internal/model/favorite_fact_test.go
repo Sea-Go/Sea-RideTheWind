@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -66,6 +67,13 @@ func favoriteFactStore(t *testing.T) *FavoriteModel {
 		t.Fatal(err)
 	}
 	if err := db.Exec(string(deliveryMigration)).Error; err != nil {
+		t.Fatal(err)
+	}
+	revisionMigration, err := os.ReadFile("003_favorite_target_revision.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(string(revisionMigration)).Error; err != nil {
 		t.Fatal(err)
 	}
 	return NewFavoriteModel(db)
@@ -207,5 +215,92 @@ func TestFavoriteFactPostgresRollbackAndConcurrentDuplicate(t *testing.T) {
 	if _, err := store.FindFavoriteByFavoriteId(ctx, item.FavoriteId); err != nil ||
 		len(favoriteOutboxRows(t, store)) != 1 {
 		t.Fatalf("business row and outbox diverged after rollback: %v", err)
+	}
+}
+
+func TestFavoritePublishedRevisionFrozenAcrossRetractAndCascade(t *testing.T) {
+	store := favoriteFactStore(t)
+	ctx := context.Background()
+	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: 43, UserId: 1001, Name: "published"}); err != nil {
+		t.Fatal(err)
+	}
+	r1 := "article-77:r1"
+	r2 := "article-88:r2"
+	for _, item := range []*FavoriteItem{
+		{FavoriteId: 701, FolderId: 43, UserId: 1001, TargetType: "article", TargetId: "article-77", TargetRevision: &r1},
+		{FavoriteId: 702, FolderId: 43, UserId: 1001, TargetType: "article", TargetId: "article-88", TargetRevision: &r2},
+		{FavoriteId: 703, FolderId: 43, UserId: 1001, TargetType: "other", TargetId: "item-1"},
+	} {
+		if err := store.InsertFavorite(ctx, item); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stored, err := store.FindFavoriteByFavoriteId(ctx, 701)
+	if err != nil || stored.TargetRevision == nil || *stored.TargetRevision != r1 {
+		t.Fatalf("published revision not durable on business row: %+v %v", stored, err)
+	}
+	if err := store.DeleteFavoriteByFavoriteId(ctx, 701, 1001); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteFolderCascade(ctx, 43, 1001); err != nil {
+		t.Fatal(err)
+	}
+	rows := favoriteOutboxRows(t, store)
+	if len(rows) != 6 {
+		t.Fatalf("unexpected frozen fact count: %d", len(rows))
+	}
+	for _, row := range rows {
+		var event favoriteEvent
+		if err := json.Unmarshal([]byte(row.Payload), &event); err != nil {
+			t.Fatal(err)
+		}
+		want := map[int64]*string{701: &r1, 702: &r2, 703: nil}[row.FavoriteID]
+		if !sameFavoriteRevision(event.Payload.TargetRevision, want) {
+			t.Fatalf("favorite %d v%d lost its original revision: %s", row.FavoriteID, row.AggregateVersion, row.Payload)
+		}
+	}
+}
+
+func TestFavoriteRevisionMigrationPreservesLegacyUnknown(t *testing.T) {
+	store := favoriteFactStore(t)
+	ctx := context.Background()
+	if err := store.conn.Migrator().DropColumn(&FavoriteItem{}, "TargetRevision"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.conn.Exec(`INSERT INTO favorite_item
+		(favorite_id,folder_id,user_id,target_id,target_type,title,cover,create_time)
+		VALUES (704,43,1001,'article-legacy','article','old title','',now())`).Error; err != nil {
+		t.Fatal(err)
+	}
+	legacyItem := FavoriteItem{FavoriteId: 704, FolderId: 43, UserId: 1001,
+		TargetId: "article-legacy", TargetType: "article", Title: "old title"}
+	legacyFact, err := favoriteOutbox(legacyItem, 1, "assert", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.conn.Create(&legacyFact).Error; err != nil {
+		t.Fatal(err)
+	}
+	var before FavoriteFactOutbox
+	if err := store.conn.Where("event_id = ?", legacyFact.EventID).Take(&before).Error; err != nil {
+		t.Fatal(err)
+	}
+	migration, err := os.ReadFile("003_favorite_target_revision.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := store.conn.Exec(string(migration)).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	legacy, err := store.FindFavoriteByFavoriteId(ctx, 704)
+	if err != nil || legacy.TargetRevision != nil {
+		t.Fatalf("legacy favorite was assigned an invented revision: %+v %v", legacy, err)
+	}
+	var frozen FavoriteFactOutbox
+	if err := store.conn.Where("event_id = ?", legacyFact.EventID).Take(&frozen).Error; err != nil ||
+		frozen.Payload != before.Payload {
+		t.Fatalf("migration changed frozen old event: %+v %v", frozen, err)
 	}
 }
