@@ -141,3 +141,7 @@ Delivery.Enabled 默认 false。DC 接入后配置独立 `/v1/events` 接收地�
 ### 多向量聚合语义
 
 真实H06检索profile可明确保存 `sum_maxsim`（查询token最大相似度求和）或 `mean_maxsim`（除以有效查询token数，BGE-M3采用此口径）。两种值进入冻结清单与profile等值核验，不自动互换；Dense/Sparse仍禁止aggregation。旧 `maxsim` 只保留原结构fixture兼容，不赋予隐含sum/mean含义；实际模型与索引必须携带明确聚合才能配对。字段形态不变，无需改写历史不可变清单。
+
+### 人工搜索判定来源
+
+管理员对 RTW 已接纳产品搜索和固定发布片段所作的等级判定、重判、撤回、原始 Outbox 事件回查及默认关闭的启用步骤，见 [SEARCH_JUDGMENT_AUTHORITY.md](docs/SEARCH_JUDGMENT_AUTHORITY.md)。这只是人工判定的权威捕获入口；是否具备正式 qrels 覆盖与可计算 Recall/MRR/nDCG，由 BTW evaluation 的独立基准验收决定。
