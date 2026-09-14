@@ -147,6 +147,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	searchFixture := newProductSearchFixture(t, &base, c.WorkerToken)
 	c.SearchSummary.Endpoint = searchFixture.server.URL + "/v1/search/summary"
 	c.SearchSummary.ScopeKey = productFixtureScopeKey
+	toolFixture := newToolSearchFixture(t)
+	c.SearchTools.Endpoint = toolFixture.server.URL + "/v1/search/tools/search"
+	c.SearchTools.ScopeKey = toolFixtureScopeKey
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
 	if err != nil {
 		t.Fatal(err)
@@ -550,6 +553,71 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatal(err)
 		}
 	}
+	toolPath := "/v1/knowledge/answer-sessions/tool-parent-session/tool-runs"
+	toolParentBody := map[string]any{"module_id": m.Id, "idempotency_key": "tool-parent-key-1"}
+	request("POST", toolPath, "", toolParentBody, nil, 401)
+	request("POST", toolPath, productToken, map[string]any{"module_id": m.Id,
+		"idempotency_key": "tool-parent-key-1", "subject_ref": acceptedSubject}, nil, 400)
+	var toolParent types.ToolParentResult
+	request("POST", toolPath, productToken, toolParentBody, &toolParent, 200)
+	if toolParent.OperationId == "" || toolParent.ScopeRef == "" || toolParent.SnapshotRef == "" ||
+		toolParent.BudgetRef == "" || toolParent.ModuleId != m.Id ||
+		toolParent.Budget.SearchCalls != 4 || toolParent.Budget.ReadCalls != 24 ||
+		toolParent.Budget.QuoteRunes != 32768 || toolParent.DeadlineAtMs <= time.Now().UnixMilli() {
+		t.Fatalf("authenticated Tool parent did not pin server scope/budget: %+v", toolParent)
+	}
+	parentPath := toolPath + "/" + toolParent.OperationId
+	var replayedParent types.ToolParentResult
+	request("POST", toolPath, productToken, toolParentBody, &replayedParent, 200)
+	if !reflect.DeepEqual(replayedParent, toolParent) {
+		t.Fatal("Tool parent idempotency changed fixed scope")
+	}
+	request("GET", parentPath, otherToken, nil, nil, 404)
+	request("GET", parentPath, productToken, nil, &replayedParent, 200)
+	if !reflect.DeepEqual(replayedParent, toolParent) {
+		t.Fatal("Tool parent GET changed fixed scope")
+	}
+	toolSearchPath := parentPath + "/searches"
+	toolSearchBody := map[string]any{"query": "Find the current evidence", "depth": "fast",
+		"intelligence": "low", "read_calls": 8, "quote_runes": 8192,
+		"idempotency_key": "tool-search-key-1"}
+	request("POST", toolSearchPath, productToken, map[string]any{"query": "Find the current evidence",
+		"depth": "fast", "intelligence": "low", "read_calls": 8, "quote_runes": 8192,
+		"idempotency_key": "tool-search-key-1", "snapshot_ref": "forged"}, nil, 400)
+	toolFixture.stage.Store(1)
+	var toolSearch types.ToolSearchResult
+	request("POST", toolSearchPath, productToken, toolSearchBody, &toolSearch, 503)
+	if toolSearch.SearchId == "" || toolSearch.Status != "retryable_failure" || len(toolSearch.Evidence) != 0 ||
+		toolFixture.calls.Load() != 1 {
+		t.Fatalf("forged Tool quote leaked: %+v calls=%d", toolSearch, toolFixture.calls.Load())
+	}
+	toolFixture.stage.Store(0)
+	request("POST", toolSearchPath, productToken, toolSearchBody, &toolSearch, 200)
+	if toolSearch.Status != "empty" || toolSearch.Evidence == nil || len(toolSearch.Evidence) != 0 ||
+		toolSearch.CitationReceipt != nil || toolSearch.PackHash != "" || toolFixture.calls.Load() != 2 {
+		t.Fatalf("empty Tool search acquired fake evidence or receipt: %+v calls=%d", toolSearch, toolFixture.calls.Load())
+	}
+	var toolSearchReplay types.ToolSearchResult
+	request("POST", toolSearchPath, productToken, toolSearchBody, &toolSearchReplay, 200)
+	if !reflect.DeepEqual(toolSearchReplay, toolSearch) || toolFixture.calls.Load() != 2 {
+		t.Fatal("completed Tool replay dispatched BTW again")
+	}
+	request("GET", toolSearchPath+"/"+toolSearch.SearchId, productToken, nil, &toolSearchReplay, 200)
+	if !reflect.DeepEqual(toolSearchReplay, toolSearch) {
+		t.Fatal("Tool GET changed completed result")
+	}
+	request("GET", toolSearchPath+"/"+toolSearch.SearchId, otherToken, nil, nil, 404)
+	request("POST", toolSearchPath, productToken, map[string]any{"query": "changed",
+		"depth": "fast", "intelligence": "low", "read_calls": 8, "quote_runes": 8192,
+		"idempotency_key": "tool-search-key-1"}, nil, 409)
+	request("POST", parentPath+"/evidence-reads", productToken,
+		map[string]any{"search_id": toolSearch.SearchId, "evidence_id": "ev_missing",
+			"idempotency_key": "tool-read-key-1"}, nil, 404)
+	request("GET", parentPath, productToken, nil, &replayedParent, 200)
+	if replayedParent.Budget.SearchCalls != 3 || replayedParent.Budget.ReadCalls != 24 ||
+		replayedParent.Budget.QuoteRunes != 32768 {
+		t.Fatalf("Tool budget did not reserve once/refund verified empty result: %+v", replayedParent.Budget)
+	}
 	searchPath := "/v1/knowledge/answer-sessions/search-facade-session/searches"
 	searchBody := map[string]any{"module_id": m.Id, "query": "What does this book say?",
 		"depth": "fast", "intelligence": "low", "idempotency_key": "product-search-key-1"}
@@ -779,6 +847,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if !realUser {
 		userRPC.missingStatus.Store(true)
 		request("GET", productPath, productToken, nil, nil, 503)
+		request("GET", parentPath, productToken, nil, nil, 503)
 		userRPC.missingStatus.Store(false)
 	}
 	var ownAnswer types.AcceptedAnswer
@@ -861,6 +930,12 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		// A disabled account is still returned by today's GetUser handler. This
 		// observed counterexample keeps the H02 disable gate open.
 		realUsers.markDisabled(t, productUID)
+		request("POST", toolPath, productToken, toolParentBody, nil, 403)
+		request("GET", parentPath, productToken, nil, nil, 403)
+		request("GET", toolSearchPath+"/"+toolSearch.SearchId, productToken, nil, nil, 403)
+		request("POST", parentPath+"/evidence-reads", productToken,
+			map[string]any{"search_id": toolSearch.SearchId, "evidence_id": "ev_missing",
+				"idempotency_key": "tool-read-key-disabled"}, nil, 403)
 		request("POST", searchPath, productToken, searchBody, nil, 403)
 		request("GET", searchPath+"/"+productSearchID, productToken, nil, nil, 403)
 		request("GET", productPath, productToken, nil, nil, 403)
@@ -871,6 +946,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatalf("active other subject changed after disabling owner: %+v", otherHistory)
 		}
 		realUsers.delete(t, productUID)
+		request("GET", parentPath, productToken, nil, nil, 403)
 		request("GET", productPath, productToken, nil, nil, 403)
 		request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
 		request("GET", citationStatePath, productToken, nil, nil, 403)
@@ -879,6 +955,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		userServer.Stop()
 	}
 	request("GET", productPath, productToken, nil, nil, 503)
+	request("GET", parentPath, productToken, nil, nil, 503)
 	request("POST", searchPath, productToken, searchBody, nil, 503)
 	request("GET", searchPath+"/"+productSearchID, productToken, nil, nil, 503)
 	request("GET", citationStatePath, productToken, nil, nil, 503)
