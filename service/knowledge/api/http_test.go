@@ -328,7 +328,7 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 		if err != nil || len(traceRaw) != 32 {
 			t.Fatalf("BTW consumer did not return actual Trace ID: %q %v", traceRaw, err)
 		}
-		foundRead, foundAccept := false, false
+		foundRead, foundAccept, foundAnswer := false, false, false
 		for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
 			logs, readErr := os.ReadFile(filepath.Join(dir, "http.log"))
 			if readErr != nil {
@@ -344,13 +344,19 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 				}
 				foundRead = foundRead || record.Event == "knowledge.search.source.read.succeeded"
 				foundAccept = foundAccept || record.Event == "knowledge.search.citations.accept.succeeded"
+				foundAnswer = foundAnswer || record.Event == "knowledge.answer.accept.succeeded"
 			}
-			if foundRead && foundAccept {
+			if foundRead && foundAccept && foundAnswer {
 				break
 			}
 		}
-		if !foundRead || !foundAccept {
-			t.Fatalf("RTW original/citation stages did not share BTW Trace ID %s: read=%v accept=%v", traceRaw, foundRead, foundAccept)
+		if !foundRead || !foundAccept || !foundAnswer {
+			t.Fatalf("RTW source/citation/answer stages did not share BTW Trace ID %s: read=%v citation=%v answer=%v", traceRaw, foundRead, foundAccept, foundAnswer)
+		}
+		var answers int
+		if err := s.DB.QueryRow(context.Background(),
+			"SELECT count(*) FROM knowledge_accepted_answers WHERE answer_id='answer-btw-real-provider'").Scan(&answers); err != nil || answers != 1 {
+			t.Fatalf("BTW accepted answer not exactly once in actual RTW PG: count=%d error=%v", answers, err)
 		}
 	}
 	badRead := read
