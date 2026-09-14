@@ -76,3 +76,9 @@ Delivery.Enabled 默认 false。DC 接入后配置独立 `/v1/events` 接收地�
 复现：安装匹配仓库 Go toolchain 与本机 PostgreSQL 后，在仓根执行 `KNOWLEDGE_PG_BIN=/path/to/postgresql/bin service/knowledge/scripts/acceptance.sh`。脚本创建随机端口/专用目录的本地 PostgreSQL，逐测试隔离 schema，结束停止实例并清理；设置 `KNOWLEDGE_KEEP_EVIDENCE=1` 可保留日志目录。直接执行 `go test ./service/knowledge/...` 只运行无外部依赖测试，PG/HTTP测试会明确 skip，不能据此声称 L2 通过。
 
 无提交到主分支、无部署。当前交付用于下一步 WS03 网页真实接线、WS05 通用事件接纳以及 WS06 三路结果联调。
+
+### 提交前独立复验补充
+
+独立复验复现了工件读取耗时超过租约后仍提交 READY/ACCEPTED 的缺陷。结果写入现在通过 PostgreSQL `clock_timestamp()` 在最终 UPDATE 再次核对租约；拒收会回滚同事务产生的 Wiki 修订、页头与 Outbox。新增构建和编制两个慢读取反例，覆盖状态与副作用均不提交。2026-09-14 使用隔离 PostgreSQL 16 执行完整 `scripts/acceptance.sh` 通过（含 race、HTTP 与静态检查）。
+
+管理员模块详情、历史 release/build/compile 列表和修订正文读接口仍待补齐；网页当前写链交付不代表完整工作台验收。

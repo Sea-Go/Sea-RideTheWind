@@ -73,6 +73,31 @@ func saveJSON(ctx context.Context, tx pgx.Tx, sql string, v any, args ...any) er
 	return err
 }
 
+// saveExecutionResult checks the execution lease at the authoritative write,
+// after potentially slow artifact verification. A rejected write rolls back
+// any revision/head/outbox changes made earlier in this transaction.
+func saveExecutionResult(ctx context.Context, tx pgx.Tx, table, id string, v any, liveLeaseRequired bool) error {
+	if table != "knowledge_builds" && table != "knowledge_compiles" {
+		return invalid("unknown execution table")
+	}
+	raw, err := encode(v)
+	if err != nil {
+		return err
+	}
+	statement := "UPDATE " + table + " SET data=$2 WHERE id=$1"
+	if liveLeaseRequired {
+		statement += " AND (data->>'lease_expires_at')::timestamptz > clock_timestamp()"
+	}
+	tag, err := tx.Exec(ctx, statement, id, raw)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return conflict("execution lease expired at result submission")
+	}
+	return nil
+}
+
 // command serializes idempotency keys and commits the domain state, outbox and replay together.
 func command[T any](ctx context.Context, s *Store, scope, key string, input any, fn func(pgx.Tx) (T, error)) (T, error) {
 	var zero T

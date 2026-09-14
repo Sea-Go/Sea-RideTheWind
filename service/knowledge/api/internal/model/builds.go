@@ -141,10 +141,12 @@ func (s *Store) mutateBuild(ctx context.Context, buildID string, fn func(pgx.Tx,
 	if err = setOperation(ctx, tx, "result:"+buildID); err != nil {
 		return initial, err
 	}
+	previousState := b.State
 	if err = fn(tx, &b); err != nil {
 		return b, err
 	}
-	if err = saveJSON(ctx, tx, "UPDATE knowledge_builds SET data=$2 WHERE id=$1", b, b.BuildId); err != nil {
+	liveLeaseRequired := previousState == "BUILDING" && (b.State == "READY" || b.State == "FAILED")
+	if err = saveExecutionResult(ctx, tx, "knowledge_builds", b.BuildId, b, liveLeaseRequired); err != nil {
 		return b, err
 	}
 	return b, tx.Commit(ctx)

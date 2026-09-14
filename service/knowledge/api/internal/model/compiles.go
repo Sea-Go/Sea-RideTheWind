@@ -87,10 +87,12 @@ func (s *Store) mutateCompile(ctx context.Context, compileID string, fn func(pgx
 	if err = setOperation(ctx, tx, "result:"+compileID); err != nil {
 		return initial, err
 	}
+	previousState := c.State
 	if err = fn(tx, &c); err != nil {
 		return c, err
 	}
-	if err = saveJSON(ctx, tx, "UPDATE knowledge_compiles SET data=$2 WHERE id=$1", c, c.CompileId); err != nil {
+	liveLeaseRequired := previousState == "BUILDING" && (c.State == "ACCEPTED" || c.State == "FAILED")
+	if err = saveExecutionResult(ctx, tx, "knowledge_compiles", c.CompileId, c, liveLeaseRequired); err != nil {
 		return c, err
 	}
 	return c, tx.Commit(ctx)
