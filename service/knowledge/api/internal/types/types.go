@@ -31,6 +31,12 @@ type AcceptCompileReq struct {
 	SourceRefs    []SourceRef `json:"source_refs,optional"`
 }
 
+type AcceptSearchCitationsReq struct {
+	SearchId string `json:"search_id"`
+	PackJson string `json:"pack_json"`
+	PackHash string `json:"pack_hash"`
+}
+
 type ActivateReq struct {
 	ModuleId                string `path:"module_id"`
 	ReleaseId               string `json:"release_id"`
@@ -76,6 +82,41 @@ type CancelCompileReq struct {
 	CompileId      string `path:"compile_id"`
 	Reason         string `json:"reason"`
 	IdempotencyKey string `json:"idempotency_key"`
+}
+
+type CitationChunk struct {
+	ChunkId     string           `json:"chunk_id"`
+	RevisionId  string           `json:"revision_id"`
+	ContentId   string           `json:"content_id"`
+	SourceKind  string           `json:"source_kind"`
+	Original    CitationObject   `json:"original"`
+	Location    CitationLocation `json:"location"`
+	Text        string           `json:"text"`
+	TextHash    string           `json:"text_hash"`
+	EncodingKey string           `json:"encoding_key"`
+	DuplicateOf string           `json:"duplicate_of,optional,omitempty"`
+	PreviousId  string           `json:"previous_id,optional,omitempty"`
+	NextId      string           `json:"next_id,optional,omitempty"`
+	Required    bool             `json:"required"`
+}
+
+type CitationChunkEnvelope struct {
+	Code int           `json:"code"`
+	Msg  string        `json:"msg"`
+	Data CitationChunk `json:"data"`
+}
+
+type CitationLocation struct {
+	Locator             string `json:"locator"`
+	OriginalByteStart   int    `json:"original_byte_start"`
+	OriginalByteEnd     int    `json:"original_byte_end"`
+	NormalizedRuneStart int    `json:"normalized_rune_start"`
+	NormalizedRuneEnd   int    `json:"normalized_rune_end"`
+}
+
+type CitationObject struct {
+	Key    string `json:"key"`
+	Sha256 string `json:"sha256"`
 }
 
 type ClaimBuildReq struct {
@@ -304,6 +345,15 @@ type PublishedRevisionsReq struct {
 	Cursor    string `form:"cursor,optional"`
 }
 
+type ReadSearchSourceReq struct {
+	ModuleId            string `json:"module_id"`
+	ReleaseId           string `json:"release_id"`
+	Generation          int64  `json:"generation"`
+	PublicationRevision string `json:"publication_revision"`
+	RevisionId          string `json:"revision_id"`
+	ChunkId             string `json:"chunk_id"`
+}
+
 type Receipt struct {
 	Accepted bool `json:"accepted"`
 }
@@ -389,6 +439,51 @@ type RevisionEnvelope struct {
 
 type RevisionPath struct {
 	RevisionId string `path:"revision_id"`
+}
+
+type SearchCitationPath struct {
+	SearchId string `path:"search_id"`
+}
+
+type SearchCitationReceipt struct {
+	SearchId   string `json:"search_id"`
+	PackHash   string `json:"pack_hash"`
+	DurableRef string `json:"durable_ref"`
+}
+
+type SearchCitationReceiptEnvelope struct {
+	Code int                   `json:"code"`
+	Msg  string                `json:"msg"`
+	Data SearchCitationReceipt `json:"data"`
+}
+
+type SearchCitationRecord struct {
+	SearchId            string                    `json:"search_id"`
+	PackHash            string                    `json:"pack_hash"`
+	DurableRef          string                    `json:"durable_ref"`
+	ModuleId            string                    `json:"module_id"`
+	ReleaseId           string                    `json:"release_id"`
+	Generation          int64                     `json:"generation"`
+	PublicationRevision string                    `json:"publication_revision"`
+	Evidence            []SearchCitationReference `json:"evidence"`
+}
+
+type SearchCitationRecordEnvelope struct {
+	Code int                  `json:"code"`
+	Msg  string               `json:"msg"`
+	Data SearchCitationRecord `json:"data"`
+}
+
+type SearchCitationReference struct {
+	EvidenceId string           `json:"evidence_id"`
+	SourceKind string           `json:"source_kind"`
+	ContentId  string           `json:"content_id"`
+	RevisionId string           `json:"revision_id"`
+	ChunkId    string           `json:"chunk_id"`
+	Original   CitationObject   `json:"original"`
+	Locator    CitationLocation `json:"locator"`
+	QuoteHash  string           `json:"quote_hash"`
+	State      string           `json:"state"`
 }
 
 type SourceRef struct {

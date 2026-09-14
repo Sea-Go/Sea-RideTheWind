@@ -68,3 +68,15 @@ CREATE INDEX IF NOT EXISTS knowledge_builds_module_page ON knowledge_builds(modu
 ALTER TABLE knowledge_compiles ADD COLUMN IF NOT EXISTS list_order bigint GENERATED ALWAYS AS IDENTITY;
 CREATE INDEX IF NOT EXISTS knowledge_compiles_module_page ON knowledge_compiles(module_id,list_order DESC);
 CREATE INDEX IF NOT EXISTS knowledge_publications_release ON knowledge_publications(module_id,release_id);
+-- A search ID has one immutable accepted evidence pack. The original JSON
+-- bytes are retained because BTW hashes its exact encoding before delivery.
+CREATE TABLE IF NOT EXISTS knowledge_search_citations (
+ search_id text PRIMARY KEY, pack_hash text NOT NULL, pack_json text NOT NULL,
+ durable_ref text NOT NULL UNIQUE, module_id text NOT NULL REFERENCES knowledge_modules(id),
+ release_id text NOT NULL REFERENCES knowledge_releases(id), pointer_revision bigint NOT NULL,
+ generation bigint NOT NULL, accepted_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS knowledge_search_citations_module ON knowledge_search_citations(module_id,accepted_at);
+DROP TRIGGER IF EXISTS knowledge_search_citation_immutable ON knowledge_search_citations;
+CREATE TRIGGER knowledge_search_citation_immutable BEFORE UPDATE OR DELETE ON knowledge_search_citations
+ FOR EACH ROW EXECUTE FUNCTION knowledge_immutable_payload();

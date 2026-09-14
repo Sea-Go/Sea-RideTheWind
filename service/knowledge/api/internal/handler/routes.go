@@ -209,6 +209,21 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Path:    "/revisions/:revision_id",
 					Handler: worker.GetRevisionHandler(serverCtx),
 				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/search-citations",
+					Handler: worker.AcceptSearchCitationsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/search-citations/:search_id",
+					Handler: worker.GetSearchCitationsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/search-sources/read",
+					Handler: worker.ReadSearchSourceHandler(serverCtx),
+				},
 			}...,
 		),
 		rest.WithPrefix("/internal/v1/knowledge"),
