@@ -130,8 +130,9 @@ func (l *GetHotArticlesLogic) buildHotArticleItem(hotItem *hotpb.HotArticleItem)
 	}
 
 	articleResp, rpcErr := l.svcCtx.ArticleRpc.GetArticle(l.ctx, &articleservice.GetArticleRequest{
-		ArticleId: hotItem.GetArticleId(),
-		IncrView:  false,
+		ArticleId:  hotItem.GetArticleId(),
+		IncrView:   false,
+		PublicOnly: true,
 	})
 	if rpcErr != nil {
 		metrics.ObserveRPCError(articleGetRPCCallee)
