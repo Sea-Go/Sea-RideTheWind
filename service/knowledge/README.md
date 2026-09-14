@@ -53,7 +53,7 @@ goctl api ts --api api/knowledge.api --dir service/knowledge/generated/typescrip
 
 ## 启动与存储
 
-示例配置在 `api/etc/knowledge-api.yaml`。通过环境提供 KNOWLEDGE_AUTH_SECRET、KNOWLEDGE_ADMIN_ID、KNOWLEDGE_WORKER_TOKEN、KNOWLEDGE_POSTGRES_DSN、KNOWLEDGE_OBJECT_DIRECTORY，以及实际构建修订 `KNOWLEDGE_SERVICE_VERSION`。未显式设置版本时，入口尝试读取 Go 构建信息中的 VCS revision；仍无法解析则拒绝启动并输出结构化失败日志。在**空的隔离数据库**先执行 `api/internal/model/schema.sql`，或把本地测试配置 Postgres.Migrate 显式设为 true；默认不自动迁移。然后在仓根执行：
+示例配置在 `api/etc/knowledge-api.yaml`。通过环境提供 KNOWLEDGE_AUTH_SECRET、KNOWLEDGE_ADMIN_ID、KNOWLEDGE_WORKER_TOKEN、KNOWLEDGE_POSTGRES_DSN、KNOWLEDGE_OBJECT_DIRECTORY，以及实际构建修订 `KNOWLEDGE_SERVICE_VERSION`。产品答案历史读面还需 `USER_AUTH_SECRET`（必须与 User Center 实际签发密钥一致）和 `USER_RPC_ETCD_HOST`（User RPC 发现地址）；其配置缺失时知识服务拒绝启动。未显式设置版本时，入口尝试读取 Go 构建信息中的 VCS revision；仍无法解析则拒绝启动并输出结构化失败日志。在**空的隔离数据库**先执行 `api/internal/model/schema.sql`，或把本地测试配置 Postgres.Migrate 显式设为 true；默认不自动迁移。然后在仓根执行：
 
 ```sh
 go run ./service/knowledge/api -f service/knowledge/api/etc/knowledge-api.yaml
