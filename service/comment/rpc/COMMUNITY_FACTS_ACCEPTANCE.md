@@ -20,12 +20,22 @@
 
 ## 部署、恢复和界限
 
-先在评论、点赞各自数据库执行 `internal/model/migrations/001_*.sql`，再启动对应 RPC/消费者；迁移重复执行幂等。新评论或点赞事实若无法写 outbox，业务 PG 事务回滚；不可手工删 outbox 来“修复”卡住的消息。消费者失败应通过 Kafka 重试或隔离死信进行恢复，不能凭日志冒充事实；当前未证明 Kafka broker 的实际重投配置。
+先在评论、点赞各自数据库依序执行 `internal/model/migrations/001_*.sql` 与 `002_*_dc_wire.sql`，再启动对应 RPC/消费者；迁移重复执行幂等。`002` 的 `NOT VALID` 约束保留既有旧行供后续辨析，但禁止旧版消费者在迁移后继续追加无出站 envelope 的事实，因此切换时须先停旧消费者。新评论或点赞事实若无法写 outbox，业务 PG 事务回滚；不可手工删 outbox 来“修复”卡住的消息。消费者失败应通过 Kafka 重试或隔离死信进行恢复，不能凭日志冒充事实；当前未证明 Kafka broker 的实际重投配置。
 
-历史 `like_record.state=2` 可能是旧消费者写入的“取消赞”操作码，也可能被旧查询解释为点踩；旧 3/4 更不符合新状态表。`last_operation_id=0` 的歧义旧行与非法旧状态会拒绝新事实事务，需按原始消息/Redis 证据单独辨析并做受控迁移。本变更不伪造历史明细或回填 H09.a 事实。Redis 写成功但 Kafka 推送失败仍可能造成暂时或永久不一致；本次只修复**已到达消费者**的 PG 确认边界。DC 正式 EventSpec/投递确认、BTW `TrustedFactBinder` 接纳、数仓 ODS/DWD、端到端对账尚未完成，因此 WS02-B/H09.a 整体仍是 `PARTIAL`。
+历史 `like_record.state=2` 可能是旧消费者写入的“取消赞”操作码，也可能被旧查询解释为点踩；旧 3/4 更不符合新状态表。`last_operation_id=0` 的歧义旧行与非法旧状态会拒绝新事实事务，需按原始消息/Redis 证据单独辨析并做受控迁移。本变更不伪造历史明细或回填 H09.a 事实。Redis 写成功但 Kafka 推送失败仍可能造成暂时或永久不一致；本次只修复**已到达消费者**的 PG 确认边界。DC 真实投递确认、BTW `TrustedFactBinder` 接纳、数仓 ODS/DWD、端到端对账尚未完成，因此 WS02-B/H09.a 整体仍是 `PARTIAL`。
+
+## DataCenter 出站 wire 合同与交接
+
+本切片在独立分支 `feat/community-dc-event-wire-20260914`，从 RTW 集成头 `c8246fe` 开始，只修改评论与点赞源事实。Outbox 原 `payload` 保持 `rtw.community-fact.v1` 业务事实，`target_revision` 与业务 `aggregate_version` 仍为 `null`，绝不把内容修订猜作数字。新增 `delivery_envelope` 冻结可直接 POST `/v1/events` 的外层：`schema_version: 1`、`aggregate_version: 正整数`、原事件 ID/类型/生产者/操作 ID、RFC3339Nano 时间和嵌套原业务 `payload`。`aggregate_id` 与 `fact_version` 列用于唯一约束、检查与派发读取；发送端必须原样复用这份已提交的 `delivery_envelope`，并以 `event_id` 作为 `Idempotency-Key`，不得重算可变时间或事实字段。
+
+评论外层 `aggregate_id` 是评论 ID，`comment_fact_stream` 在评论创建/删除/互动同一 PG 事务中逐条分配连续版本；点赞外层 `aggregate_id=like-state/<UID>/<target_type>/<target_id>`，`like_fact_stream` 在该用户目标状态真正变化的事务中分配连续版本。点赞业务载荷中的原 `aggregate_id=<target_type>/<target_id>` 仍指互动目标。两种版本都只是各自生产者事实流版本，不是内容修订、客户端雪花操作 ID，也不是 DataCenter 接收 offset。旧 Outbox 若对同一聚合仍有 `delivery_envelope IS NULL` 行，新事实事务拒绝提交，需先依据原始事实次序和消息证据做受控迁移；不可将所有旧行填 `1`、随意删旧行或绕开拒发门禁。新派发器只能 claim 非空 envelope，旧行不得发往 DC。
+
+本切片没有评论/点赞派发器和收据持久化，也未证明线上 Kafka/Redis 或 BTW 摄取。它交给 H09 派发层的准确字段是 `delivery_envelope`、`event_id`、`aggregate_id`、`fact_version`；DataCenter 回执须匹配 `producer/event_id`，原体重放返回首次 `receipt_id/input_hash/offset`。接收 201/200 仅表示技术接纳，不等于业务事实已经进入 DWD 或可训练。
 
 ## 验收证据
 
 `service/comment/rpc/internal/model/test-community-postgres.sh` 在隔离 PostgreSQL **16.14** 上运行三个包的 `go test -mod=readonly -race -count=1`，退出 0；同一次 PG 会话中两份 SQL 迁移各执行两遍且退出 0。测试覆盖评论创建/回复/待审核、重复及冲突 ID、跨目标与无权删除、重复删除不重扣父回复、并发点赞只产生一次事实、状态正反操作、outbox 失败回滚；点赞覆盖同消息/冲突消息、旧消息、同批有序反转、并发重复投递、失败回滚以及实际消费者的失败返回和重试。
 
 `go test -mod=readonly -race -count=1 ./service/comment/rpc/... ./service/like/rpc/...`、对应 `go vet` 和 `go mod verify` 均退出 0。此验收是 RTW 源事务与消费端的隔离 PG 子链，未声称真实 Kafka/Redis、DC 交付、BTW 接纳或线上运行。
+
+设置 `SEA_DC_PLATFORM_ROOT` 为已核对的 DataCenter 独立工作树后，同一脚本额外构建并启动真实 `cmd/platform -migrate`，对隔离 PG 中真实 RTW 评论四版与点赞六版共十条冻结 envelope 执行 HTTP 接纳。2026-09-14 的本地验收退出 0：两个 producer 各自从 offset 1 开始；评论 source watermark 连续到 4；相同 ID 同体重放回原 receipt/hash/offset；同 ID 改体、另一 ID 占用同聚合版本均为 409，字符串 schema 与空聚合版本均为 400。此处是实际 DC HTTP 契约子验收，不是 RTW 派发器/回执落库验收。
