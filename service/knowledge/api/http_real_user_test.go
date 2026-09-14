@@ -31,11 +31,15 @@ import (
 )
 
 type realUserServices struct {
-	apiURL  string
-	rpc     pb.UserServiceClient
-	conn    *grpc.ClientConn
-	dbDSN   string
-	rpcStop func()
+	apiURL        string
+	rpc           pb.UserServiceClient
+	conn          *grpc.ClientConn
+	dbDSN         string
+	rpcStop       func()
+	dcURL         string
+	dcOwnerBearer string
+	dcOtherBearer string
+	realDC        bool
 }
 
 const (
@@ -119,25 +123,36 @@ func startRealUserServices(t *testing.T, store *model.Store, secret string) *rea
 		t.Fatal(err)
 	}
 	linkDB.Close()
-	dcOwnerID, dcOtherID := uuid.NewString(), uuid.NewString()
-	dcAuth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/v1/auth/me" {
-			http.NotFound(w, r)
-			return
+	dcURL, ownerBearer, otherBearer := os.Getenv("H01_DC_AUTH_URL"),
+		os.Getenv("H01_DC_OWNER_BEARER"), os.Getenv("H01_DC_OTHER_BEARER")
+	realDC := dcURL != ""
+	if realDC {
+		if ownerBearer == "" || otherBearer == "" {
+			t.Fatal("real DC H01 gate requires both independently issued access sessions")
 		}
-		var id string
-		switch r.Header.Get("Authorization") {
-		case "Bearer " + realUserDCOwnerBearer:
-			id = dcOwnerID
-		case "Bearer " + realUserDCOtherBearer:
-			id = dcOtherID
-		default:
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		_ = json.NewEncoder(w).Encode(map[string]string{"id": id})
-	}))
-	t.Cleanup(dcAuth.Close)
+	} else {
+		ownerBearer, otherBearer = realUserDCOwnerBearer, realUserDCOtherBearer
+		dcOwnerID, dcOtherID := uuid.NewString(), uuid.NewString()
+		dcAuth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet || r.URL.Path != "/v1/auth/me" {
+				http.NotFound(w, r)
+				return
+			}
+			var id string
+			switch r.Header.Get("Authorization") {
+			case "Bearer " + ownerBearer:
+				id = dcOwnerID
+			case "Bearer " + otherBearer:
+				id = dcOtherID
+			default:
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"id": id})
+		}))
+		t.Cleanup(dcAuth.Close)
+		dcURL = dcAuth.URL
+	}
 	apiConfig := map[string]any{
 		"Name": "real-usercenter-test", "Host": "127.0.0.1", "Port": apiPort, "Mode": "test",
 		"Log":      map[string]any{"Mode": "console", "Level": "error"},
@@ -145,7 +160,7 @@ func startRealUserServices(t *testing.T, store *model.Store, secret string) *rea
 		"UserRpc":  map[string]any{"Endpoints": []string{rpcEndpoint}},
 		"BizRedis": map[string]any{"Host": "127.0.0.1:1", "Type": "node", "NonBlock": true},
 		"AccountLink": map[string]any{"Enabled": true, "PostgresDSN": base.String(),
-			"DataCenterMeURL": dcAuth.URL + "/v1/auth/me"},
+			"DataCenterMeURL": dcURL + "/v1/auth/me"},
 	}
 	startRealUserProcess(t, os.Getenv("KNOWLEDGE_REAL_USER_API_BINARY"), root, "usercenter", apiConfig)
 	apiURL := "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(apiPort))
@@ -164,7 +179,8 @@ func startRealUserServices(t *testing.T, store *model.Store, secret string) *rea
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	return &realUserServices{apiURL: apiURL, rpc: userRPC, conn: conn, dbDSN: base.String(), rpcStop: rpcStop}
+	return &realUserServices{apiURL: apiURL, rpc: userRPC, conn: conn, dbDSN: base.String(), rpcStop: rpcStop,
+		dcURL: dcURL, dcOwnerBearer: ownerBearer, dcOtherBearer: otherBearer, realDC: realDC}
 }
 
 func freeUserTestPort(t *testing.T) int {
@@ -309,6 +325,39 @@ func (s *realUserServices) bindAndExchange(t *testing.T, uid int64, rtwToken, dc
 			tokenResponse.StatusCode, session.LinkRevision, err)
 	}
 	return session.Token
+}
+
+func (s *realUserServices) revokeOtherDCAndRejectExchange(t *testing.T) {
+	t.Helper()
+	if !s.realDC {
+		t.Fatal("real DC revocation proof requires nativeauth, not an HTTP fixture")
+	}
+	revoke, err := http.NewRequest(http.MethodDelete, s.dcURL+"/v1/auth/sessions/current", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revoke.Header.Set("Authorization", "Bearer "+s.dcOtherBearer)
+	response, err := http.DefaultClient.Do(revoke)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("real DC native session revocation status=%d", response.StatusCode)
+	}
+	exchange, err := http.NewRequest(http.MethodPost, s.apiURL+"/usercenter/v1/product-sessions/exchange", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchange.Header.Set("Authorization", "Bearer "+s.dcOtherBearer)
+	result, err := http.DefaultClient.Do(exchange)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = result.Body.Close()
+	if result.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("revoked real DC bearer still exchanged status=%d", result.StatusCode)
+	}
 }
 
 func (s *realUserServices) delete(t *testing.T, uid int64) {

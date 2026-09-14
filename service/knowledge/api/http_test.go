@@ -104,8 +104,11 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		realUsers = startRealUserServices(t, s, userSecret)
 		productUID, productToken = realUsers.registerAndLogin(t, "knowledge-history-owner")
 		otherUID, otherToken = realUsers.registerAndLogin(t, "knowledge-history-other")
-		productToken = realUsers.bindAndExchange(t, productUID, productToken, realUserDCOwnerBearer)
-		otherToken = realUsers.bindAndExchange(t, otherUID, otherToken, realUserDCOtherBearer)
+		productToken = realUsers.bindAndExchange(t, productUID, productToken, realUsers.dcOwnerBearer)
+		otherToken = realUsers.bindAndExchange(t, otherUID, otherToken, realUsers.dcOtherBearer)
+		if realUsers.realDC {
+			realUsers.revokeOtherDCAndRejectExchange(t)
+		}
 		userEndpoint = realUsers.conn.Target()
 	} else {
 		userListener, listenErr := net.Listen("tcp", "127.0.0.1:0")
