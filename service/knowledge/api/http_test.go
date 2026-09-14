@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"sea-try-go/service/knowledge/api/internal/config"
+	"sea-try-go/service/knowledge/api/internal/model"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/core/conf"
@@ -300,8 +301,16 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	request("POST", "/v1/knowledge/modules/"+m.Id+"/sources", token, types.CreateSourceReq{Title: "Book A", Content: "Book A\n\nEvidence", MediaType: "text/markdown", Provenance: "synthetic", IdempotencyKey: "http-source"}, &a, 200)
 	var w types.Revision
 	request("POST", "/v1/knowledge/modules/"+m.Id+"/wiki-pages/page-a/revisions", token, types.CreateWikiReq{Title: "Interpretation", Content: "My interpretation", SourceRefs: []types.SourceRef{{RevisionId: a.RevisionId, Locator: "paragraph:2"}}, IdempotencyKey: "http-wiki"}, &w, 200)
+	realBGE := os.Getenv("SEA_DC_BGE_RUNTIME")
+	retrievalProfiles := testenv.Profiles()
+	if realBGE != "" {
+		if os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT") == "" {
+			t.Fatal("actual DC BGE acceptance requires the independent BTW product consumer")
+		}
+		retrievalProfiles = realBGEProfiles(t, realBGE)
+	}
 	var r types.Release
-	request("POST", "/v1/knowledge/modules/"+m.Id+"/releases", token, types.CreateReleaseReq{SourceRevisionIds: []string{a.RevisionId}, WikiRevisionIds: []string{w.RevisionId}, ChunkingProfile: "paragraph-v1", RetrievalProfiles: testenv.Profiles(), IdempotencyKey: "http-release"}, &r, 200)
+	request("POST", "/v1/knowledge/modules/"+m.Id+"/releases", token, types.CreateReleaseReq{SourceRevisionIds: []string{a.RevisionId}, WikiRevisionIds: []string{w.RevisionId}, ChunkingProfile: "paragraph-v1", RetrievalProfiles: retrievalProfiles, IdempotencyKey: "http-release"}, &r, 200)
 	var build types.Build
 	request("POST", "/v1/knowledge/releases/"+r.ReleaseId+"/index-builds", token, types.CreateBuildReq{IdempotencyKey: "http-build"}, &build, 200)
 	request("POST", "/internal/v1/knowledge/builds/"+build.BuildId+"/claim", c.WorkerToken, types.ClaimBuildReq{LeaseExpiresAt: time.Now().Add(time.Hour).Format(time.RFC3339Nano), Generation: build.Generation, AttemptId: "http-worker", LeaseEpoch: 1, ManifestHash: build.ManifestHash}, &build, 200)
@@ -318,14 +327,75 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		Location: types.CitationLocation{Locator: "paragraph:2", OriginalByteStart: 8, OriginalByteEnd: 16,
 			NormalizedRuneStart: 0, NormalizedRuneEnd: len([]rune(quote))},
 		Text: quote, TextHash: quoteHash, EncodingKey: object.Hash([]byte(quote)), Required: true}
+	if realBGE != "" {
+		encoded, encodeErr := json.Marshal([]any{r.ChunkingProfile, quote})
+		if encodeErr != nil {
+			t.Fatal(encodeErr)
+		}
+		chunk.EncodingKey = object.Hash(encoded)
+	}
 	chunkManifest := map[string]any{"schema_version": 1, "module_id": m.Id, "release_id": r.ReleaseId,
 		"input_manifest_hash": r.ManifestHash, "profile": r.ChunkingProfile, "parser_version": "sea.paragraph.v1",
 		"chunker_version": "trpc.fixed.v1.8.1", "chunk_size": 32, "overlap": 0,
 		"inputs": []any{map[string]any{"revision_id": a.RevisionId, "content_id": a.EntityId,
 			"source_kind": a.Kind, "original": chunk.Original, "chunk_count": 1}}, "chunks": []types.CitationChunk{chunk}}
-	index := testenv.Index(t, s, build, r)
-	index.ChunkManifest = testenv.Put(t, s, chunkManifest)
-	ref := testenv.Put(t, s, index)
+	if realBGE != "" {
+		wikiText := "My interpretation"
+		wikiHash := object.Hash([]byte(wikiText))
+		wikiIdentity, identityErr := json.Marshal([]any{w.RevisionId, r.ChunkingProfile, 1, 0, wikiHash})
+		if identityErr != nil {
+			t.Fatal(identityErr)
+		}
+		wikiEncoding, encodeErr := json.Marshal([]any{r.ChunkingProfile, wikiText})
+		if encodeErr != nil {
+			t.Fatal(encodeErr)
+		}
+		wikiChunk := types.CitationChunk{ChunkId: object.Hash(wikiIdentity), RevisionId: w.RevisionId,
+			ContentId: w.EntityId, SourceKind: w.Kind, Original: types.CitationObject{Key: w.ObjectKey, Sha256: w.ContentHash},
+			Location: types.CitationLocation{Locator: "paragraph:1", OriginalByteStart: 0,
+				OriginalByteEnd: len(wikiText), NormalizedRuneStart: 0, NormalizedRuneEnd: len([]rune(wikiText))},
+			Text: wikiText, TextHash: wikiHash, EncodingKey: object.Hash(wikiEncoding), Required: true}
+		chunkManifest["inputs"] = []any{map[string]any{"revision_id": a.RevisionId, "content_id": a.EntityId,
+			"source_kind": a.Kind, "original": chunk.Original, "chunk_count": 1},
+			map[string]any{"revision_id": w.RevisionId, "content_id": w.EntityId,
+				"source_kind": w.Kind, "original": wikiChunk.Original, "chunk_count": 1}}
+		chunkManifest["chunks"] = []types.CitationChunk{chunk, wikiChunk}
+	}
+	chunkManifestRef := testenv.Put(t, s, chunkManifest)
+	var index model.IndexManifest
+	var ref model.ArtifactRef
+	var realSearchEndpoint string
+	if realBGE == "" {
+		index = testenv.Index(t, s, build, r)
+		index.ChunkManifest = chunkManifestRef
+		ref = testenv.Put(t, s, index)
+	} else {
+		setup := &realIndexSetup{DCRuntime: realBGE, ArtifactDir: filepath.Join(dir, "objects"),
+			ChunkManifest: chunkManifestRef, BuildID: build.BuildId, ReleaseID: r.ReleaseId,
+			Generation: build.Generation, ResultPath: filepath.Join(dir, "btw-real-index-result.json"),
+			ExpectedQuote: quote, ExpectedChunkID: chunk.ChunkId}
+		realSearchEndpoint = startRealBTWProductServer(t, dir, os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT"),
+			base, c.WorkerToken, m.Id, &chunk, setup)
+		resultRaw, readErr := os.ReadFile(setup.ResultPath)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		var result realIndexResult
+		if err := json.Unmarshal(resultRaw, &result); err != nil || result.ChunkCount != 2 || len(result.Indexes) != 3 {
+			t.Fatal("BTW actual BGE three-lane result incomplete")
+		}
+		ref = result.IndexManifest
+		indexRaw, getErr := s.Objects.Get(context.Background(), ref.Key, ref.SHA256)
+		if getErr != nil || json.Unmarshal(indexRaw, &index) != nil || index.ChunkManifest != chunkManifestRef ||
+			index.ChunkCount != 2 || len(index.Lanes) != 3 {
+			t.Fatal("RTW cannot read BTW actual three-lane index manifest")
+		}
+		for _, lane := range index.Lanes {
+			if result.Indexes[lane.Profile.Lane] != lane.Artifact {
+				t.Fatal("BTW reported lane reference differs from immutable index manifest")
+			}
+		}
+	}
 	result := types.AcceptBuildReq{Generation: build.Generation, AttemptId: build.AttemptId, LeaseEpoch: build.LeaseEpoch, ManifestHash: build.ManifestHash, State: "READY", IndexManifestRef: ref.Key, IndexManifestHash: ref.SHA256}
 	request("POST", "/internal/v1/knowledge/builds/"+build.BuildId+"/results", c.WorkerToken, result, &build, 200)
 	request("GET", "/v1/knowledge/modules/"+m.Id+"/published", "", nil, nil, 404)
@@ -661,7 +731,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if btwRoot := os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT"); btwRoot != "" {
 		// Stage four is only a byte-preserving relay. The independent BTW test
 		// process verifies RTW's scope and commits through its real RootSessionBoundary.
-		endpoint := startRealBTWProductServer(t, dir, btwRoot, base, c.WorkerToken, m.Id, nil)
+		endpoint := startRealBTWProductServer(t, dir, btwRoot, base, c.WorkerToken, m.Id, nil, nil)
 		searchFixture.mu.Lock()
 		searchFixture.forwardURL = endpoint
 		searchFixture.mu.Unlock()
@@ -700,15 +770,22 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		if !reflect.DeepEqual(replayedReal, realResult) {
 			t.Fatalf("real BTW answer and RTW operation GET differ: %+v", replayedReal)
 		}
-		// This second process receives only a published chunk identity. It
-		// independently rereads RTW's active snapshot and exact source, accepts
-		// the citation, runs the native summary Graph, and commits the turn.
-		endpoint = startRealBTWProductServer(t, dir, btwRoot, base, c.WorkerToken, m.Id, &chunk)
+		// The structural path starts a second process with a published chunk
+		// identity. The real-index path reuses the process that built the three
+		// immutable lanes before RTW accepted and published their refs.
+		if realSearchEndpoint != "" {
+			endpoint = realSearchEndpoint
+		} else {
+			endpoint = startRealBTWProductServer(t, dir, btwRoot, base, c.WorkerToken, m.Id, &chunk, nil)
+		}
 		searchFixture.mu.Lock()
 		searchFixture.forwardURL = endpoint
 		searchFixture.mu.Unlock()
 		citedBody := map[string]any{"module_id": m.Id, "query": "What does Book A say?",
 			"depth": "fast", "intelligence": "low", "idempotency_key": "product-search-real-btw-cited-1"}
+		if realSearchEndpoint != "" {
+			citedBody["query"] = quote // exact self-query requires all three real BGE lanes to hit.
+		}
 		callsBeforeCited := searchFixture.calls.Load()
 		var cited types.ProductSearchResult
 		request("POST", searchPath, productToken, citedBody, &cited, 200)

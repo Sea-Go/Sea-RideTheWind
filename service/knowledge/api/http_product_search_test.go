@@ -27,6 +27,79 @@ import (
 
 const productFixtureScopeKey = "test-only-search-scope-key-32-bytes-minimum"
 
+// The optional real-index handoff is private task data. The DC runtime file
+// contains only disposable local credentials and is never copied into Git.
+type realIndexSetup struct {
+	DCRuntime       string            `json:"dc_runtime"`
+	ArtifactDir     string            `json:"artifact_dir"`
+	ChunkManifest   model.ArtifactRef `json:"chunk_manifest"`
+	BuildID         string            `json:"build_id"`
+	ReleaseID       string            `json:"release_id"`
+	Generation      int64             `json:"generation"`
+	ResultPath      string            `json:"result_path"`
+	ExpectedQuote   string            `json:"expected_quote"`
+	ExpectedChunkID string            `json:"expected_chunk_id"`
+}
+
+type realIndexResult struct {
+	IndexManifest model.ArtifactRef            `json:"index_manifest"`
+	Indexes       map[string]model.ArtifactRef `json:"indexes"`
+	ChunkCount    int                          `json:"chunk_count"`
+}
+
+func realBGEProfiles(t *testing.T, runtimePath string) []types.RetrievalProfile {
+	t.Helper()
+	info, err := os.Stat(runtimePath)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
+		t.Fatalf("DataCenter BGE runtime must be a private regular file: %v", err)
+	}
+	raw, err := os.ReadFile(runtimePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var runtime struct {
+		Endpoint       string `json:"endpoint"`
+		Configurations map[string]struct {
+			Profile struct {
+				Model    string `json:"model"`
+				Space    string `json:"representation_space"`
+				Contract struct {
+					Kind        string `json:"kind"`
+					Dimensions  int    `json:"dimensions"`
+					TokenizerID string `json:"tokenizer_id"`
+					Aggregation string `json:"aggregation"`
+				} `json:"representation_contract"`
+			} `json:"profile"`
+		} `json:"configurations"`
+	}
+	if err = json.Unmarshal(raw, &runtime); err != nil || runtime.Endpoint == "" || len(runtime.Configurations) != 3 {
+		t.Fatal("incomplete actual DataCenter BGE runtime")
+	}
+	profiles := make([]types.RetrievalProfile, 0, 3)
+	for _, kind := range []string{"dense", "sparse", "token_matrix"} {
+		wire, ok := runtime.Configurations[kind]
+		if !ok || wire.Profile.Model == "" || wire.Profile.Space == "" ||
+			wire.Profile.Contract.Kind != kind || wire.Profile.Contract.TokenizerID == "" || wire.Profile.Contract.Dimensions < 1 {
+			t.Fatalf("DataCenter BGE %s profile incomplete", kind)
+		}
+		lane := kind
+		if kind == "token_matrix" {
+			lane = "multivector"
+		}
+		p := types.RetrievalProfile{Lane: lane, Encoder: wire.Profile.Model,
+			Tokenizer: wire.Profile.Contract.TokenizerID, Space: wire.Profile.Space,
+			Dimensions: wire.Profile.Contract.Dimensions}
+		if kind == "token_matrix" {
+			p.Mask, p.Aggregation = "valid", wire.Profile.Contract.Aggregation
+			if p.Aggregation != "mean_maxsim" {
+				t.Fatal("actual BGE ColBERT profile must retain mean_maxsim")
+			}
+		}
+		profiles = append(profiles, p)
+	}
+	return profiles
+}
+
 type productFixtureScope struct {
 	Audience               string                   `json:"aud"`
 	Subject                types.AcceptedSubjectRef `json:"subject_ref"`
@@ -221,7 +294,8 @@ func decodeProductFixtureScope(t *testing.T, header string) (productFixtureScope
 // startRealBTWProductServer starts an independently compiled BTW test process.
 // The existing fixture remains a byte-preserving relay, so its test stages
 // cannot fabricate an accepted turn for this path.
-func startRealBTWProductServer(t *testing.T, dir, btwRoot, rtwBase, workerToken, moduleID string, candidate *types.CitationChunk) string {
+func startRealBTWProductServer(t *testing.T, dir, btwRoot, rtwBase, workerToken, moduleID string,
+	candidate *types.CitationChunk, real *realIndexSetup) string {
 	t.Helper()
 	variant := "empty"
 	if candidate != nil {
@@ -232,10 +306,14 @@ func startRealBTWProductServer(t *testing.T, dir, btwRoot, rtwBase, workerToken,
 	fixture, err := json.Marshal(map[string]string{"rtw_base": rtwBase, "worker_token": workerToken,
 		"scope_key": productFixtureScopeKey, "ready_path": readyPath, "module_id": moduleID})
 	if candidate != nil {
-		fixture, err = json.Marshal(map[string]any{"rtw_base": rtwBase, "worker_token": workerToken,
+		values := map[string]any{"rtw_base": rtwBase, "worker_token": workerToken,
 			"scope_key": productFixtureScopeKey, "ready_path": readyPath, "module_id": moduleID,
 			"candidate": map[string]string{"revision_id": candidate.RevisionId,
-				"chunk_id": candidate.ChunkId, "quote_hash": candidate.TextHash}})
+				"chunk_id": candidate.ChunkId, "quote_hash": candidate.TextHash}}
+		if real != nil {
+			values["real_index"] = real
+		}
+		fixture, err = json.Marshal(values)
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -284,7 +362,11 @@ func startRealBTWProductServer(t *testing.T, dir, btwRoot, rtwBase, workerToken,
 			t.Logf("BTW product server log: %s", log)
 		}
 	})
-	for deadline := time.Now().Add(45 * time.Second); time.Now().Before(deadline); time.Sleep(25 * time.Millisecond) {
+	startup := 45 * time.Second
+	if real != nil {
+		startup = 4 * time.Minute // actual CPU BGE encoding and all three self probes
+	}
+	for deadline := time.Now().Add(startup); time.Now().Before(deadline); time.Sleep(25 * time.Millisecond) {
 		contents, err := os.ReadFile(readyPath)
 		if err != nil {
 			continue
