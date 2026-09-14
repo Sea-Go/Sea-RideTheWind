@@ -8,4 +8,6 @@ RTW父测试从自己的HTTP及PG `knowledge_builds`复核READY/代/Ref/hash，`
 
 复验命令：`SEA_BTW_INDEX_CONSUMER_ROOT=<BTW集成树> bash service/knowledge/scripts/acceptance.sh`，脚本创建/停止独立PG16并跑完整知识服务race、真实HTTP与vet；BTW子脚本自启停另一组PG16，跑单个跨仓消费者race、worker vet和diff检查。原同仓`TestRealHTTPKnowledgeWorkflow`、生产知识服务API以及其它原测试仍通过。BTW对应范围见`cmd/worker/RTW_REAL_INDEX_ACCEPTANCE.md`。
 
+合入RTW知识服务集成树后，又以`KNOWLEDGE_REAL_USER_GATE=1`、`SEA_BTW_CITATION_CONSUMER_ROOT=<BTW集成树>`和`SEA_BTW_INDEX_CONSUMER_ROOT=<BTW集成树>`同时运行**完整**脚本，退出码0。真实User Center/User RPC+知识HTTP/隔离PG的主体状态测试、BTW当前发布引用/已接纳答案、BTW三路local-exact索引到真RTW READY均在同一固定代码基线重跑，两个RTW HTTP工作流和两类BTW子测试全部PASS。来源/模型/技术job的fixture范围不因此改变。
+
 **尚未验证**：实际DC BGE-M3而非固定2维表示fixture、真实DC jobs进程、Milvus Dense/Sparse/Multi-vector同代索引、生产对象存储、正式发布指针及搜索消费、Collector下钻、跨DC job的全局build epoch分配和性能/故障恢复容量。因此不得把本次“RTW READY”写成产品已发布或完整H06/J01验收。
