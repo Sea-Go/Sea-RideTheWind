@@ -216,6 +216,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				},
 				{
 					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/search-snapshot",
+					Handler: worker.GetCurrentSearchSnapshotHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
 					Path:    "/releases/:release_id",
 					Handler: worker.GetReleaseHandler(serverCtx),
 				},

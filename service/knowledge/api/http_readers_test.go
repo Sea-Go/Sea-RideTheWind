@@ -18,7 +18,7 @@ type httpRequest func(method, path, auth string, in, out any, want int)
 
 // verifyProductReaders runs through the real go-zero process. Structural READY
 // fixtures unlock publication; they do not claim actual indexing/model quality.
-func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, token, objectRoot string, m types.Module, a, w types.Revision, r types.Release, b types.Build) {
+func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, token, workerToken, objectRoot string, m types.Module, a, w types.Revision, r types.Release, b types.Build) {
 	t.Helper()
 	modulePath := "/v1/knowledge/modules/" + m.Id
 	var draft types.Module
@@ -114,6 +114,12 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 		request("GET", path, "", nil, nil, 404)
 	}
 	request("PUT", modulePath+"/activation", token, types.ActivateReq{ReleaseId: r2.ReleaseId, BuildId: candidate.BuildId, ExpectedPointerRevision: 1, Reason: "publish new interpretation"}, nil, 200)
+	snapshotPath := "/internal/v1/knowledge/modules/" + m.Id + "/search-snapshot"
+	var snapshot types.SearchSnapshot
+	request("GET", snapshotPath, workerToken, nil, &snapshot, 200)
+	if snapshot.ReleaseId != r2.ReleaseId || snapshot.Generation != candidate.Generation || snapshot.PublicationRevision != "2" {
+		t.Fatalf("current search snapshot followed historical release: %+v", snapshot)
+	}
 	request("GET", modulePath+"/published-releases/"+r.ReleaseId, "", nil, &loadedRelease, 200)
 	if loadedRelease.ReleaseId != r.ReleaseId {
 		t.Fatal("historical release followed active pointer")
@@ -151,6 +157,10 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 		t.Fatal(err)
 	}
 	request("POST", modulePath+"/withdrawals", token, types.WithdrawReq{TargetKind: "revision", TargetId: w.RevisionId, Reason: "withdraw historical interpretation", IdempotencyKey: "withdraw-old-http"}, nil, 200)
+	request("GET", snapshotPath, workerToken, nil, &snapshot, 200)
+	if snapshot.ReleaseId != r2.ReleaseId || snapshot.PublicationRevision != "2" {
+		t.Fatal("withdrawal of historical member changed current snapshot", snapshot)
+	}
 	request("GET", publicOld+"/"+w.RevisionId, "", nil, nil, 410)
 	request("GET", publicOld, "", nil, nil, 410)
 	request("GET", modulePath+"/published-releases/"+r.ReleaseId, "", nil, nil, 410)
@@ -162,6 +172,7 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 	if loaded.Lifecycle != "WITHDRAWN" {
 		t.Fatal("admin lost withdrawn module details", loaded)
 	}
+	request("GET", snapshotPath, workerToken, nil, nil, 410)
 }
 
 func verifyPagedReaderSchema(t *testing.T, request httpRequest, token, path string) {

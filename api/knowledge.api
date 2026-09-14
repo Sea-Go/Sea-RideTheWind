@@ -227,6 +227,19 @@ type (
 		Msg  string        `json:"msg"`
 		Data CitationChunk `json:"data"`
 	}
+	SearchSnapshot {
+		ModuleId            string                    `json:"module_id"`
+		ReleaseId           string                    `json:"release_id"`
+		Generation          int64                     `json:"generation"`
+		PublicationRevision string                    `json:"publication_revision"`
+		Indexes             map[string]CitationObject `json:"indexes"`
+		ValidRevisionIds    []string                  `json:"valid_revision_ids"`
+	}
+	SearchSnapshotEnvelope {
+		Code int            `json:"code"`
+		Msg  string         `json:"msg"`
+		Data SearchSnapshot `json:"data"`
+	}
 	AcceptSearchCitationsReq {
 		SearchId string `json:"search_id"`
 		PackJson string `json:"pack_json"`
@@ -596,6 +609,9 @@ service knowledge-api {
 	middleware: Worker
 )
 service knowledge-api {
+	@handler GetCurrentSearchSnapshot
+	get /modules/:module_id/search-snapshot (ModulePath) returns (SearchSnapshotEnvelope)
+
 	@handler ReadSearchSource
 	post /search-sources/read (ReadSearchSourceReq) returns (CitationChunkEnvelope)
 

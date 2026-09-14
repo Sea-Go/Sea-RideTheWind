@@ -36,13 +36,13 @@ var operations = map[string]bool{
 	"knowledge.build.create": true, "knowledge.build.claim": true, "knowledge.build.accept": true, "knowledge.build.cancel": true,
 	"knowledge.compile.create": true, "knowledge.compile.claim": true, "knowledge.compile.accept": true, "knowledge.compile.cancel": true,
 	"knowledge.release.activate": true, "knowledge.content.withdraw": true, "knowledge.outbox.deliver": true,
-	"knowledge.outbox.poll":        true,
-	"knowledge.search.source.read": true, "knowledge.search.citations.accept": true, "knowledge.search.citations.get": true,
+	"knowledge.outbox.poll":             true,
+	"knowledge.search.snapshot.current": true, "knowledge.search.source.read": true, "knowledge.search.citations.accept": true, "knowledge.search.citations.get": true,
 	"knowledge.answer.accept": true, "knowledge.answer.get": true, "knowledge.answer.list": true,
 }
 
 var readOnlyOperations = map[string]bool{
-	"knowledge.search.source.read": true, "knowledge.search.citations.get": true,
+	"knowledge.search.snapshot.current": true, "knowledge.search.source.read": true, "knowledge.search.citations.get": true,
 	"knowledge.answer.get": true, "knowledge.answer.list": true, "knowledge.outbox.poll": true,
 }
 

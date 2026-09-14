@@ -1208,6 +1208,91 @@
         }
       }
     },
+    "/internal/v1/knowledge/modules/{module_id}/search-snapshot": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetCurrentSearchSnapshot",
+        "operationId": "workerGetCurrentSearchSnapshot",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "module_id",
+                    "release_id",
+                    "generation",
+                    "publication_revision",
+                    "indexes",
+                    "valid_revision_ids"
+                  ],
+                  "properties": {
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "indexes": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "key",
+                          "sha256"
+                        ],
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "sha256": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "publication_revision": {
+                      "type": "string"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "valid_revision_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/knowledge/releases/{release_id}": {
       "get": {
         "produces": [
