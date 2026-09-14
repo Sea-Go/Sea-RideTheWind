@@ -103,6 +103,16 @@ func (l *DeleteCommentLogic) DeleteComment(in *pb.DeleteCommentReq) (resp *pb.De
 
 	remainCount, err := l.svcCtx.CommentModel.DeleteCommentTx(ctx, in.CommentId, in.UserId, in.TargetType, in.TargetId)
 	if err != nil {
+		if err == model.ErrorCommentNotFound {
+			result = "biz_fail"
+			err = errmsg.NewGrpcErr(errmsg.ErrorCommentNotExist, "评论不存在")
+			return nil, err
+		}
+		if err == model.ErrorCommentForbidden {
+			result = "biz_fail"
+			err = errmsg.NewGrpcErr(errmsg.ErrorUserNoRight, "无权执行删除操作")
+			return nil, err
+		}
 		result = "sys_fail"
 		span.RecordError(err)
 		logger.LogBusinessErr(ctx, errmsg.ErrorDbUpdate, err)
