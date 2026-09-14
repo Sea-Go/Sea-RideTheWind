@@ -19,6 +19,8 @@ import (
 
 var favoriteReceiptHash = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
+var ErrFavoriteFactBlocked = errors.New("favorite fact frozen envelope blocked")
+
 // FavoriteWireEvent is the DC H04 envelope stored verbatim in the RTW business
 // transaction. Its payload stays owned by the favorite domain.
 type FavoriteWireEvent struct {
@@ -148,7 +150,17 @@ func (m *FavoriteModel) DispatchFavoriteFactOnce(ctx context.Context, sender Fav
 	}
 	var event FavoriteWireEvent
 	if err := json.Unmarshal([]byte(row.Payload), &event); err != nil || !validFavoriteDelivery(row, event) {
-		return false, errors.New("favorite fact outbox envelope conflicts with source row")
+		if updateErr := tx.Model(&FavoriteFactOutbox{}).Where("event_id = ?", row.EventID).
+			Update("status", FavoriteFactBlocked).Error; updateErr != nil {
+			return false, updateErr
+		}
+		if commitErr := tx.Commit().Error; commitErr != nil {
+			return false, commitErr
+		}
+		slog.WarnContext(ctx, "favorite fact frozen envelope blocked", "event", "favorite.delivery.blocked",
+			"event_id", row.EventID, "producer", favoriteProducer, "outcome", "manual_migration_required",
+			"error_code", "INVALID_FROZEN_ENVELOPE")
+		return false, ErrFavoriteFactBlocked
 	}
 	slog.InfoContext(ctx, "favorite fact delivery started", "event", "favorite.delivery.started",
 		"event_id", event.EventID, "producer", event.Producer, "aggregate_version", event.AggregateVersion)

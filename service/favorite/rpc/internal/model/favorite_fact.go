@@ -16,6 +16,7 @@ const (
 	FavoriteFactPending = 0
 	FavoriteFactSent    = 1
 	FavoriteFactFailed  = 2
+	FavoriteFactBlocked = 3 // frozen envelope requires explicit migration
 )
 
 var ErrFavoriteOwnerMismatch = errors.New("favorite owner mismatch")

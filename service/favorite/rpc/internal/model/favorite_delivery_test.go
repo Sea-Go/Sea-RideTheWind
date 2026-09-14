@@ -409,6 +409,53 @@ func TestFavoriteDeliveryRealDataCenterSnowflakeIDs(t *testing.T) {
 			t.Fatalf("cross-user or old-source fixture became authoritative: event=%s status=%d", row.EventID, status)
 		}
 	}
+	// A pre-existing unsafe numeric Outbox row is quarantined without
+	// changing its event ID/body, so a later valid event can reach real DC.
+	const blockedID, followingID int64 = 9007199254741023, 9007199254741025
+	blockedItem := FavoriteItem{FavoriteId: blockedID, FolderId: folderID, UserId: 1001,
+		TargetType: "article", TargetId: "article-legacy-number"}
+	if err := store.conn.Create(&blockedItem).Error; err != nil {
+		t.Fatal(err)
+	}
+	blocked, err := favoriteOutbox(blockedItem, 1, "assert", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocked.Payload = strings.ReplaceAll(blocked.Payload,
+		`"favorite_id":"9007199254741023"`, `"favorite_id":9007199254741023`)
+	blocked.Payload = strings.ReplaceAll(blocked.Payload,
+		`"folder_id":"9007199254740993"`, `"folder_id":9007199254740993`)
+	if err := store.conn.Create(&blocked).Error; err != nil {
+		t.Fatal(err)
+	}
+	var frozenBlocked FavoriteFactOutbox
+	if err := store.conn.Where("event_id = ?", blocked.EventID).Take(&frozenBlocked).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InsertFavorite(ctx, &FavoriteItem{FavoriteId: followingID, FolderId: folderID,
+		UserId: 1001, TargetType: "article", TargetId: "article-after-legacy"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := runFavoriteDispatchProcess(t, store, endpoint, token); err == nil {
+		t.Fatal("unsafe legacy event was dispatched to DC")
+	}
+	var quarantined FavoriteFactOutbox
+	if err := store.conn.Where("event_id = ?", blocked.EventID).Take(&quarantined).Error; err != nil ||
+		quarantined.Status != FavoriteFactBlocked || quarantined.Payload != frozenBlocked.Payload {
+		t.Fatalf("unsafe frozen event was not preserved and blocked: row=%+v err=%v", quarantined, err)
+	}
+	if status, _ := readFavoriteAuthority(t, authorityURL, authorityToken,
+		"rtw.community.favorite", blocked.EventID); status != 404 {
+		t.Fatalf("blocked legacy source was published: %d", status)
+	}
+	if err := runFavoriteDispatchProcess(t, store, endpoint, token); err != nil {
+		t.Fatalf("blocked legacy row starved valid DC successor: %v", err)
+	}
+	following := readFavoriteDCReceipt(t, &http.Client{Timeout: 3 * time.Second}, baseURL, token,
+		"favorite.9007199254741025.v1")
+	if following.Offset != second.Offset+1 {
+		t.Fatalf("valid DC successor offset after blocked row: %+v", following)
+	}
 }
 
 func TestFavoriteAuthorityProcessDefaultClosed(t *testing.T) {
