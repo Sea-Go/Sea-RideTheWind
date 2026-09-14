@@ -1,5 +1,5 @@
 // Package identity resolves a user from the authenticated usercenter JWT and
-// the authoritative UserService. Tenant membership is not represented here.
+// the authoritative UserService into RTW's single-platform subject namespace.
 package identity
 
 import (
@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"sea-try-go/service/user/user/rpc/pb"
 
@@ -20,6 +21,22 @@ var (
 	ErrUserNotFound     = errors.New("authenticated user not found")
 	ErrIdentityMismatch = errors.New("authenticated user RPC identity mismatch")
 )
+
+const (
+	// AuthorityID is RTW's stable source for user identities.
+	AuthorityID = "rtw.identity"
+	// PlatformTenantID is a namespace for this single-platform deployment.
+	// It is not an organization or a claim obtained from the client.
+	PlatformTenantID = "platform"
+)
+
+// SubjectRef is the RTW-issued H01 wire value. The three fields are generated
+// by this service from a verified user, never decoded from a client payload.
+type SubjectRef struct {
+	AuthorityID string `json:"authority_id"`
+	TenantID    string `json:"tenant_id"`
+	SubjectID   string `json:"subject_id"`
+}
 
 // UserReader is the narrow authoritative read needed by identity resolution.
 // Production passes the existing UserService gRPC client.
@@ -45,8 +62,7 @@ func ClaimedUID(ctx context.Context) (int64, error) {
 }
 
 // ResolveUser verifies that the authenticated UID still names the same user
-// in RTW. It intentionally does not issue a SubjectRef: RTW currently has no
-// authoritative tenant membership or tenant identifier to put in that value.
+// in RTW. It must be called only behind go-zero's JWT middleware.
 func ResolveUser(ctx context.Context, users UserReader) (*pb.UserInfo, error) {
 	uid, err := ClaimedUID(ctx)
 	if err != nil {
@@ -69,4 +85,19 @@ func ResolveUser(ctx context.Context, users UserReader) (*pb.UserInfo, error) {
 		return nil, ErrIdentityMismatch
 	}
 	return response.User, nil
+}
+
+// ResolveSubjectRef issues a complete source-side SubjectRef in RTW's current
+// single-platform namespace. A future multi-tenant product needs a new
+// authoritative mapping contract before this value can be changed.
+func ResolveSubjectRef(ctx context.Context, users UserReader) (SubjectRef, error) {
+	user, err := ResolveUser(ctx, users)
+	if err != nil {
+		return SubjectRef{}, err
+	}
+	return SubjectRef{
+		AuthorityID: AuthorityID,
+		TenantID:    PlatformTenantID,
+		SubjectID:   strconv.FormatInt(user.Uid, 10),
+	}, nil
 }
