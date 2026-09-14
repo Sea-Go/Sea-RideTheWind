@@ -48,6 +48,14 @@
 
 这次真实进程/PG 联验覆盖：本 UID 的 accepted-answer 列表、AnswerID 和该答案引用状态；参数中伪造另一个**实际注册** UID 仍只读到自己；另一用户 JWT 对同会话得空列表、对 AnswerID/引用为 404；第一页和续页 ordinal 顺序；来源撤回后引用状态变 `unavailable`；真实 `DeleteUser` 删除后持旧 JWT 的三个产品读接口均为 403；真实 User RPC 停止后为 503。管理员和 worker token 仍不能访问产品读面，JWT 缺失在 RPC 前为 401。`TestRealHTTPKnowledgeWorkflowWithUserCenter` 与原桩版测试、全部 `service/knowledge/...` race、`go vet` 和 diff-check 均通过。Redis/Etcd 未启动：服务使用直连 RPC，测试 Redis 为非阻塞占位，注册和登录公开路由没有使用 Redis；因此这次**没有验证**登出黑名单或生产服务发现。
 
-发现一个 H02 明确反例：把用户库 `users.status` 更新为 `1` 后，真实 User Center 再登录返回封禁码 `1011`，但真实 User RPC `GetUser` 仍返回 `Found=true`，知识产品历史 GET 仍返回 200。`GetUser` 当前不检查该状态；因本切片的 `[W1]` 仅限知识 API 测试、验收脚本及本文，没有修改 User RPC 生产逻辑。**停用后的历史/引用禁止读取未通过，WS02-D/H02 整体保持 PARTIAL**；后续应由用户身份权威层决定并返回可供消费者拒绝的状态，再重跑这条真实服务反例。
+该阶段发现一个 H02 明确反例：把用户库 `users.status` 更新为 `1` 后，真实 User Center 再登录返回封禁码 `1011`，但原 User RPC `GetUser` 仍返回 `Found=true` 且不携状态，知识产品历史 GET 仍返回 200。下段记录了此反例的后续修复与复跑；旧结果保留作回归基线。
 
 本次区域：`[W0:ROOT]` 独立 RTW 工作树；`[W1:WRITE]` `service/knowledge/api/http_test.go`、`http_real_user_test.go`、`service/knowledge/scripts/acceptance.sh`、本文；`[R1:READ_ONLY]` User RPC、User Center 生产实现、BTW/Docs；`[D1:DEPENDENCY]` go-zero 1.10.2、pgx 5.10.0；`[G1:GENERATED]` 无修改；`[X1:EXTERNAL]` 只写脚本自建自停的本地 PG16 与子进程；`[N1:OUT_OF_SCOPE]` 用户原工作树、生产用户库、生产身份逻辑；`[T1:TEMP]` 脚本 mktemp 目录和测试专属对象目录。主职责 `[C8:VERIFY]`，跨 `[C1:TRANSPORT]` JWT/HTTP/gRPC 与 `[C4:PERSISTENCE]` 真实 User/Knowledge 隔离数据库。现有前述“真实用户数据库未验”文字是较早固定提交的结果；本段更新了本地证据层级，不表示正式搜索入口、客户端或线上部署完成。
+
+## 停用账户旧 JWT：状态权威回执与复跑
+
+后续小切片保持 User RPC `GetUser` 原有 `Found` 语义，但由数据库 `users.status` 填充 `proto/user.proto` 中新增的 `UserInfo.optional status = 6`。共享 RTW 身份解析要求回执中的 UID 与已验 JWT 相同、状态字段**确实存在**且为 0，才生成 `rtw.identity/platform/<UID>`；非零状态不能建立主体。旧 User RPC 缺字段时显式 503，不将 proto3 默认 0 误判为活跃；数据库状态 1 的旧 JWT 对产品历史列表、AnswerID 和引用状态 GET 都是 403。User Center 的停用账户再次登录仍返回封禁码 1011，另一真实活跃 UID 的空会话列表保持 200。真实删除用户后的三个产品 GET 仍 403，RPC 停服仍 503，撤回后的历史引用仍标 `unavailable`。本地 `KNOWLEDGE_REAL_USER_GATE=1 bash service/knowledge/scripts/acceptance.sh` 再跑退出 0，涵盖独立 PG16、race 插桩 User RPC/User Center 进程、全 `service/knowledge/...` 与 `service/user/user/...` race 测试、两侧 vet、diff-check。固定桩另测旧回执缺字段；用户 RPC 直接 PG 测试证明 0/1/2 均真实传出；proto3 序列化测试证明“缺字段”和“值为 0”可区分。
+
+`GetUser` 的其他现有调用方包括文章作者名、消息资料、收藏/关注存在性判断；它们继续按原有 `Found` 解释，不因本切片变成“用户不存在”。管理员用户查询走独立 Admin RPC。`UserInfo` 新字段按 protobuf 字段号向后兼容，但知识新解析要求先升级**所有** User RPC 实例，再切知识 API/User Center 身份解析；混合版本期间旧 RPC 回执会得到 503。User RPC 登录逻辑当前只拦数据库状态 1，其他非零状态的账户语义仍待统一；Redis 登出黑名单、正式服务发现、RTW 用户事件→DC→BTW、客户端与线上密钥/部署仍未联验，WS02-D/H02 整体保持 `PARTIAL`。
+
+本增量区域：`[W0:ROOT]` 本独立 RTW 工作树；`[W1:WRITE]` `proto/user.proto`、其生成的 `service/user/user/rpc/pb/user.pb.go`、User RPC `GetUser`、共享及兼容身份解析与直接测试、知识 HTTP 身份响应/联验、脚本和两份验收文档；`[R1:READ_ONLY]` article/message/favorite/follow/admin 消费者与 BTW/Docs；`[D1:DEPENDENCY]` go-zero 1.10.2、protobuf Go 1.36.11；`[G1:GENERATED]` `pb/user.pb.go` 仅由 proto 源与固定 protoc/protoc-gen-go 版本再生；`[X1:EXTERNAL]` 仅脚本自启停的本地 PG16、进程和合成账户；`[N1:OUT_OF_SCOPE]` 原用户工作树、共享/生产 DB、部署；`[T1:TEMP]` 本任务临时 protoc 工具和验收目录。主职责 `[C7:CONTRACT]`，跨 `[C1:TRANSPORT]`、`[C2:APPLICATION]`、`[C4:PERSISTENCE]`、`[C8:VERIFY]`。本结果只接纳**停用旧 JWT 的局部协议/数据库链路**，H02 不整体通过。
