@@ -195,6 +195,7 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 	cmd.Env = append(os.Environ(),
 		"BTW_SEARCH_MODE=local-exact", "BTW_SEARCH_API_ADDR="+apiAddr,
 		"BTW_SEARCH_METRICS_ADDR="+metricsAddr, "BTW_SEARCH_SCOPE_KEY="+productFixtureScopeKey,
+		"BTW_SEARCH_TOOLS_SCOPE_KEY="+toolFixtureScopeKey,
 		"BTW_RTW_URL="+rtwBase, "BTW_RTW_TOKEN="+workerToken,
 		"BTW_DC_URL="+dc.Endpoint, "BTW_DC_TOKEN="+dc.Token,
 		"BTW_SEARCH_MODEL_URL="+modelServer.URL+"/v1",
