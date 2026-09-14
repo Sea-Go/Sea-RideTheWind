@@ -14,8 +14,6 @@ import (
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/common/snowflake"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -63,16 +61,9 @@ func (l *DeleteArticleLogic) DeleteArticle(in *__.DeleteArticleRequest) (*__.Del
 		return nil, err
 	}
 
-	if article.Content != "" {
-		timer := prometheus.NewTimer(metrics.MinioRequestDuration.WithLabelValues("delete"))
-		err = l.svcCtx.MinioClient.RemoveObject(spanCtx, l.svcCtx.Config.MinIO.BucketName, article.Content, minio.RemoveObjectOptions{})
-		timer.ObserveDuration()
-		if err != nil {
-			metrics.MinioRequestErrors.WithLabelValues("delete").Inc()
-			logger.LogBusinessErr(spanCtx, errmsg.ErrorMinioDelete, fmt.Errorf("remove minio object failed: %w", err), logger.WithArticleID(in.ArticleId))
-			return nil, err
-		}
-	}
+	// Published revisions and their frozen source bytes must remain
+	// readable by historical H03 consumers after a logical deletion. Object
+	// garbage collection requires a separate retention/acknowledgement policy.
 
 	eventID, err := l.newDeleteEventID()
 	if err != nil {
@@ -91,6 +82,9 @@ func (l *DeleteArticleLogic) DeleteArticle(in *__.DeleteArticleRequest) (*__.Del
 	}
 
 	if err := l.svcCtx.ArticleRepo.RunInTx(spanCtx, func(tx *gorm.DB) error {
+		if err := mqs.RetractPublicationTx(spanCtx, tx, article, eventID, time.Now()); err != nil {
+			return err
+		}
 		if err := l.svcCtx.ArticleSyncOutbox.CreateTx(spanCtx, tx, outbox); err != nil {
 			return err
 		}

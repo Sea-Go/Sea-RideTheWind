@@ -2,6 +2,8 @@ package logic
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -84,6 +86,9 @@ func (l *UpdateArticleLogic) UpdateArticle(in *__.UpdateArticleRequest) (*__.Upd
 	case prevPublished && sourceChanged:
 		mqs.SetSyncState(article, "queued", "pending_review", mqs.ArticleSyncReasonUpdate, "", now.UnixMilli(), "")
 		article.Status = int32(__.ArticleStatus_REVIEWING)
+		if err := l.setReviewNonce(article); err != nil {
+			return nil, err
+		}
 		if err := l.svcCtx.ArticleRepo.Update(ctx, article); err != nil {
 			span.RecordError(err)
 			logger.LogBusinessErr(ctx, errmsg.ErrorDbUpdate, err, logger.WithArticleID(in.ArticleId))
@@ -97,12 +102,19 @@ func (l *UpdateArticleLogic) UpdateArticle(in *__.UpdateArticleRequest) (*__.Upd
 		if in.Status != nil && *in.Status != __.ArticleStatus_ARTICLE_STATUS_UNSPECIFIED && requestedStatus != __.ArticleStatus_PUBLISHED {
 			article.Status = int32(requestedStatus)
 		}
+		review := __.ArticleStatus(article.Status) == __.ArticleStatus_REVIEWING &&
+			(sourceChanged || prevStatus != __.ArticleStatus_REVIEWING)
+		if review {
+			if err := l.setReviewNonce(article); err != nil {
+				return nil, err
+			}
+		}
 		if err := l.svcCtx.ArticleRepo.Update(ctx, article); err != nil {
 			span.RecordError(err)
 			logger.LogBusinessErr(ctx, errmsg.ErrorDbUpdate, err, logger.WithArticleID(in.ArticleId))
 			return nil, err
 		}
-		if __.ArticleStatus(article.Status) == __.ArticleStatus_REVIEWING && (sourceChanged || prevStatus != __.ArticleStatus_REVIEWING) {
+		if review {
 			if err := l.enqueueReview(ctx, article); err != nil {
 				span.RecordError(err)
 				return nil, err
@@ -112,6 +124,16 @@ func (l *UpdateArticleLogic) UpdateArticle(in *__.UpdateArticleRequest) (*__.Upd
 
 	metrics.ArticleTotal.WithLabelValues("update").Inc()
 	return &__.UpdateArticleResponse{Success: true}, nil
+}
+
+func (l *UpdateArticleLogic) setReviewNonce(article *model.Article) error {
+	id, err := l.newEventID()
+	if err != nil {
+		return err
+	}
+	mqs.EnsureExtInfo(article)
+	article.ExtInfo[mqs.ExtReviewNonce] = id
+	return nil
 }
 
 func (l *UpdateArticleLogic) applySourceUpdates(ctx context.Context, article *model.Article, in *__.UpdateArticleRequest) (bool, error) {
@@ -126,11 +148,11 @@ func (l *UpdateArticleLogic) applySourceUpdates(ctx context.Context, article *mo
 		sourceChanged = true
 	}
 	if in.MarkdownContent != nil {
-		objectName := article.Content
-		if objectName == "" {
-			objectName = fmt.Sprintf("%s%s.md", l.svcCtx.Config.MinIO.ArticlePath, article.ID)
-			article.Content = objectName
-		}
+		// Each approved revision must keep its original bytes. The old
+		// articleID.md object or earlier hash key is never overwritten by an
+		// author's next edit.
+		objectName := articleMarkdownObjectName(l.svcCtx.Config.MinIO.ArticlePath,
+			article.ID, *in.MarkdownContent)
 
 		timer := prometheus.NewTimer(metrics.MinioRequestDuration.WithLabelValues("put"))
 		_, err := l.svcCtx.MinioClient.PutObject(
@@ -148,6 +170,7 @@ func (l *UpdateArticleLogic) applySourceUpdates(ctx context.Context, article *mo
 			return false, err
 		}
 		metrics.FileUploadTotal.WithLabelValues("markdown").Inc()
+		article.Content = objectName
 		sourceChanged = true
 	}
 	if in.CoverImageUrl != nil {
@@ -164,6 +187,11 @@ func (l *UpdateArticleLogic) applySourceUpdates(ctx context.Context, article *mo
 	}
 
 	return sourceChanged, nil
+}
+
+func articleMarkdownObjectName(prefix, articleID, markdown string) string {
+	sum := sha256.Sum256([]byte(markdown))
+	return fmt.Sprintf("%s%s-%s.md", prefix, articleID, hex.EncodeToString(sum[:]))
 }
 
 func (l *UpdateArticleLogic) updatePublishedToSourceOnly(ctx context.Context, article *model.Article, requestedStatus __.ArticleStatus, now time.Time) error {
@@ -186,6 +214,9 @@ func (l *UpdateArticleLogic) updatePublishedToSourceOnly(ctx context.Context, ar
 	mqs.SetSyncState(article, "source_only", "pending", mqs.ArticleSyncReasonStatusChange, eventID, versionMs, "")
 
 	if err := l.svcCtx.ArticleRepo.RunInTx(ctx, func(tx *gorm.DB) error {
+		if err := mqs.RetractPublicationTx(ctx, tx, article, eventID, now); err != nil {
+			return err
+		}
 		if err := l.svcCtx.ArticleRepo.UpdateTx(ctx, tx, article); err != nil {
 			return err
 		}
@@ -203,6 +234,7 @@ func (l *UpdateArticleLogic) enqueueReview(ctx context.Context, article *model.A
 		ArticleID:   article.ID,
 		AuthorID:    article.AuthorID,
 		ContentPath: article.Content,
+		ReviewNonce: article.ExtInfo[mqs.ExtReviewNonce],
 	})
 	if err := l.svcCtx.KqPusher.PushWithKey(ctx, article.ID, string(msgBytes)); err != nil {
 		metrics.KafkaPushErrors.WithLabelValues("article_review").Inc()

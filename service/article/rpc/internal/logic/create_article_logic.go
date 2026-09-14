@@ -102,6 +102,7 @@ func (l *CreateArticleLogic) CreateArticle(in *__.CreateArticleRequest) (*__.Cre
 			mqs.ExtLastSyncVersion:   "0",
 			mqs.ExtPendingSyncReason: mqs.ArticleSyncReasonCreate,
 			mqs.ExtLastSyncReason:    mqs.ArticleSyncReasonCreate,
+			mqs.ExtReviewNonce:       articleID,
 		},
 	}
 
@@ -117,6 +118,7 @@ func (l *CreateArticleLogic) CreateArticle(in *__.CreateArticleRequest) (*__.Cre
 		ArticleID:   articleID,
 		AuthorID:    in.AuthorId,
 		ContentPath: objectName,
+		ReviewNonce: articleID,
 	}
 
 	msgBytes, _ := json.Marshal(msg)

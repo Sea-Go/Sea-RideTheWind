@@ -29,12 +29,14 @@ const (
 	ExtLastSyncReason    = "last_sync_reason"
 	ExtPublishedOnce     = "published_once"
 	ExtPendingSyncReason = "pending_sync_reason"
+	ExtReviewNonce       = "review_nonce"
 )
 
 type ArticleReviewMessage struct {
 	ArticleID   string `json:"article_id"`
 	AuthorID    string `json:"author_id"`
 	ContentPath string `json:"content_path"`
+	ReviewNonce string `json:"review_nonce,omitempty"`
 }
 
 type ArticleSyncEvent struct {

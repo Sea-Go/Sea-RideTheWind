@@ -58,6 +58,17 @@ func InitDB(c config.Config) (*gorm.DB, error) {
 	); err != nil {
 		return nil, fmt.Errorf("failed to auto migrate models: %w", err)
 	}
+	var revisionSchemaReady bool
+	if err := db.Raw(`SELECT EXISTS(
+		SELECT 1 FROM pg_trigger
+		WHERE tgname='article_revision_immutable'
+		  AND tgrelid=to_regclass('article_revision')
+	)`).Scan(&revisionSchemaReady).Error; err != nil {
+		return nil, fmt.Errorf("check community revision migration: %w", err)
+	}
+	if !revisionSchemaReady {
+		return nil, fmt.Errorf("community revision migration 002_community_revision.sql is required before article RPC startup")
+	}
 
 	// Keep the local pool conservative so the outbox poller does not exhaust
 	// the shared Postgres instance.
