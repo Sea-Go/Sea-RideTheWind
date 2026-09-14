@@ -1277,6 +1277,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		if dcRoot := os.Getenv("SEA_DC_JOB_PLATFORM_ROOT"); dcRoot != "" {
 			actualDC = startRealDCJobPlatform(t, dir, dcRoot)
 			fixtureData["dc_job_url"], fixtureData["dc_job_token"] = actualDC.BaseURL, actualDC.Token
+			if os.Getenv("SEA_BGE_WORKER_EXPIRY") == "1" {
+				fixtureData["dc_job_dsn"] = actualDC.Pool.Config().ConnString()
+			}
 		}
 		fixtureRaw, marshalErr := json.Marshal(fixtureData)
 		if marshalErr != nil {
@@ -1294,6 +1297,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 				t.Fatal("real BGE worker processes require the locked provider and actual DC jobs")
 			}
 			consumerTest = "TestRTWRealBGEWorkerProcesses"
+			if os.Getenv("SEA_BGE_WORKER_EXPIRY") == "1" {
+				consumerTest = "TestRTWRealBGEWorkerLeaseExpiry"
+			}
 		}
 		consumer.Env = append(os.Environ(), "SEA_RTW_REAL_INDEX_FIXTURE="+fixturePath,
 			"GOFLAGS=-run=^"+consumerTest+"$")
@@ -1335,7 +1341,11 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatalf("RTW HTTP returned a different accepted build: %+v", acceptedBuild)
 		}
 		if actualDC != nil {
-			if handoff.DCJobID == "" || handoff.DCLeaseEpoch != 1 || handoff.RTWLeaseEpoch != 2 ||
+			expectedDC, expectedRTW := int64(1), int64(2)
+			if os.Getenv("SEA_BGE_WORKER_EXPIRY") == "1" {
+				expectedDC, expectedRTW = 2, 3
+			}
+			if handoff.DCJobID == "" || handoff.DCLeaseEpoch != expectedDC || handoff.RTWLeaseEpoch != expectedRTW ||
 				acceptedBuild.LeaseEpoch != handoff.RTWLeaseEpoch {
 				t.Fatalf("actual DC job and RTW build fence were conflated: handoff=%+v RTW=%+v", handoff, acceptedBuild)
 			}
