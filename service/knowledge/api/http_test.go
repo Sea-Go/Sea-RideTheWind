@@ -130,7 +130,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	c.Mode = "test"
 	c.Host = "127.0.0.1"
 	c.Port = port
-	c.Timeout = 15000
+	c.Timeout = 120000
 	c.Log.Mode = "console"
 	c.Log.Level = "info"
 	c.Observability.Version = os.Getenv("KNOWLEDGE_TEST_VERSION")
@@ -143,6 +143,10 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	c.UserRpc.Endpoints = []string{userEndpoint}
 	c.AdministratorIDs = []string{"test-admin"}
 	c.WorkerToken = "synthetic-worker-token"
+	var base string
+	searchFixture := newProductSearchFixture(t, &base, c.WorkerToken)
+	c.SearchSummary.Endpoint = searchFixture.server.URL + "/v1/search/summary"
+	c.SearchSummary.ScopeKey = productFixtureScopeKey
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
 	if err != nil {
 		t.Fatal(err)
@@ -207,7 +211,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Log(string(log))
 		}
 	})
-	base := "http://" + net.JoinHostPort("127.0.0.1", fmtInt(port))
+	base = "http://" + net.JoinHostPort("127.0.0.1", fmtInt(port))
 	client := &http.Client{Timeout: 5 * time.Second}
 	deadline := time.Now().Add(15 * time.Second)
 	for {
@@ -546,6 +550,114 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatal(err)
 		}
 	}
+	searchPath := "/v1/knowledge/answer-sessions/search-facade-session/searches"
+	searchBody := map[string]any{"module_id": m.Id, "query": "What does this book say?",
+		"depth": "fast", "intelligence": "low", "idempotency_key": "product-search-key-1"}
+	request("POST", searchPath, "", searchBody, nil, 401)
+	request("POST", searchPath, productToken, map[string]any{"module_id": m.Id,
+		"query": "hello", "depth": "fast", "intelligence": "low", "idempotency_key": "bad\nkey"}, nil, 400)
+	request("POST", searchPath, productToken, map[string]any{"module_id": m.Id,
+		"query": "hello", "depth": "fast", "intelligence": "low", "idempotency_key": "short"}, nil, 400)
+	request("POST", searchPath, productToken, map[string]any{"module_id": m.Id,
+		"query": "hello", "depth": "fast", "intelligence": "low", "idempotency_key": "product-unexpected", "subject_ref": acceptedSubject}, nil, 400)
+	request("GET", searchPath+"/search_missing", productToken, nil, nil, 404)
+	var productSearch types.ProductSearchResult
+	request("POST", searchPath, productToken, searchBody, &productSearch, 503)
+	if productSearch.Status != "retryable_failure" || productSearch.SearchId == "" || productSearch.AnswerId == "" ||
+		searchFixture.calls.Load() != 1 {
+		t.Fatalf("BTW forged 200 leaked an unaccepted product answer: %+v calls=%d", productSearch, searchFixture.calls.Load())
+	}
+	productSearchID, answerIDForSearch := productSearch.SearchId, productSearch.AnswerId
+	var productStatus types.ProductSearchResult
+	request("GET", searchPath+"/"+productSearchID, productToken, nil, &productStatus, 200)
+	if productStatus.Status != "retryable_failure" || productStatus.AnswerId != answerIDForSearch {
+		t.Fatalf("failed product search lost its stable operation identity: %+v", productStatus)
+	}
+	var emptyProductHistory types.AcceptedAnswersPage
+	request("GET", "/v1/knowledge/answer-sessions/search-facade-session/accepted-answers",
+		productToken, nil, &emptyProductHistory, 200)
+	if len(emptyProductHistory.Items) != 0 {
+		t.Fatalf("forged BTW 200 entered accepted answer history: %+v", emptyProductHistory)
+	}
+	searchFixture.stage.Store(1) // BTW commits via real RTW private HTTP, then returns 502.
+	request("POST", searchPath, productToken, searchBody, &productSearch, 200)
+	if productSearch.Status != "insufficient" || productSearch.SearchId != productSearchID ||
+		productSearch.AnswerId != answerIDForSearch || len(productSearch.Citations) != 0 ||
+		searchFixture.calls.Load() != 2 {
+		t.Fatalf("committed answer was not recovered after lost BTW reply: %+v calls=%d", productSearch, searchFixture.calls.Load())
+	}
+	request("GET", searchPath+"/"+productSearchID, productToken, nil, &productStatus, 200)
+	if !reflect.DeepEqual(productStatus, productSearch) {
+		t.Fatalf("operation GET disagrees with recovered accepted answer: %+v %+v", productStatus, productSearch)
+	}
+	request("POST", searchPath, productToken, searchBody, &productStatus, 200)
+	if !reflect.DeepEqual(productStatus, productSearch) || searchFixture.calls.Load() != 2 {
+		t.Fatal("same-key replay reran BTW or changed accepted answer")
+	}
+	request("GET", searchPath+"/"+productSearchID, otherToken, nil, nil, 404)
+	changedSearchBody := map[string]any{"module_id": m.Id, "query": "a different question",
+		"depth": "fast", "intelligence": "low", "idempotency_key": "product-search-key-1"}
+	request("POST", searchPath, productToken, changedSearchBody, nil, 409)
+	searchFixture.stage.Store(2) // Normal BTW success only after its real RTW commit.
+	newSearchBody := map[string]any{"module_id": m.Id, "query": "A second question",
+		"depth": "detailed", "intelligence": "medium", "idempotency_key": "product-search-key-2"}
+	request("POST", searchPath, productToken, newSearchBody, &productStatus, 200)
+	if productStatus.Status != "insufficient" || productStatus.SearchId == productSearchID || searchFixture.calls.Load() != 3 {
+		t.Fatalf("normal committed BTW response did not verify: %+v calls=%d", productStatus, searchFixture.calls.Load())
+	}
+	searchFixture.stage.Store(3)
+	inFlightBody := map[string]any{"module_id": m.Id, "query": "A held search",
+		"depth": "fast", "intelligence": "high", "idempotency_key": "product-search-key-3"}
+	inFlightRaw, err := json.Marshal(inFlightBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstDone := make(chan error, 1)
+	go func() {
+		req, reqErr := http.NewRequest(http.MethodPost, base+searchPath, bytes.NewReader(inFlightRaw))
+		if reqErr != nil {
+			firstDone <- reqErr
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+productToken)
+		response, reqErr := client.Do(req)
+		if reqErr != nil {
+			firstDone <- reqErr
+			return
+		}
+		io.Copy(io.Discard, response.Body)
+		response.Body.Close()
+		if response.StatusCode != 503 {
+			firstDone <- fmt.Errorf("held POST status=%d, want 503", response.StatusCode)
+			return
+		}
+		firstDone <- nil
+	}()
+	select {
+	case <-searchFixture.entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("first product operation did not reach BTW")
+	}
+	searchFixture.mu.Lock()
+	heldScope := searchFixture.scopes[len(searchFixture.scopes)-1]
+	searchFixture.mu.Unlock()
+	request("GET", searchPath+"/"+heldScope.SearchID, productToken, nil, &productStatus, 202)
+	if productStatus.Status != "in_flight" || productStatus.AnswerId != heldScope.AnswerID {
+		t.Fatalf("running operation GET lost stable identity: %+v", productStatus)
+	}
+	request("POST", searchPath, productToken, inFlightBody, &productStatus, 202)
+	if searchFixture.calls.Load() != 4 {
+		t.Fatal("duplicate operation bypassed active lease and called BTW")
+	}
+	close(searchFixture.release)
+	if err := <-firstDone; err != nil {
+		t.Fatal(err)
+	}
+	request("GET", searchPath+"/"+heldScope.SearchID, productToken, nil, &productStatus, 200)
+	if productStatus.Status != "retryable_failure" {
+		t.Fatalf("failed held operation is not queryable: %+v", productStatus)
+	}
 	productPath := "/v1/knowledge/answer-sessions/" + commitAnswer.SessionId + "/accepted-answers"
 	citationStatePath := productPath + "/" + answerID + "/citations"
 	var beforeUnauthorized int64
@@ -649,6 +761,8 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		// A disabled account is still returned by today's GetUser handler. This
 		// observed counterexample keeps the H02 disable gate open.
 		realUsers.markDisabled(t, productUID)
+		request("POST", searchPath, productToken, searchBody, nil, 403)
+		request("GET", searchPath+"/"+productSearchID, productToken, nil, nil, 403)
 		request("GET", productPath, productToken, nil, nil, 403)
 		request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
 		request("GET", citationStatePath, productToken, nil, nil, 403)
@@ -665,6 +779,8 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		userServer.Stop()
 	}
 	request("GET", productPath, productToken, nil, nil, 503)
+	request("POST", searchPath, productToken, searchBody, nil, 503)
+	request("GET", searchPath+"/"+productSearchID, productToken, nil, nil, 503)
 	request("GET", citationStatePath, productToken, nil, nil, 503)
 	if btwRoot := os.Getenv("SEA_BTW_INDEX_CONSUMER_ROOT"); btwRoot != "" {
 		// A separate unpublished module gives BTW an actual, unclaimed RTW
