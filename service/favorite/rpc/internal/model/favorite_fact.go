@@ -55,8 +55,10 @@ type favoriteFactPayload struct {
 	SourceRef      string             `json:"source_ref"`
 	EventTime      string             `json:"event_time"`
 	AvailableAt    string             `json:"available_at"`
-	FavoriteID     int64              `json:"favorite_id"`
-	FolderID       int64              `json:"folder_id"`
+	// Business IDs are decimal strings: DC's JCS input hash rejects JSON
+	// integers above 2^53, while production Snowflake IDs exceed that range.
+	FavoriteID string `json:"favorite_id"`
+	FolderID   string `json:"folder_id"`
 }
 
 type favoriteEvent struct {
@@ -87,7 +89,8 @@ func favoriteOutbox(item FavoriteItem, version int64, operation string, now time
 			Subject:    favoriteSubjectRef{"rtw.identity", "platform", strconv.FormatInt(item.UserId, 10)},
 			TargetType: item.TargetType, TargetID: item.TargetId, TargetRevision: nil,
 			Operation: operation, SourceRef: fmt.Sprintf("rtw.favorite/%d", item.FavoriteId),
-			EventTime: at, AvailableAt: at, FavoriteID: item.FavoriteId, FolderID: item.FolderId,
+			EventTime: at, AvailableAt: at, FavoriteID: strconv.FormatInt(item.FavoriteId, 10),
+			FolderID: strconv.FormatInt(item.FolderId, 10),
 		},
 	}
 	body, err := json.Marshal(event)
