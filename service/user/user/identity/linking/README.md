@@ -1,10 +1,10 @@
 # H01 候选方案：DC 账号绑定与 RTW 产品会话交换
 
-状态：**选型尚待产品确认；此独立开发分支默认关闭，未部署。** 此实现对应 Sea-Docs H01 的“RTW 维护 DC UUID→RTW UID 显式绑定”选项。DC UUID 与 RTW 数字 UID 保持不同主键；不按邮箱或昵称推断，不共享 JWT 签名密钥，也不让桌面端自报 SubjectRef。
+状态：**选型尚待产品确认；此独立开发分支默认关闭，未部署。** 隔离 DC nativeauth→RTW User Center→知识产品身份子链为 **L2 INTEGRATED**，H01/WS04-A 整体仍 `PARTIAL`。此实现对应 Sea-Docs H01 的“RTW 维护 DC UUID→RTW UID 显式绑定”选项。DC UUID 与 RTW 数字 UID 保持不同主键；不按邮箱或昵称推断，不共享 JWT 签名密钥，也不让桌面端自报 SubjectRef。
 
 ## 工作范围与权威状态
 
-- [W0:ROOT] 独立 RTW 工作树 `/Users/edy/Sea/.codex-worktrees/sea-rtw-account-binding-20260914`，基线 `ded36cb`。[W1:WRITE] `service/user/user/identity/{resolve.go,linking/}`、User Center 配置/装配/手写扩展 Handler 与直接测试、知识产品的真实 User Center 验收测试。[R1:READ_ONLY] DC 的 `/v1/auth/me`、WhaleHall Bun、Sea-Docs、RTW 原始脏树及集成树。[D1:DEPENDENCY] 锁定 go-zero JWT 解析器、pgx 与 User RPC；不修改模块缓存。[G1:GENERATED] 原 `handler/routes.go` 与 `types.go` 保持生成源原样；H01 候选路由由 `RegisterAccountLinkHandlers` 独立注册。[X1:EXTERNAL] 仅脚本启动的随机端口隔离 PG16 和 HTTP 会话测试服务；无共享/生产写入。[N1:OUT_OF_SCOPE] 生产启用、DC 本仓修改、WhaleHall 接线和即时撤销合同。[T1:TEMP] 保留测试 PG 数据/日志供核对。
+- [W0:ROOT] 独立 RTW 工作树 `/Users/edy/Sea/.codex-worktrees/sea-rtw-account-binding-20260914`，基线 `ded36cb`。[W1:WRITE] `service/user/user/identity/{resolve.go,linking/}`、User Center 配置/装配/手写扩展 Handler 与直接测试、知识产品的真实 User Center 验收测试和可选 `service/knowledge/scripts/acceptance.sh` 门禁。[R1:READ_ONLY] DC 现有 `/v1/auth/me` 与 `nativeauth`、WhaleHall Bun、Sea-Docs、RTW 原始脏树及集成树；Go `-overlay` 将本仓 `testdata/dc_auth_fixture_test.go` **虚拟编入只读 DC checkout**，不写 DC 文件。[D1:DEPENDENCY] 锁定 go-zero JWT 解析器、pgx 与 User RPC；不修改模块缓存。[G1:GENERATED] 原 `handler/routes.go` 与 `types.go` 保持生成源原样；H01 候选路由由 `RegisterAccountLinkHandlers` 独立注册。[X1:EXTERNAL] 仅脚本启动的随机端口隔离 PG16、DC/RTW HTTP 进程及内存测试 Redis；无共享/生产写入。[N1:OUT_OF_SCOPE] 生产启用、DC 本仓修改、WhaleHall 接线和即时撤销合同。[T1:TEMP] 保留测试 PG 数据/日志供核对；包含 bearer 的临时控制文件在结束时覆写为停止标记。
 - 主职责 [C4:PERSISTENCE] 是 RTW identity 的 UUID 永久归属与活动链接 CAS；跨 [C1:TRANSPORT] 双令牌分离及会话交换、[C2:APPLICATION] DC 当前会话和 User RPC 复核、[C7:CONTRACT] 短 RTW JWT、[C8:VERIFY] 真 PG/真实 RTW 进程验收。DC 是其 bearer 有效性的唯一判断者；User RPC 是 UID 当前有效性的唯一判断者；知识产品维持现有 RTW JWT 身份门禁。
 
 ## 合同与迁移
@@ -24,9 +24,12 @@
 
 - `bash service/user/user/identity/linking/acceptance.sh`：自建随机端口 PG16，go-zero 真路由、PG 唯一键/并发抢绑、幂等、停用/换绑、同人和异人 UUID 反例、错误 RTW JWT、DC 会话撤销/切号、RTW UID 停用、120 秒 JWT、DC 超时/错误/重定向/响应无效反例，在 `-race` 与 vet 下通过。HTTP DC `auth/me` 为可切换当前会话的**测试实现**，并非 DataCenter 真进程。
 - `KNOWLEDGE_REAL_USER_GATE=1 KNOWLEDGE_KEEP_EVIDENCE=1 bash service/knowledge/scripts/acceptance.sh`：真实 RTW User RPC、User Center、隔离用户 PG 与知识产品 HTTP 进程；网页身份的 RTW 登录 JWT 显式绑定 DC HTTP 会话 fixture，之后只用 DC bearer 交换短 RTW 产品 JWT；真实知识产品路线经 User RPC 解析为同一 UID，另一 UID 不可读其会话/历史。全包 race/vet 通过。此链不能称 DC Redis/PG 原生 bearer 已联验。
+- `H01_DC_CHECKOUT=/Users/edy/Sea/.codex-worktrees/sea-dc-observability-20260914 H01_DC_REAL_GATE=1 KNOWLEDGE_REAL_USER_GATE=1 KNOWLEDGE_KEEP_EVIDENCE=1 bash service/knowledge/scripts/acceptance.sh`：同一随机端口 PG16 上用独立 DC 库的**最小原生账号表**、DC `UserStore`、真实 `nativeauth`、`api.New(...).Router()` 和内存测试 Redis 签发两枚不同 UUID 的真实 opaque `wh_access_`。RTW 真进程分别绑定并交换，知识 HTTP 验证同 UID 和他人隔离；DC `DELETE /v1/auth/sessions/current` 撤销后再次交换 401，另一个 DC 账号停用并提升 `auth_epoch` 后 `/v1/auth/me` 401。此测试使用真实 DC API/会话代码，但**不是完整 DC 迁移、真实 Valkey、完整 DC cmd/server 或生产网关**。
 
 最终独立绑定日志在 `/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-h01-account-link.coc8Yf/go-test.log`；真实 RTW 知识链日志在 `/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-knowledge-acceptance.d8Ruyr/test.log` 和同目录 `user-test.log`。`TestRealHTTPKnowledgeWorkflowWithUserCenter` 26.33 秒通过；独立 PG 并发、HTTP 和 DC 合同反例全部通过；`go mod verify` 与 `git diff --check` 退出 0。验收目录保留但脚本启动的 PG 与 RTW 子进程已停止。已检查进程日志，无 `wh_access_` 或 JWT 字符串匹配。
 
+真 DC 联验的最终证据为 `/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-knowledge-acceptance.YtUJGT/{dc-auth.log,test.log,user-test.log}`：命令退出 0，DC overlay 测试包 86.269 秒通过，`TestRealHTTPKnowledgeWorkflowWithUserCenter` 25.08 秒通过，User Center 全包 race/vet 通过。`dc-fixture.json` 已覆写为 `{"stopped":true}`；相关 DC/RTW/PG 进程均已停止，日志未匹配到 bearer 或 JWT 字符串。
+
 **时间边界**：DC `auth/me` 在每次交换时检查当前 bearer；DC 会话撤销、换号或 RTW 解绑后，**下一次交换**会拒收。交换前验证与签发之间仍有跨服务时序窗。已签发的普通 RTW JWT 没有 DC 会话内省或绑定修订校验；即使 DC 随后撤销或解绑，现有知识路由仍可能接受它直到最多 120 秒到期。RTW UID 停用仍会由现有知识 User RPC 门禁即时拒绝。要实现 DC 撤销的即时产品阻断，需要另立跨服务会话/撤销合同；WhaleHall Bun 在当前账号代次变化时必须取消未决操作并清除旧 JWT，不能拿测试固定 JWT 进生产。
 
-真实 DC `nativeauth`/Redis/PG 到 RTW 的同次联验、正式账户恢复/跨 UID 迁移政策、桌面 Bun 与网页同历史、线上配置/发布尚未完成；H01/WS04-A 仍为 `PARTIAL`。
+完整 DC schema/真实 Valkey/生产 Caddy 与部署、正式账户恢复/跨 UID 迁移政策、桌面 Bun 与网页同历史、线上配置/发布尚未完成；即便测试内的 DC 原生身份子链通过，H01/WS04-A 仍为 `PARTIAL`。
