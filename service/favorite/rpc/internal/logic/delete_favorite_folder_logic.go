@@ -78,7 +78,7 @@ func (l *DeleteFavoriteFolderLogic) DeleteFavoriteFolder(in *favoritepb.DeleteFa
 		return nil, err
 	}
 
-	if dbErr = l.svcCtx.FavoriteModel.DeleteFolderCascade(ctx, in.GetFolderId()); dbErr != nil {
+	if dbErr = l.svcCtx.FavoriteModel.DeleteFolderCascade(ctx, in.GetFolderId(), in.GetUserId()); dbErr != nil {
 		span.RecordError(dbErr)
 		metrics.ObserveDBError(folderModule, "delete", "db")
 		metrics.ObserveOp(folderModule, folderDelete, resultFail)
