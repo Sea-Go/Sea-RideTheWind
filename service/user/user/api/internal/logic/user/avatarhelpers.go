@@ -2,19 +2,14 @@ package user
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
+	"sea-try-go/service/user/user/api/internal/identity"
 	"sea-try-go/service/user/user/api/internal/types"
 	"sea-try-go/service/user/user/rpc/pb"
 )
 
 func currentUserID(ctx context.Context) (int64, error) {
-	userID, ok := ctx.Value("userId").(json.Number)
-	if !ok {
-		return 0, fmt.Errorf("ctx userId is not json.Number")
-	}
-	return userID.Int64()
+	return identity.ClaimedUID(ctx)
 }
 
 func avatarHistoryItemFromPB(item *pb.AvatarHistoryItem) types.AvatarHistoryItem {
