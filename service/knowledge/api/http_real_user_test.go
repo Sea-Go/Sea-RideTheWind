@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
@@ -18,8 +19,10 @@ import (
 	"time"
 
 	"sea-try-go/service/knowledge/api/internal/model"
+	"sea-try-go/service/user/user/identity/linking"
 	"sea-try-go/service/user/user/rpc/pb"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -34,6 +37,11 @@ type realUserServices struct {
 	dbDSN   string
 	rpcStop func()
 }
+
+const (
+	realUserDCOwnerBearer = "wh_access_rtw_h01_owner"
+	realUserDCOtherBearer = "wh_access_rtw_h01_other"
+)
 
 func TestRealHTTPKnowledgeWorkflowWithUserCenter(t *testing.T) {
 	if os.Getenv("KNOWLEDGE_REAL_USER_RPC_BINARY") == "" || os.Getenv("KNOWLEDGE_REAL_USER_API_BINARY") == "" {
@@ -102,12 +110,42 @@ func startRealUserServices(t *testing.T, store *model.Store, secret string) *rea
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+	linkDB, err := pgxpool.New(context.Background(), base.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := linkDB.Exec(context.Background(), linking.MigrationSQL); err != nil {
+		linkDB.Close()
+		t.Fatal(err)
+	}
+	linkDB.Close()
+	dcOwnerID, dcOtherID := uuid.NewString(), uuid.NewString()
+	dcAuth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/auth/me" {
+			http.NotFound(w, r)
+			return
+		}
+		var id string
+		switch r.Header.Get("Authorization") {
+		case "Bearer " + realUserDCOwnerBearer:
+			id = dcOwnerID
+		case "Bearer " + realUserDCOtherBearer:
+			id = dcOtherID
+		default:
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": id})
+	}))
+	t.Cleanup(dcAuth.Close)
 	apiConfig := map[string]any{
 		"Name": "real-usercenter-test", "Host": "127.0.0.1", "Port": apiPort, "Mode": "test",
 		"Log":      map[string]any{"Mode": "console", "Level": "error"},
 		"UserAuth": map[string]any{"AccessSecret": secret, "AccessExpire": 3600},
 		"UserRpc":  map[string]any{"Endpoints": []string{rpcEndpoint}},
 		"BizRedis": map[string]any{"Host": "127.0.0.1:1", "Type": "node", "NonBlock": true},
+		"AccountLink": map[string]any{"Enabled": true, "PostgresDSN": base.String(),
+			"DataCenterMeURL": dcAuth.URL + "/v1/auth/me"},
 	}
 	startRealUserProcess(t, os.Getenv("KNOWLEDGE_REAL_USER_API_BINARY"), root, "usercenter", apiConfig)
 	apiURL := "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(apiPort))
@@ -230,6 +268,47 @@ func (s *realUserServices) registerAndLogin(t *testing.T, username string) (int6
 		t.Fatal("real User Center did not sign a JWT")
 	}
 	return uid, loggedIn.Token
+}
+
+func (s *realUserServices) bindAndExchange(t *testing.T, uid int64, rtwToken, dcBearer string) string {
+	t.Helper()
+	bindBody := bytes.NewBufferString(`{"expected_revision":0}`)
+	bind, err := http.NewRequest(http.MethodPost, s.apiURL+"/usercenter/v1/account-link", bindBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bind.Header.Set("X-RTW-Authorization", "Bearer "+rtwToken)
+	bind.Header.Set("Authorization", "Bearer "+dcBearer)
+	bind.Header.Set("Content-Type", "application/json")
+	response, err := http.DefaultClient.Do(bind)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var link linking.Link
+	if err := json.NewDecoder(response.Body).Decode(&link); err != nil || response.StatusCode != http.StatusOK ||
+		link.UID != uid || link.State != "active" || link.Revision != 1 {
+		t.Fatalf("real User Center H01 bind status=%d link=%+v err=%v", response.StatusCode, link, err)
+	}
+	exchange, err := http.NewRequest(http.MethodPost, s.apiURL+"/usercenter/v1/product-sessions/exchange", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchange.Header.Set("Authorization", "Bearer "+dcBearer)
+	tokenResponse, err := http.DefaultClient.Do(exchange)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tokenResponse.Body.Close()
+	var session linking.ProductSession
+	if err := json.NewDecoder(tokenResponse.Body).Decode(&session); err != nil ||
+		tokenResponse.StatusCode != http.StatusOK || session.Token == "" ||
+		session.LinkRevision != 1 || session.ExpiresAtUnix-time.Now().Unix() > linking.ProductTTLSeconds ||
+		session.ExpiresAtUnix <= time.Now().Unix() {
+		t.Fatalf("real User Center H01 exchange status=%d revision=%d err=%v",
+			tokenResponse.StatusCode, session.LinkRevision, err)
+	}
+	return session.Token
 }
 
 func (s *realUserServices) delete(t *testing.T, uid int64) {
