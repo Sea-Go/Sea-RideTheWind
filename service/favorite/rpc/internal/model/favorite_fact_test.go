@@ -61,6 +61,13 @@ func favoriteFactStore(t *testing.T) *FavoriteModel {
 	if err := db.Exec(string(migration)).Error; err != nil {
 		t.Fatal(err)
 	}
+	deliveryMigration, err := os.ReadFile("002_favorite_fact_delivery.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(string(deliveryMigration)).Error; err != nil {
+		t.Fatal(err)
+	}
 	return NewFavoriteModel(db)
 }
 
