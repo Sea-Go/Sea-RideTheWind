@@ -71,6 +71,16 @@ func ResolveUser(ctx context.Context, users UserReader) (*pb.UserInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ActiveUID(ctx, users, uid)
+}
+
+// ActiveUID resolves a server-side UID (for example, one read from RTW's
+// account binding) through the authoritative User RPC. It never accepts a
+// client-supplied UID as proof of identity.
+func ActiveUID(ctx context.Context, users UserReader, uid int64) (*pb.UserInfo, error) {
+	if uid <= 0 {
+		return nil, ErrInvalidClaim
+	}
 	if users == nil {
 		return nil, fmt.Errorf("user RPC is nil: %w", ErrIdentityMismatch)
 	}
