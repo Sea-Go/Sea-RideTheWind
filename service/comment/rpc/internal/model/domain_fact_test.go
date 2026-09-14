@@ -25,7 +25,7 @@ func factTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&Subject{}, &CommentContent{}, &CommentIndex{}, &CommentLike{}, &CommentDomainFactOutbox{}); err != nil {
+	if err := db.AutoMigrate(&Subject{}, &CommentContent{}, &CommentIndex{}, &CommentLike{}, &CommentDomainFactOutbox{}, &CommentFactStream{}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -53,6 +53,32 @@ func readCommentFact(t *testing.T, db *gorm.DB, id string) commentFact {
 	return fact
 }
 
+func readCommentDelivery(t *testing.T, db *gorm.DB, id string) commentDeliveryEnvelope {
+	t.Helper()
+	var row CommentDomainFactOutbox
+	if err := db.First(&row, "event_id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if row.AggregateID == nil || row.FactVersion == nil || row.DeliveryEnvelope == nil {
+		t.Fatalf("comment fact has no frozen DC envelope: %+v", row)
+	}
+	var wire commentDeliveryEnvelope
+	if err := json.Unmarshal([]byte(*row.DeliveryEnvelope), &wire); err != nil {
+		t.Fatal(err)
+	}
+	if wire.SchemaVersion != 1 || wire.AggregateVersion != *row.FactVersion ||
+		wire.AggregateID != *row.AggregateID || wire.EventID != row.EventID || wire.EventType != row.EventType ||
+		wire.Producer != "rtw.comment-rpc" || wire.OperationID == "" || wire.OccurredAt == "" {
+		t.Fatalf("invalid comment DC envelope: %+v, row=%+v", wire, row)
+	}
+	var payload commentFact
+	if err := json.Unmarshal(wire.Payload, &payload); err != nil || payload.EventID != row.EventID ||
+		payload.SchemaVersion != "rtw.community-fact.v1" || payload.AggregateVersion != nil {
+		t.Fatalf("business fact was overwritten by wire version: %+v %v", payload, err)
+	}
+	return wire
+}
+
 func TestCommentFactsCommitRetryAndRetract(t *testing.T) {
 	db := factTestDB(t)
 	model := NewCommentModel(db)
@@ -71,6 +97,9 @@ func TestCommentFactsCommitRetryAndRetract(t *testing.T) {
 		t.Fatal(err)
 	}
 	created := readCommentFact(t, db, "rtw.comment/1001/created")
+	if wire := readCommentDelivery(t, db, "rtw.comment/1001/created"); wire.AggregateID != "1001" || wire.AggregateVersion != 1 {
+		t.Fatalf("comment create version: %+v", wire)
+	}
 	if created.SubjectRef != "rtw.identity/platform/101" || created.TargetRevision != nil ||
 		created.RevisionStatus != "unknown" || created.SearchEvidence || created.VisibilityState != 0 ||
 		created.Operation != "create" || created.SourceRef != "rtw.comment/1001" {
@@ -102,6 +131,9 @@ func TestCommentFactsCommitRetryAndRetract(t *testing.T) {
 		}
 	}
 	deleted := readCommentFact(t, db, "rtw.comment/1002/deleted")
+	if wire := readCommentDelivery(t, db, "rtw.comment/1002/deleted"); wire.AggregateID != "1002" || wire.AggregateVersion != 2 {
+		t.Fatalf("comment retract version: %+v", wire)
+	}
 	if deleted.SubjectRef != "rtw.identity/platform/303" || deleted.OperatorRef != "rtw.identity/platform/202" || deleted.Operation != "retract" {
 		t.Fatalf("wrong retract ownership: %+v", deleted)
 	}
@@ -128,6 +160,36 @@ func TestCommentFactsCommitRetryAndRetract(t *testing.T) {
 	if countCommentFacts(t, db) != 6 {
 		t.Fatalf("only three real interaction transitions expected, got %d facts", countCommentFacts(t, db))
 	}
+	var interactions []CommentDomainFactOutbox
+	if err := db.Where("aggregate_id = ? AND event_type = ?", "1001", "community.comment.interaction").
+		Order("fact_version").Find(&interactions).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(interactions) != 3 {
+		t.Fatalf("expected three interaction versions, got %d", len(interactions))
+	}
+	for i, row := range interactions {
+		if wire := readCommentDelivery(t, db, row.EventID); wire.AggregateVersion != int64(i+2) {
+			t.Fatalf("comment interaction version %d: %+v", i, wire)
+		}
+	}
+}
+
+func TestUnversionedLegacyCommentFactBlocksNewAggregateVersion(t *testing.T) {
+	db := factTestDB(t)
+	if err := db.Create(&CommentDomainFactOutbox{EventID: "legacy-comment-1501", EventType: "legacy",
+		Payload: `{"aggregate_id":"1501"}`}).Error; err != nil {
+		t.Fatal(err)
+	}
+	msg := kqtypes.CommentKafkaMsg{CommentId: 1501, UserId: 101, OwnerId: 202,
+		TargetType: "article", TargetId: "501", Content: "legacy", CreateTime: time.Now().Unix()}
+	if err := NewCommentModel(db).InsertCommentTx(context.Background(), msg, 0); err == nil {
+		t.Fatal("new comment fact followed an unresolved legacy source")
+	}
+	var count int64
+	if err := db.Model(&CommentIndex{}).Where("id = ?", 1501).Count(&count).Error; err != nil || count != 0 {
+		t.Fatalf("legacy gate did not roll back business row: %d %v", count, err)
+	}
 }
 
 func TestCommentFactFailureRollsBackBusinessState(t *testing.T) {
@@ -148,6 +210,9 @@ func TestCommentFactFailureRollsBackBusinessState(t *testing.T) {
 	}
 	if err := db.Model(&Subject{}).Where("target_type = ? AND target_id = ?", "article", "201").Count(&count).Error; err != nil || count != 0 {
 		t.Fatalf("subject counter survived failed fact: count=%d err=%v", count, err)
+	}
+	if err := db.Model(&CommentFactStream{}).Where("aggregate_id = ?", "1003").Count(&count).Error; err != nil || count != 0 {
+		t.Fatalf("fact stream version survived failed comment transaction: count=%d err=%v", count, err)
 	}
 	msg.UserId = 0
 	if err := model.InsertCommentTx(ctx, msg, 0); err == nil {

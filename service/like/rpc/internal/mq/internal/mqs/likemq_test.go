@@ -25,7 +25,7 @@ func TestConsumerAcknowledgesOnlyCommittedDomainFact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.LikeRecord{}, &model.LikeConsumeInbox{}, &model.LikeOutboxEvent{}, &model.LikeDomainFactOutbox{}); err != nil {
+	if err := db.AutoMigrate(&model.LikeRecord{}, &model.LikeConsumeInbox{}, &model.LikeOutboxEvent{}, &model.LikeDomainFactOutbox{}, &model.LikeFactStream{}); err != nil {
 		t.Fatal(err)
 	}
 	service := NewLikeUpdateService(context.Background(), &svc.ServiceContext{
