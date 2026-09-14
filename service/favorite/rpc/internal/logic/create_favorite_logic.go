@@ -101,6 +101,7 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 
 	title := strings.TrimSpace(in.GetTitle())
 	cover := strings.TrimSpace(in.GetCover())
+	var targetRevision *string
 	if targetType == "article" {
 		snapshot, depErr := resolveArticleSnapshot(ctx, l.svcCtx, targetID)
 		if depErr != nil {
@@ -112,6 +113,10 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 		// Article metadata comes only from the published projection. Request
 		// fields must not replace a frozen revision with a draft/client value.
 		title, cover = snapshot.Title, snapshot.Cover
+		if snapshot.RevisionID != "" {
+			revisionID := snapshot.RevisionID
+			targetRevision = &revisionID
+		}
 	}
 
 	if _, dbErr = l.svcCtx.FavoriteModel.FindFavoriteByFolderTarget(ctx, in.GetFolderId(), targetID, targetType); dbErr == nil {
@@ -137,13 +142,14 @@ func (l *CreateFavoriteLogic) CreateFavorite(in *favoritepb.CreateFavoriteReq) (
 	}
 
 	favorite := &model.FavoriteItem{
-		FavoriteId: favoriteID,
-		FolderId:   in.GetFolderId(),
-		UserId:     in.GetUserId(),
-		TargetId:   targetID,
-		TargetType: targetType,
-		Title:      title,
-		Cover:      cover,
+		FavoriteId:     favoriteID,
+		FolderId:       in.GetFolderId(),
+		UserId:         in.GetUserId(),
+		TargetId:       targetID,
+		TargetType:     targetType,
+		TargetRevision: targetRevision,
+		Title:          title,
+		Cover:          cover,
 	}
 	if dbErr = l.svcCtx.FavoriteModel.InsertFavorite(ctx, favorite); dbErr != nil {
 		span.RecordError(dbErr)

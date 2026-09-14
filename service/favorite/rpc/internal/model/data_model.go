@@ -16,15 +16,18 @@ func (FavoriteFolder) TableName() string {
 }
 
 type FavoriteItem struct {
-	Id         uint64    `gorm:"primaryKey"`
-	FavoriteId int64     `gorm:"column:favorite_id;uniqueIndex;not null"`
-	FolderId   int64     `gorm:"column:folder_id;not null;index;uniqueIndex:uk_folder_target"`
-	UserId     int64     `gorm:"column:user_id;not null;index"`
-	TargetId   string    `gorm:"column:target_id;type:varchar(255);not null;index;uniqueIndex:uk_folder_target"`
-	TargetType string    `gorm:"column:target_type;type:varchar(50);not null;index;uniqueIndex:uk_folder_target"`
-	Title      string    `gorm:"column:title;type:varchar(255)"`
-	Cover      string    `gorm:"column:cover;type:varchar(500)"`
-	CreateTime time.Time `gorm:"column:create_time;autoCreateTime"`
+	Id         uint64 `gorm:"primaryKey"`
+	FavoriteId int64  `gorm:"column:favorite_id;uniqueIndex;not null"`
+	FolderId   int64  `gorm:"column:folder_id;not null;index;uniqueIndex:uk_folder_target"`
+	UserId     int64  `gorm:"column:user_id;not null;index"`
+	TargetId   string `gorm:"column:target_id;type:varchar(255);not null;index;uniqueIndex:uk_folder_target"`
+	TargetType string `gorm:"column:target_type;type:varchar(50);not null;index;uniqueIndex:uk_folder_target"`
+	// Nil means the source had no provable published revision when this
+	// favorite was created. In particular, do not backfill legacy rows.
+	TargetRevision *string   `gorm:"column:target_revision;type:varchar(96)"`
+	Title          string    `gorm:"column:title;type:varchar(255)"`
+	Cover          string    `gorm:"column:cover;type:varchar(500)"`
+	CreateTime     time.Time `gorm:"column:create_time;autoCreateTime"`
 }
 
 func (FavoriteItem) TableName() string {
