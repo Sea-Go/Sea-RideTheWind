@@ -4,7 +4,7 @@
 
 ## 部署和交接
 
-先在现有 Favorite PostgreSQL 库执行 `internal/model/001_favorite_fact_outbox.sql`，再执行 `internal/model/002_favorite_fact_delivery.sql`。后者增加 DC 回执列，并拒绝修改已生成的事件身份、版本和 payload。`FavoriteFactOutbox` 的 `status=0` 为待交付，`2` 为失败待重试，`1` 仅表示 DC 已持久技术接纳；`status=1` **不代表** BTW 事实已接纳、数仓已覆盖或某内容已经发布。
+先在现有 Favorite PostgreSQL 库执行 `internal/model/001_favorite_fact_outbox.sql`，再执行 `internal/model/002_favorite_fact_delivery.sql`。后者增加 DC 回执列，并拒绝修改已生成的事件身份、版本和 payload。`FavoriteFactOutbox` 的 `status=0` 为待交付，`2` 为失败待重试，`1` 仅表示 DC 已持久技术接纳；`3` 为冻结输入不合法、需人工迁移的阻断行，不会再次进入派发队列。`status=1` **不代表** BTW 事实已接纳、数仓已覆盖或某内容已经发布。高位 Snowflake ID 的新编码、旧版阻断和权威读合同见 [FACT_AUTHORITY_ACCEPTANCE.md](FACT_AUTHORITY_ACCEPTANCE.md)。
 
 独立进程 `cmd/fact-dispatch` 需要 `FAVORITE_DATABASE_URL`、`DC_PLATFORM_EVENT_URL`（完整 `/v1/events` URL）和 `DC_PLATFORM_SERVICE_TOKEN`。`-once` 仅处理至多一条，默认每秒扫描，每批至多 16 条。进程按 `status IN (0,2)` 与 `FOR UPDATE SKIP LOCKED` 领单条；同一收藏的撤回版只在建立版已有 RTW 落库的 DC 技术回执后才可领取，避免并发跳锁让撤回先占 DC offset，阻塞 BTW 的前驱依赖。只发送业务事务内冻结的 JSON 和 `Idempotency-Key=event_id`。DC 返回 201/200 后，还必须核对 `event_id/producer/technical_status=accepted/receipt_id/input_hash/offset/received_at`，才在本地同一事务记 `delivered_at`、DC 回执 ID/hash/offset。HTTP 超时或回执不匹配只增加失败次数，保留原始事件供下轮同键同体重投。技术状态可在 DC 的 `GET /v1/events/{producer}/{event_id}` 权威查询；DC 的 `GET /v1/event-consumers/{consumer}/events` 与 `POST .../ack` 留给 BTW/数仓消费者，不由 RTW 代 ACK。
 

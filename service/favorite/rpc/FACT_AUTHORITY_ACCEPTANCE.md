@@ -63,12 +63,12 @@ BTW Binder 应用 `producer,event_id` 向此 RTW 读口查源，再逐字段核�
 
 ## 已冻结历史与迁移边界
 
-迁移前先检查 `favorite_fact_outbox` 中 `jsonb_typeof(payload->'payload'->'favorite_id')` 和 `jsonb_typeof(payload->'payload'->'folder_id')`。旧版安全范围内的数字事件按原 EventSpec/hash 继续投递和读取。超过 2^53 的旧版数字事件，派发器在本地校验阶段阻断、不调用 DC、不修改 payload/event_id/版本；已失败的旧行也不得直接改写为字符串后按同一个事件 ID 重投。需要先查 DC `(producer,event_id)` 回执确认是否有既存输入，再单独制定新的事件版本/迁移合同和 BTW 兼容规则；当前实现不自动修复历史行。原库执行 `001_favorite_fact_outbox.sql` 与 `002_favorite_fact_delivery.sql` 后才可启用读口。
+迁移前先检查 `favorite_fact_outbox` 中 `jsonb_typeof(payload->'payload'->'favorite_id')` 和 `jsonb_typeof(payload->'payload'->'folder_id')`。旧版安全范围内的数字事件按原 EventSpec/hash 继续投递和读取。超过 2^53 的旧版数字事件，派发器在本地校验阶段阻断、不调用 DC、不修改 payload/event_id/版本；它只把技术状态置为 `3=blocked`，记录结构化 `favorite.delivery.blocked`/`INVALID_FROZEN_ENVELOPE`，后续合法行仍可派发。已失败的旧行也不得直接改写为字符串后按同一个事件 ID 重投。需要先查 DC `(producer,event_id)` 回执确认是否有既存输入，再单独制定新的事件版本/迁移合同和 BTW 兼容规则；当前实现不自动修复历史行。原库执行 `001_favorite_fact_outbox.sql` 与 `002_favorite_fact_delivery.sql` 后才可启用读口。
 
 ## 本分支验收
 
 - 修复前，`favorite_id=9007199254740995`、`folder_id=9007199254740993` 的真实 RTW→DC `cmd/platform` 请求返回 HTTP `400 INVALID_JSON`；隔离证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-dc.13C9j3`。
-- 修复后，`SEA_DC_PLATFORM_ROOT=<隔离 DC 工作树> bash service/favorite/rpc/acceptance-dc.sh` 通过：高位建立与撤回各获不同 DC 回执及连续 offset，固定事件重投不增新事件；独立 RTW HTTP 进程在接纳前 `404`、接纳后 `200` 并与 DC 原 hash/receipt/received_at 对齐，未知/错 producer/无令牌/篡改/跨用户或旧来源夹具均拒绝，缺配置的读进程无法启动。最终证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-dc.2NKjLx`。
-- `bash service/favorite/rpc/acceptance.sh` 在隔离 PG16 上 `-race -count=1` 与 vet 退出 `0`，覆盖跨用户、旧来源、撤回主体冲突、小整数旧事件兼容、高位旧数字阻断且 Outbox 不改写；最终证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-fact.onTlXI`。
+- 修复后，`SEA_DC_PLATFORM_ROOT=<隔离 DC 工作树> bash service/favorite/rpc/acceptance-dc.sh` 通过：高位建立与撤回各获不同 DC 回执及连续 offset，固定事件重投不增新事件；独立 RTW HTTP 进程在接纳前 `404`、接纳后 `200` 并与 DC 原 hash/receipt/received_at 对齐，未知/错 producer/无令牌/篡改/跨用户或旧来源夹具均拒绝，缺配置的读进程无法启动。旧高位数字事件被标为 `blocked` 后，同批后继合法事件仍由真实 DC 接纳为 offset 5；最终证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-dc.MTEAX9`。
+- `bash service/favorite/rpc/acceptance.sh` 在隔离 PG16 上 `-race -count=1` 与 vet 退出 `0`，覆盖跨用户、旧来源、撤回主体冲突、小整数旧事件兼容、高位旧数字阻断且 Outbox 不改写、后继事件继续派发；最终证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-favorite-fact.aEq8Fq`。
 
 文章公开边界仍待交接：当前 `resolveArticleSnapshot` 调 `ArticleRpc.GetArticle(ArticleId, IncrView:false)`，基线 `GetArticleRequest` 没有可证明公开修订的 `PublicOnly` 字段。应在文章域公开读 RPC 新字段集成后给收藏快照加公开门禁，不从 `status` 猜测冻结 r1。本分支未改文章或生成 pb。

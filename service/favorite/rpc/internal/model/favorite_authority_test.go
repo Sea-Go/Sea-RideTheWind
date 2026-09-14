@@ -108,17 +108,34 @@ func TestFavoriteAuthorityLegacyExactIntegerAndUnsafeIDBlock(t *testing.T) {
 	if err := store.conn.Where("event_id = ?", unsafe.EventID).Take(&before).Error; err != nil {
 		t.Fatal(err)
 	}
+	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: 902, UserId: 1001, Name: "after-blocked"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InsertFavorite(ctx, &FavoriteItem{FavoriteId: highID + 2, FolderId: 902,
+		UserId: 1001, TargetType: "article", TargetId: "article-after-blocked"}); err != nil {
+		t.Fatal(err)
+	}
 	called := false
-	sender := favoriteSenderFunc(func(context.Context, FavoriteWireEvent, json.RawMessage) (FavoriteTechnicalReceipt, error) {
+	sender := favoriteSenderFunc(func(_ context.Context, event FavoriteWireEvent, _ json.RawMessage) (FavoriteTechnicalReceipt, error) {
 		called = true
-		return FavoriteTechnicalReceipt{}, nil
+		return FavoriteTechnicalReceipt{EventID: event.EventID, Producer: event.Producer,
+			TechnicalStatus: "accepted", ReceiptID: "after-blocked", InputHash: strings.Repeat("a", 64),
+			Offset: 1, ReceivedAt: time.Now().UTC().Format(time.RFC3339Nano)}, nil
 	})
-	if sent, err := store.DispatchFavoriteFactOnce(ctx, sender); sent || err == nil || called {
+	if sent, err := store.DispatchFavoriteFactOnce(ctx, sender); sent || !errors.Is(err, ErrFavoriteFactBlocked) || called {
 		t.Fatalf("unsafe legacy event was sent or rewritten: sent=%t err=%v called=%t", sent, err, called)
 	}
 	var unchanged FavoriteFactOutbox
 	if err := store.conn.Where("event_id = ?", unsafe.EventID).Take(&unchanged).Error; err != nil ||
-		unchanged.Status != FavoriteFactPending || unchanged.Payload != before.Payload {
+		unchanged.Status != FavoriteFactBlocked || unchanged.Payload != before.Payload {
 		t.Fatalf("blocked legacy outbox identity changed: row=%+v err=%v", unchanged, err)
+	}
+	if sent, err := store.DispatchFavoriteFactOnce(ctx, sender); !sent || err != nil || !called {
+		t.Fatalf("blocked legacy head starved next fixed event: sent=%t err=%v called=%t", sent, err, called)
+	}
+	var next FavoriteFactOutbox
+	if err := store.conn.Where("event_id = ?", "favorite.9007199254740995.v1").Take(&next).Error; err != nil ||
+		next.Status != FavoriteFactSent || next.TechnicalReceiptID != "after-blocked" {
+		t.Fatalf("next event was not technically accepted: row=%+v err=%v", next, err)
 	}
 }
