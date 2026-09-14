@@ -22,4 +22,6 @@
 
 最终本地证据目录：`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-knowledge-acceptance.ExHc6S/`（临时目录，由验收脚本保留）。`test.log`、`observability/knowledge-http.jsonl`、`observability/knowledge-metrics.prom` 的 SHA256 分别是 `afa06782aa96b220cc071bb106b1f07b34421472cdd145f5986b3e2fd540ff79`、`29aa6b81750d7c508ec517675dbe465c500d9bf8a081ebf3fed2c9bbc35bd57c`、`1a1c5502fcc40624f101806015266f9576195b9cdf38df42f0e720aded65615f`。运行日志中 `knowledge.answer.accept` 的成功、重放、拒绝以及 `get/list` 成功记录均含 trace/span/request/operation ID；指标只对唯一答案提交计 `sea_knowledge_commits_total{operation="knowledge.answer.accept"} 1`，读取与重投没有制造新提交。
 
-仍需接线：BTW 的 `AcceptedRootHistory` HTTP adapter、答复流提交前门禁、按已接受产品 turn 组织真正可续跑的 Agent 历史、RTW 用户 JWT 到完整 SubjectRef 的权威解析、前端历史页面与引用状态读取。这里没有把后续工作写成已验收。
+上述是该固定提交时的提供方证据。后续BTW已生成`AcceptedRootHistory` HTTP adapter，并在同一RTW真实HTTP/隔离PG16进程里提交已接纳引用的`succeeded` turn、幂等重放、按完整scope读回和跨主体拒读；RTW真实PG证明该AnswerID只留一条，答案提交JSON终态与BTW父Trace同ID。RTW用户服务也已在已验JWT与User RPC回执后生成固定单平台`rtw.identity/platform/<UID>`主体三元组。两者的局部证据见本仓`search-citations.md`与`service/user/user/api/identity_contract.md`，不代表实际用户事件或服务间Binder已接通。
+
+仍需接线：正式搜索答复流提交前门禁、按已接受产品turn组织真正可续跑的Agent历史、RTW真实用户到知识搜索入口的主体传递、前端历史页面与引用状态读取、实际Collector→DC下钻。WS02-D/H02/H07整体仍未验收。

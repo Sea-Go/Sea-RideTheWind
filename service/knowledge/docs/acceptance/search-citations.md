@@ -27,4 +27,6 @@
 
 在RTW集成开发树与BTW集成开发树固定版本下，设置`SEA_BTW_CITATION_CONSUMER_ROOT=/Users/edy/Sea/.codex-worktrees/sea-btw-runtime-content-20260914`运行**完整**`bash service/knowledge/scripts/acceptance.sh`，退出码0。`TestRealHTTPKnowledgeWorkflow`启动真实RTW go-zero HTTP进程与隔离PG16，发布带结构性三路IndexManifest的固定release，然后把该fixture交给另一个Go模块的BTW生成客户端测试进程。BTW实际经Worker HTTP读取同版原文、以自身`EvidencePack`序列化结果提交新search_id引用并回查同一RTW数据库收据；RTW日志中原文读取与引用接纳应用阶段的trace_id均与BTW提供的W3C父Trace ID一致。测试断言该新search_id与RTW原有search_id合计正好**两次唯一引用提交**，重放不增加计数。
 
-这证明H07**引用子链**的两仓真实进程/PG/HTTP/Trace合同，仍以合成三路IndexManifest为输入；没有真实BGE-M3同代三引擎、BTW正式搜索API/单根回答运行、RTW AcceptedRootHistory跨仓消费、网页/桌宠公开EOF或Collector→DC下钻。因此本页RTW局部状态可上推到`INTEGRATED`引用合同，H07/OBS-r3整体仍`PARTIAL/NOT_VERIFIED`。
+后续同一BTW子进程还把该search_id和已提交引用收据组成`succeeded`已验证产品turn，调用RTW真实答案历史POST/GET/List；相同turn重投仍只在PG留一条，跨主体按AnswerID读取拒绝，RTW`knowledge.answer.accept.succeeded`日志与原文/引用阶段共用BTW父Trace ID。完整隔离PG16/race/vet脚本再跑退出码0；详见本仓`accepted-answers.md`和BTW`internal/app/RTW_ACCEPTED_HISTORY_ACCEPTANCE.md`。
+
+这证明H07**引用及答案历史子链**的两仓真实进程/PG/HTTP/Trace合同，仍以合成三路IndexManifest为输入；没有真实BGE-M3同代三引擎、BTW正式搜索API/单根回答运行、网页/桌宠公开EOF或Collector→DC下钻。因此本页RTW局部状态可上推到`INTEGRATED`子合同，H07/OBS-r3整体仍`PARTIAL/NOT_VERIFIED`。
