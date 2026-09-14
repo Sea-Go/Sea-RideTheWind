@@ -661,7 +661,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if btwRoot := os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT"); btwRoot != "" {
 		// Stage four is only a byte-preserving relay. The independent BTW test
 		// process verifies RTW's scope and commits through its real RootSessionBoundary.
-		endpoint := startRealBTWProductServer(t, dir, btwRoot, base, c.WorkerToken)
+		endpoint := startRealBTWProductServer(t, dir, btwRoot, base, c.WorkerToken, m.Id, nil)
 		searchFixture.mu.Lock()
 		searchFixture.forwardURL = endpoint
 		searchFixture.mu.Unlock()
@@ -699,6 +699,63 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		request("GET", searchPath+"/"+realResult.SearchId, productToken, nil, &replayedReal, 200)
 		if !reflect.DeepEqual(replayedReal, realResult) {
 			t.Fatalf("real BTW answer and RTW operation GET differ: %+v", replayedReal)
+		}
+		// This second process receives only a published chunk identity. It
+		// independently rereads RTW's active snapshot and exact source, accepts
+		// the citation, runs the native summary Graph, and commits the turn.
+		endpoint = startRealBTWProductServer(t, dir, btwRoot, base, c.WorkerToken, m.Id, &chunk)
+		searchFixture.mu.Lock()
+		searchFixture.forwardURL = endpoint
+		searchFixture.mu.Unlock()
+		citedBody := map[string]any{"module_id": m.Id, "query": "What does Book A say?",
+			"depth": "fast", "intelligence": "low", "idempotency_key": "product-search-real-btw-cited-1"}
+		callsBeforeCited := searchFixture.calls.Load()
+		var cited types.ProductSearchResult
+		request("POST", searchPath, productToken, citedBody, &cited, 200)
+		if cited.Status != "succeeded" || cited.SearchId == "" || cited.AnswerId == "" ||
+			cited.Answer != "The published source states: "+quote || len(cited.Citations) != 1 ||
+			cited.Citations[0].Quote != quote || cited.Citations[0].QuoteHash != quoteHash ||
+			cited.Citations[0].RevisionId != a.RevisionId || cited.Citations[0].ContentId != a.EntityId ||
+			cited.CitationReceiptRef == "" || searchFixture.calls.Load() != callsBeforeCited+1 {
+			t.Fatalf("real BTW cited product result is not RTW accepted evidence: %+v calls=%d",
+				cited, searchFixture.calls.Load())
+		}
+		if testing.Verbose() {
+			t.Logf("RTW signed cited search accepted by real BTW root: search=%s answer=%s receipt=%s evidence=%s",
+				cited.SearchId, cited.AnswerId, cited.CitationReceiptRef, cited.Citations[0].EvidenceId)
+		}
+		var acceptedCount, acceptedCitations, citationRecords int
+		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_accepted_answers
+ WHERE answer_id=$1 AND search_id=$2 AND authority_id='rtw.identity' AND tenant_id='platform'
+ AND subject_id=$3 AND session_id='search-facade-session' AND status='succeeded'`,
+			cited.AnswerId, cited.SearchId, fmt.Sprintf("%d", productUID)).Scan(&acceptedCount); err != nil || acceptedCount != 1 {
+			t.Fatalf("real cited BTW answer missing from RTW PG: count=%d err=%v", acceptedCount, err)
+		}
+		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_answer_citations WHERE answer_id=$1`,
+			cited.AnswerId).Scan(&acceptedCitations); err != nil || acceptedCitations != 1 {
+			t.Fatalf("real cited BTW answer has no accepted citation in RTW PG: count=%d err=%v", acceptedCitations, err)
+		}
+		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_search_citations WHERE search_id=$1`,
+			cited.SearchId).Scan(&citationRecords); err != nil || citationRecords != 1 {
+			t.Fatalf("real cited BTW search has no durable RTW receipt: count=%d err=%v", citationRecords, err)
+		}
+		var citedReplay types.ProductSearchResult
+		request("POST", searchPath, productToken, citedBody, &citedReplay, 200)
+		if !reflect.DeepEqual(citedReplay, cited) || searchFixture.calls.Load() != callsBeforeCited+1 {
+			t.Fatalf("real cited BTW idempotent replay changed answer: %+v calls=%d", citedReplay, searchFixture.calls.Load())
+		}
+		request("GET", searchPath+"/"+cited.SearchId, productToken, nil, &citedReplay, 200)
+		if !reflect.DeepEqual(citedReplay, cited) {
+			t.Fatalf("real cited BTW answer and RTW operation GET differ: %+v", citedReplay)
+		}
+		request("GET", searchPath+"/"+cited.SearchId, otherToken, nil, nil, 404)
+		var citedState types.ProductAnswerCitationStates
+		request("GET", "/v1/knowledge/answer-sessions/search-facade-session/accepted-answers/"+
+			cited.AnswerId+"/citations", productToken, nil, &citedState, 200)
+		if citedState.Status != "succeeded" || len(citedState.Citations) != 1 ||
+			citedState.Citations[0].State != "available" ||
+			citedState.Citations[0].EvidenceId != cited.Citations[0].EvidenceId {
+			t.Fatalf("real cited BTW answer is not available in RTW product citation state: %+v", citedState)
 		}
 	}
 	productPath := "/v1/knowledge/answer-sessions/" + commitAnswer.SessionId + "/accepted-answers"
@@ -964,6 +1021,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	expectedCitationCommits := 1
 	if os.Getenv("SEA_BTW_CITATION_CONSUMER_ROOT") != "" {
 		expectedCitationCommits += 3 // BTW delivery, direct typed Tool and native Agent Tool commit distinct search IDs
+	}
+	if os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT") != "" {
+		expectedCitationCommits++ // The signed product search accepts one real RTW citation.
 	}
 	if !strings.Contains(string(metricBody), fmt.Sprintf(`sea_knowledge_commits_total{operation="knowledge.search.citations.accept"} %d`, expectedCitationCommits)) {
 		t.Fatal("citation replay was counted as another durable commit")
