@@ -30,7 +30,7 @@ func InitDB(conf DBConf) *gorm.DB {
 	if err != nil {
 		log.Fatalln("database connection failed")
 	}
-	err = db.AutoMigrate(&FavoriteFolder{}, &FavoriteItem{})
+	err = db.AutoMigrate(&FavoriteFolder{}, &FavoriteItem{}, &FavoriteFactOutbox{})
 	if err != nil {
 		log.Fatalln("database migration failed")
 	}

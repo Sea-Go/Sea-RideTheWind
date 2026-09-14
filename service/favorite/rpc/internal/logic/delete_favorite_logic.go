@@ -78,7 +78,7 @@ func (l *DeleteFavoriteLogic) DeleteFavorite(in *favoritepb.DeleteFavoriteReq) (
 		return nil, err
 	}
 
-	if dbErr = l.svcCtx.FavoriteModel.DeleteFavoriteByFavoriteId(ctx, in.GetFavoriteId()); dbErr != nil {
+	if dbErr = l.svcCtx.FavoriteModel.DeleteFavoriteByFavoriteId(ctx, in.GetFavoriteId(), in.GetUserId()); dbErr != nil {
 		span.RecordError(dbErr)
 		metrics.ObserveDBError(itemModule, "delete", "db")
 		metrics.ObserveOp(itemModule, itemDelete, resultFail)

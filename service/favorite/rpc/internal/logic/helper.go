@@ -104,9 +104,17 @@ func ensureUserExists(ctx context.Context, svcCtx *svc.ServiceContext, userID in
 		}
 		return favoritecommon.GRPCError(codes.Internal, favoritecommon.ErrorServerCommon)
 	}
-	if resp == nil || !resp.Found {
+	if resp == nil || !resp.Found || resp.User == nil {
 		metrics.ObserveOp("dependency", "user_get", resultFail)
 		return favoritecommon.GRPCError(codes.NotFound, favoritecommon.ErrorUserNotFound)
+	}
+	if resp.User.Uid != userID || resp.User.Status == nil {
+		metrics.ObserveOp("dependency", "user_get", resultFail)
+		return favoritecommon.GRPCError(codes.Unavailable, favoritecommon.ErrorServerCommon)
+	}
+	if resp.User.GetStatus() != 0 {
+		metrics.ObserveOp("dependency", "user_get", resultFail)
+		return favoritecommon.GRPCError(codes.PermissionDenied, favoritecommon.ErrorForbidden)
 	}
 
 	metrics.ObserveOp("dependency", "user_get", resultSuccess)

@@ -63,23 +63,6 @@ func (m *FavoriteModel) UpdateFolderNameByFolderId(ctx context.Context, folderId
 		Update("name", name).Error
 }
 
-func (m *FavoriteModel) DeleteFolderByFolderId(ctx context.Context, folderId int64) error {
-	return m.conn.WithContext(ctx).Where("folder_id = ?", folderId).Delete(&FavoriteFolder{}).Error
-}
-
-func (m *FavoriteModel) DeleteFolderCascade(ctx context.Context, folderId int64) error {
-	return m.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("folder_id = ?", folderId).Delete(&FavoriteItem{}).Error; err != nil {
-			return err
-		}
-		return tx.Where("folder_id = ?", folderId).Delete(&FavoriteFolder{}).Error
-	})
-}
-
-func (m *FavoriteModel) InsertFavorite(ctx context.Context, favorite *FavoriteItem) error {
-	return m.conn.WithContext(ctx).Create(favorite).Error
-}
-
 func (m *FavoriteModel) FindFavoritesByFolderId(ctx context.Context, folderId int64) ([]FavoriteItem, error) {
 	var favorites []FavoriteItem
 	err := m.conn.WithContext(ctx).
@@ -116,12 +99,4 @@ func (m *FavoriteModel) FindFavoriteByFolderTarget(ctx context.Context, folderId
 		return nil, ErrorNotFound
 	}
 	return nil, err
-}
-
-func (m *FavoriteModel) DeleteFavoriteByFavoriteId(ctx context.Context, favoriteId int64) error {
-	return m.conn.WithContext(ctx).Where("favorite_id = ?", favoriteId).Delete(&FavoriteItem{}).Error
-}
-
-func (m *FavoriteModel) DeleteFavoritesByFolderId(ctx context.Context, folderId int64) error {
-	return m.conn.WithContext(ctx).Where("folder_id = ?", folderId).Delete(&FavoriteItem{}).Error
 }
