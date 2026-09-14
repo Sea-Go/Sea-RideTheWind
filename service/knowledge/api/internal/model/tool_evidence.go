@@ -36,6 +36,7 @@ func (s *Store) VerifyToolSearchResult(ctx context.Context, parent ToolParent, c
 	if result.SearchId != child.SearchID || result.SnapshotRef != parent.SnapshotRef ||
 		result.RequestedIntelligence != child.Input.Intelligence ||
 		strings.TrimSpace(result.StopReason) == "" || len(result.StopReason) > 256 ||
+		result.Evidence == nil || result.Gaps == nil || result.Conflicts == nil ||
 		result.Usage.ReadCalls < len(result.Evidence) || result.Usage.ReadCalls > child.ReservedReads ||
 		result.Usage.QuoteRunes < 0 || result.Usage.QuoteRunes > child.ReservedRunes ||
 		len(result.Evidence) > 100 || len(result.Gaps) > 100 || len(result.Conflicts) != 0 ||
