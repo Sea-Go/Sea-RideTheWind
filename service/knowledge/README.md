@@ -49,6 +49,7 @@ goctl api ts --api api/knowledge.api --dir service/knowledge/generated/typescrip
 - READY 不自动发布。`PUT /modules/{id}/activation` 对 release/build/expected_pointer_revision/reason 验证后，在同事务更新指针、publication 审计和 Outbox。回滚使用同一接口、保持 pointer_revision 递增。现网页没有 idempotency_key 时，以 actor/module/expected_pointer_revision 作为重试身份；同键不同输入返回 409。
 - 已取消/被替代构建不影响旧 READY build；已撤回来源不能通过回滚重新启用。公开读取固定同一 PostgreSQL 快照，正文对象和修订仍按 hash 核对。
 - H07 worker 引用接口按发布指针版本、release、generation 读取原文 chunk，并在模块锁下接纳 BTW 固定 EvidencePack 的精确 JSON/hash；同 search_id 重投同收据，按 search_id 回查只给引用身份与当前可用状态。路径、提交点和局部验收见 [search-citations.md](docs/acceptance/search-citations.md)。
+- 学习问答的已接受产品历史通过 worker `accepted-answers` API 按完整主体、逻辑会话和 AnswerID 原子接纳；成功回答在同事务绑定 H07 引用收据，空证据回合不制造引用。按 AnswerID 回查不确定提交，按接受顺序有界分页。局部验收与未接的公开学习流见 [accepted-answers.md](docs/acceptance/accepted-answers.md)。
 
 ## 启动与存储
 
