@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"sea-try-go/service/knowledge/api/internal/config"
 	"sea-try-go/service/knowledge/api/internal/model"
@@ -689,7 +690,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		t.Fatalf("Tool budget did not reserve once/refund verified empty result: %+v", replayedParent.Budget)
 	}
 	if btwRoot := os.Getenv("SEA_BTW_TOOLS_CONSUMER_ROOT"); btwRoot != "" {
-		endpoint := startRealBTWToolsServer(t, dir, btwRoot, base, c.WorkerToken, m.Id)
+		endpoint := startRealBTWToolsServer(t, dir, btwRoot, base, c.WorkerToken, m.Id, nil)
 		toolFixture.mu.Lock()
 		toolFixture.forwardURL = endpoint
 		toolFixture.mu.Unlock()
@@ -730,6 +731,75 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		if replayedParent.Budget.SearchCalls != 2 || replayedParent.Budget.ReadCalls != 24 ||
 			replayedParent.Budget.QuoteRunes != 32768 {
 			t.Fatalf("real BTW Tool budget did not commit once: %+v", replayedParent.Budget)
+		}
+		beforeCited := replayedParent.Budget
+		citedEndpoint := startRealBTWToolsServer(t, t.TempDir(), btwRoot, base, c.WorkerToken, m.Id, &chunk)
+		toolFixture.mu.Lock()
+		toolFixture.forwardURL = citedEndpoint
+		toolFixture.mu.Unlock()
+		citedBody := map[string]any{"query": "Find the current evidence", "depth": "fast",
+			"intelligence": "low", "read_calls": 8, "quote_runes": 8192,
+			"idempotency_key": "tool-search-real-btw-cited-1"}
+		callsBefore = toolFixture.calls.Load()
+		var citedResult types.ToolSearchResult
+		request("POST", toolSearchPath, productToken, citedBody, &citedResult, 200)
+		if citedResult.SearchId == "" || citedResult.Status != "complete" ||
+			citedResult.SnapshotRef != toolParent.SnapshotRef || len(citedResult.Evidence) != 1 ||
+			citedResult.Evidence[0].RevisionId != chunk.RevisionId ||
+			citedResult.Evidence[0].SourceKind != chunk.SourceKind ||
+			citedResult.Evidence[0].Quote != quote || citedResult.Evidence[0].QuoteHash != quoteHash ||
+			citedResult.PackHash == "" || citedResult.CitationReceipt == nil ||
+			citedResult.CitationReceipt.SearchId != citedResult.SearchId ||
+			citedResult.CitationReceipt.PackHash != citedResult.PackHash ||
+			citedResult.CitationReceipt.DurableRef == "" ||
+			citedResult.Usage.ReadCalls != 1 || citedResult.Usage.QuoteRunes != utf8.RuneCountInString(quote) ||
+			toolFixture.calls.Load() != callsBefore+1 {
+			t.Fatalf("real BTW Tool cited evidence or usage invalid: %+v calls=%d", citedResult,
+				toolFixture.calls.Load())
+		}
+		durable, err := s.GetSearchCitations(context.Background(), citedResult.SearchId)
+		if err != nil || durable.PackHash != citedResult.PackHash ||
+			durable.DurableRef != citedResult.CitationReceipt.DurableRef || len(durable.Evidence) != 1 ||
+			durable.Evidence[0].EvidenceId != citedResult.Evidence[0].EvidenceId ||
+			durable.Evidence[0].QuoteHash != quoteHash {
+			t.Fatalf("real BTW Tool citation was not durably accepted: %+v err=%v", durable, err)
+		}
+		var citedReplay types.ToolSearchResult
+		request("POST", toolSearchPath, productToken, citedBody, &citedReplay, 200)
+		if !reflect.DeepEqual(citedReplay, citedResult) || toolFixture.calls.Load() != callsBefore+1 {
+			t.Fatal("real BTW cited Tool replay reran search or changed evidence")
+		}
+		request("GET", toolSearchPath+"/"+citedResult.SearchId, productToken, nil, &citedReplay, 200)
+		if !reflect.DeepEqual(citedReplay, citedResult) {
+			t.Fatal("real BTW cited Tool GET disagrees with POST")
+		}
+		request("GET", toolSearchPath+"/"+citedResult.SearchId, otherToken, nil, nil, 404)
+		request("GET", parentPath, productToken, nil, &replayedParent, 200)
+		if replayedParent.Budget.SearchCalls != beforeCited.SearchCalls-1 ||
+			replayedParent.Budget.ReadCalls != beforeCited.ReadCalls-1 ||
+			replayedParent.Budget.QuoteRunes != beforeCited.QuoteRunes-utf8.RuneCountInString(quote) {
+			t.Fatalf("real BTW cited Tool did not refund unused reservation once: before=%+v after=%+v",
+				beforeCited, replayedParent.Budget)
+		}
+		readBody := map[string]any{"search_id": citedResult.SearchId,
+			"evidence_id": citedResult.Evidence[0].EvidenceId, "idempotency_key": "tool-read-real-btw-cited-1"}
+		var reread types.ToolReadResult
+		request("POST", parentPath+"/evidence-reads", productToken, readBody, &reread, 200)
+		if reread.Evidence.Quote != quote || reread.Evidence.QuoteHash != quoteHash ||
+			reread.CitationReceipt.DurableRef != citedResult.CitationReceipt.DurableRef ||
+			reread.SnapshotRef != toolParent.SnapshotRef {
+			t.Fatalf("RTW Tool product reread differs from accepted evidence: %+v", reread)
+		}
+		var rereadReplay types.ToolReadResult
+		request("POST", parentPath+"/evidence-reads", productToken, readBody, &rereadReplay, 200)
+		if !reflect.DeepEqual(rereadReplay, reread) {
+			t.Fatal("RTW Tool product reread changed on same idempotency key")
+		}
+		request("GET", parentPath, productToken, nil, &replayedParent, 200)
+		if replayedParent.Budget.ReadCalls != beforeCited.ReadCalls-2 ||
+			replayedParent.Budget.QuoteRunes != beforeCited.QuoteRunes-2*utf8.RuneCountInString(quote) {
+			t.Fatalf("RTW Tool reread did not charge once: before=%+v after=%+v",
+				beforeCited, replayedParent.Budget)
 		}
 	}
 	searchPath := "/v1/knowledge/answer-sessions/search-facade-session/searches"
@@ -1222,6 +1292,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	}
 	if os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT") != "" {
 		expectedCitationCommits++ // The signed product search accepts one real RTW citation.
+	}
+	if os.Getenv("SEA_BTW_TOOLS_CONSUMER_ROOT") != "" {
+		expectedCitationCommits++ // The signed Tools child accepts one real RTW citation.
 	}
 	if !strings.Contains(string(metricBody), fmt.Sprintf(`sea_knowledge_commits_total{operation="knowledge.search.citations.accept"} %d`, expectedCitationCommits)) {
 		t.Fatal("citation replay was counted as another durable commit")
