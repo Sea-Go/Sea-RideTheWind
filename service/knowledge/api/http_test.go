@@ -149,6 +149,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	searchFixture := newProductSearchFixture(t, &base, c.WorkerToken)
 	c.SearchSummary.Endpoint = searchFixture.server.URL + "/v1/search/summary"
 	c.SearchSummary.ScopeKey = productFixtureScopeKey
+	if os.Getenv("SEA_BTW_SUMMARY_DC_RUNTIME_FILE") != "" {
+		c.SearchSummary.FastTimeoutMillis = 60000 // measured local Ollama may need more than the fixed fixture
+	}
 	toolFixture := newToolSearchFixture(t)
 	c.SearchTools.Endpoint = toolFixture.server.URL + "/v1/search/tools/search"
 	c.SearchTools.ScopeKey = toolFixtureScopeKey
@@ -218,7 +221,11 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		}
 	})
 	base = "http://" + net.JoinHostPort("127.0.0.1", fmtInt(port))
-	client := &http.Client{Timeout: 5 * time.Second}
+	clientTimeout := 5 * time.Second
+	if os.Getenv("SEA_BTW_SUMMARY_DC_RUNTIME_FILE") != "" {
+		clientTimeout = 95 * time.Second
+	}
+	client := &http.Client{Timeout: clientTimeout}
 	deadline := time.Now().Add(15 * time.Second)
 	for {
 		res, e := client.Get(base + "/v1/knowledge/modules")
@@ -1027,9 +1034,15 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		}
 		callsBeforeCited := searchFixture.calls.Load()
 		var cited types.ProductSearchResult
+		citedStarted := time.Now()
 		request("POST", searchPath, productToken, citedBody, &cited, 200)
+		citedLatency := time.Since(citedStarted)
+		answerValid := cited.Answer == "The published source states: "+quote
+		if formalAPI != nil && formalAPI.liveGateway {
+			answerValid = strings.TrimSpace(cited.Answer) != "" && strings.Contains(strings.ToLower(cited.Answer), "evidence")
+		}
 		if cited.Status != "succeeded" || cited.SearchId == "" || cited.AnswerId == "" ||
-			cited.Answer != "The published source states: "+quote || len(cited.Citations) != 1 ||
+			!answerValid || len(cited.Citations) != 1 ||
 			cited.Citations[0].Quote != quote || cited.Citations[0].QuoteHash != quoteHash ||
 			cited.Citations[0].RevisionId != a.RevisionId || cited.Citations[0].ContentId != a.EntityId ||
 			cited.CitationReceiptRef == "" || searchFixture.calls.Load() != callsBeforeCited+1 {
@@ -1075,6 +1088,56 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			citedState.Citations[0].State != "available" ||
 			citedState.Citations[0].EvidenceId != cited.Citations[0].EvidenceId {
 			t.Fatalf("real cited BTW answer is not available in RTW product citation state: %+v", citedState)
+		}
+		if formalAPI != nil && formalAPI.liveGateway {
+			var history types.AcceptedAnswersPage
+			request("GET", "/v1/knowledge/answer-sessions/search-facade-session/accepted-answers?limit=50",
+				productToken, nil, &history, 200)
+			found := false
+			for _, item := range history.Items {
+				if item.AnswerId == cited.AnswerId && item.SearchId == cited.SearchId && item.Status == "succeeded" {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatal("live DataCenter summary absent from RTW user product history")
+			}
+			if outputDir := os.Getenv("SEA_BTW_SUMMARY_RESULT_DIR"); outputDir != "" {
+				info, err := os.Stat(outputDir)
+				if err != nil || !info.IsDir() || info.Mode().Perm()&0077 != 0 {
+					t.Fatal("live summary result directory must be private")
+				}
+				report := map[string]any{"schema_version": "sea.search.live-summary-rtw.v1",
+					"delivery_execution": "observed", "depth": "fast", "intelligence": "low",
+					"delivery": "summary", "search_id": cited.SearchId, "answer_id": cited.AnswerId,
+					"subject_authority_id": "rtw.identity", "subject_tenant_id": "platform",
+					"subject_id": fmt.Sprintf("%d", productUID), "session_id": "search-facade-session",
+					"answer": cited.Answer, "citation_receipt_ref": cited.CitationReceiptRef,
+					"evidence_id": cited.Citations[0].EvidenceId,
+					"quote":       cited.Citations[0].Quote, "quote_hash": cited.Citations[0].QuoteHash,
+					"rtw_answer_rows": acceptedCount, "rtw_answer_citation_rows": acceptedCitations,
+					"rtw_search_citation_rows":    citationRecords,
+					"rtw_product_history_present": true, "real_user_center": realUser,
+					"end_to_end_latency_ms": citedLatency.Milliseconds(),
+					"model_gateway":         "datacenter-local-ollama", "model_usage": nil,
+					"qrel_complete": false}
+				body, err := json.MarshalIndent(report, "", "  ")
+				if err != nil {
+					t.Fatal(err)
+				}
+				file, err := os.OpenFile(filepath.Join(outputDir, "summary-"+cited.SearchId+".json"),
+					os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := file.Write(append(body, '\n')); err != nil {
+					file.Close()
+					t.Fatal(err)
+				}
+				if err := file.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
 		}
 	}
 	productPath := "/v1/knowledge/answer-sessions/" + commitAnswer.SessionId + "/accepted-answers"
