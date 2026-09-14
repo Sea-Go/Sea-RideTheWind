@@ -32,6 +32,9 @@ type fakeArticleRPC struct {
 }
 
 func (f fakeArticleRPC) GetArticle(_ context.Context, in *articleservice.GetArticleRequest) (*articleservice.GetArticleResponse, error) {
+	if !in.PublicOnly || in.IncrView {
+		return nil, errors.New("hot hydration must use public article scope without a view")
+	}
 	if err := f.errors[in.GetArticleId()]; err != nil {
 		return nil, err
 	}
@@ -39,6 +42,21 @@ func (f fakeArticleRPC) GetArticle(_ context.Context, in *articleservice.GetArti
 		return resp, nil
 	}
 	return &articleservice.GetArticleResponse{}, nil
+}
+
+func TestGetHotArticlesKeepsApprovedRevisionWhileSourceIsReviewing(t *testing.T) {
+	// Article RPC's public projection reports status=2 and frozen r1 title
+	// while its mutable source row is in REVIEWING for the next edit.
+	logic := NewGetHotArticlesLogic(context.Background(), &svc.ServiceContext{
+		HotRpc: fakeHotRPC{resp: &hotpb.GetHotArticlesResponse{Items: []*hotpb.HotArticleItem{{ArticleId: "editing", HotScore: 100}}}},
+		ArticleRpc: fakeArticleRPC{responses: map[string]*articleservice.GetArticleResponse{
+			"editing": {Article: &articlepb.Article{Id: "editing", Title: "Approved r1", Status: articlepb.ArticleStatus_PUBLISHED}},
+		}},
+	})
+	resp, err := logic.GetHotArticles(&types.HotArticlesReq{Page: 1, PageSize: 20})
+	if err != nil || resp.Total != 1 || len(resp.Items) != 1 || resp.Items[0].Title != "Approved r1" {
+		t.Fatalf("editing source hid approved hot article: %+v %v", resp, err)
+	}
 }
 
 func TestGetHotArticlesAppliesDefaultsAndPageSizeCap(t *testing.T) {
