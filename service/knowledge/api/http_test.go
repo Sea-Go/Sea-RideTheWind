@@ -426,6 +426,10 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if state.PointerRevision != 1 || state.ActiveReleaseId != r.ReleaseId {
 		t.Fatal(state)
 	}
+	if btwRoot := os.Getenv("SEA_BTW_ITEM_CONSUMER_ROOT"); btwRoot != "" {
+		runRealBTWItemPool(t, btwRoot, base, c.WorkerToken, os.Getenv("KNOWLEDGE_TEST_DSN"),
+			m.Id, a.RevisionId, a.EntityId)
+	}
 	var searchSnapshot types.SearchSnapshot
 	request("GET", snapshotPath, c.WorkerToken, nil, &searchSnapshot, 200)
 	if searchSnapshot.ModuleId != m.Id || searchSnapshot.ReleaseId != r.ReleaseId ||
