@@ -83,10 +83,24 @@ func TestHTTPProcessHelper(t *testing.T) {
 	}
 }
 func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
+	if os.Getenv("SEA_RTW_NATIVE_FOUR_SOURCE") == "1" {
+		t.Skip("use the explicit four-Source native workflow test")
+	}
+	runRealHTTPKnowledgeWorkflow(t, false)
+}
+
+func TestRealHTTPNativeFourSourceWorkflow(t *testing.T) {
+	if os.Getenv("SEA_RTW_NATIVE_FOUR_SOURCE") != "1" {
+		t.Skip("requires the explicit RTW native four-Source selector")
+	}
 	runRealHTTPKnowledgeWorkflow(t, false)
 }
 
 func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
+	nativeFourSource, nativeErr := nativeFourSourceMode(realUser)
+	if nativeErr != nil {
+		t.Fatal(nativeErr) // Before PG, RTW HTTP, DC BGE or Lite effects.
+	}
 	factSetHolder, selectionErr := wikiFactSetHolderMode()
 	if selectionErr != nil {
 		t.Fatal(selectionErr) // Before any test schema, source or DC effect.
@@ -493,6 +507,11 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		}
 	}
 	realBGE := os.Getenv("SEA_DC_BGE_RUNTIME")
+	if nativeFourSource {
+		// The legacy one-Source+Wiki module keeps its structural index and
+		// historic assertions. Only the separate four-Source module uses BGE.
+		realBGE = ""
+	}
 	retrievalProfiles := testenv.Profiles()
 	if realBGE != "" {
 		if os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT") == "" {
@@ -641,7 +660,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatal("formal cmd/api real-socket gate requires actual DC BGE runtime")
 		}
 		formalAPI = startRealBTWSearchAPIProcess(t, dir, socketRoot, base, c.WorkerToken,
-			realBGE, builtIndex, quote)
+			realBGE, builtIndex, quote, "")
 		realSearchEndpoint = formalAPI.URL
 	}
 	request("PUT", "/v1/knowledge/modules/"+m.Id+"/activation", token, activation, &state, 200)
@@ -2059,6 +2078,10 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		if !seen[event] {
 			t.Fatalf("missing runtime event %s in %d records", event, len(records))
 		}
+	}
+	if nativeFourSource {
+		runRealNativeFourSourceHandoff(t, s, request, dir, base, token,
+			c.WorkerToken, productToken, searchFixture, m.Id, r.ReleaseId)
 	}
 }
 func fmtInt(n int) string { b, _ := json.Marshal(n); return string(b) }
