@@ -20,7 +20,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func main() {
+func main() { os.Exit(execute()) }
+
+func execute() int {
 	once := flag.Bool("once", false, "dispatch at most one pending comment fact")
 	flag.Parse()
 	started := time.Now()
@@ -37,10 +39,11 @@ func main() {
 		logger.Error("comment fact dispatcher stopped", "event", "comment.fact_delivery.stopped",
 			"outcome", "failed", "duration_ms", float64(time.Since(started).Microseconds())/1000,
 			"error_code", "DELIVERY_FAILED", "error_type", "process")
-		os.Exit(1)
+		return 1
 	}
 	logger.Info("comment fact dispatcher stopped", "event", "comment.fact_delivery.stopped",
 		"outcome", "succeeded", "duration_ms", float64(time.Since(started).Microseconds())/1000)
+	return 0
 }
 
 func run(once bool, logger *slog.Logger) error {

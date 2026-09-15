@@ -20,7 +20,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func main() {
+func main() { os.Exit(execute()) }
+
+func execute() int {
 	started := time.Now()
 	meta := communityfact.ProcessMetadata{Service: "rtw-like-fact-authority", Environment: os.Getenv("RTW_ENVIRONMENT"),
 		Version: os.Getenv("RTW_SERVICE_VERSION"), InstanceID: os.Getenv("RTW_INSTANCE_ID"), Component: "community"}
@@ -35,10 +37,11 @@ func main() {
 		logger.Error("like fact authority stopped", "event", "like.fact_authority.stopped",
 			"outcome", "failed", "duration_ms", float64(time.Since(started).Microseconds())/1000,
 			"error_code", "AUTHORITY_UNAVAILABLE", "error_type", "process")
-		os.Exit(1)
+		return 1
 	}
 	logger.Info("like fact authority stopped", "event", "like.fact_authority.stopped",
 		"outcome", "succeeded", "duration_ms", float64(time.Since(started).Microseconds())/1000)
+	return 0
 }
 
 func run(logger *slog.Logger) error {

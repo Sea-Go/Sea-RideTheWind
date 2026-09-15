@@ -18,8 +18,8 @@ import (
 type AuthorityLookup func(context.Context, string, string) (AuthorityFact, error)
 
 // NewAuthorityHandler exposes one domain-owned source lookup on an internal
-// service endpoint. Producer and event ID are query parameters because RTW
-// event IDs contain slashes and must remain byte-for-byte stable.
+// service endpoint. Query parameters keep lookup independent of HTTP path
+// routing while RTW event IDs remain bounded path-segment-safe identifiers.
 func NewAuthorityHandler(producer, token string, lookup AuthorityLookup, logger *slog.Logger) (http.Handler, error) {
 	if producer == "" || len(token) < 32 || lookup == nil || logger == nil {
 		return nil, errors.New("community fact authority is not configured")
