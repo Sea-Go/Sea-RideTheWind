@@ -293,6 +293,59 @@ func TestWikiCompileDefaultH04ReplacementKeepsSourceOrder(t *testing.T) {
 	h04 := &mqs.HTTPSender{Endpoint: dc.BaseURL + "/v1/events", Token: dc.Token,
 		Client: &http.Client{Timeout: 3 * time.Second}}
 	var sent int
+	// CreateModule creates no Outbox fact; CreateSource produces one older
+	// non-Wiki revision event with its original H04 routing.
+	for i := 0; i < 1; i++ {
+		accepted, err := store.DispatchOne(ctx, h04)
+		if err != nil || !accepted {
+			t.Fatalf("default H04 predecessor fixture did not drain source: %t %v", accepted, err)
+		}
+		sent++
+	}
+	heldRequest, err := store.DB.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = heldRequest.Rollback(context.Background()) })
+	var lockedRequestID string
+	if err := heldRequest.QueryRow(ctx, "SELECT event_id FROM knowledge_outbox WHERE event_id=$1 FOR UPDATE",
+		oldRequested.Event.EventID).Scan(&lockedRequestID); err != nil ||
+		lockedRequestID != oldRequested.Event.EventID {
+		t.Fatalf("could not lock old H04 requested row: %s %v", lockedRequestID, err)
+	}
+	if accepted, err := store.DispatchOne(ctx, h04); !errors.Is(err, model.ErrWikiCompilePredecessorPending) || accepted {
+		t.Fatalf("H04 sent supersede after SKIP LOCKED old requested: %t %v", accepted, err)
+	}
+	wikiCompileDCHTTP(t, dc, http.MethodGet,
+		"/v1/events/ridethewind.knowledge/"+oldSuperseded.Event.EventID,
+		"", nil, http.StatusNotFound, nil)
+	if err := heldRequest.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if accepted, err := store.DispatchOne(ctx, h04); err != nil || !accepted {
+		t.Fatalf("old H04 requested row did not recover after lock release: %t %v", accepted, err)
+	}
+	sent++
+	heldSupersede, err := store.DB.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = heldSupersede.Rollback(context.Background()) })
+	var lockedSupersedeID string
+	if err := heldSupersede.QueryRow(ctx, "SELECT event_id FROM knowledge_outbox WHERE event_id=$1 FOR UPDATE",
+		oldSuperseded.Event.EventID).Scan(&lockedSupersedeID); err != nil ||
+		lockedSupersedeID != oldSuperseded.Event.EventID {
+		t.Fatalf("could not lock old H04 supersede row: %s %v", lockedSupersedeID, err)
+	}
+	if accepted, err := store.DispatchOne(ctx, h04); !errors.Is(err, model.ErrWikiCompilePredecessorPending) || accepted {
+		t.Fatalf("H04 sent new requested after SKIP LOCKED old supersede: %t %v", accepted, err)
+	}
+	wikiCompileDCHTTP(t, dc, http.MethodGet,
+		"/v1/events/ridethewind.knowledge/"+newRequested.Event.EventID,
+		"", nil, http.StatusNotFound, nil)
+	if err := heldSupersede.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 16; i++ {
 		accepted, err := store.DispatchOne(ctx, h04)
 		if err != nil {
@@ -303,7 +356,7 @@ func TestWikiCompileDefaultH04ReplacementKeepsSourceOrder(t *testing.T) {
 		}
 		sent++
 	}
-	if sent < 3 {
+	if sent != 4 {
 		t.Fatalf("default H04 did not deliver old/request/supersede/new facts: %d", sent)
 	}
 	type receipt struct {
