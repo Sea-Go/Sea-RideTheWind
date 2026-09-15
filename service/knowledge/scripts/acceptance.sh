@@ -31,6 +31,24 @@ PY
 knowledge_started=true
 export KNOWLEDGE_TEST_DSN="postgres://sea_knowledge_test@127.0.0.1:$knowledge_port/postgres?sslmode=disable"
 export KNOWLEDGE_TEST_VERSION="$(git -C "$knowledge_repo" rev-parse HEAD)"
+if [[ "${KNOWLEDGE_V2_PRODUCER_SCOPE:-0}" == 1 ]]; then
+  if [[ "${KNOWLEDGE_REAL_USER_GATE:-0}" != 1 ]]; then
+    printf 'v2 producer candidate requires the real UserCenter gate\n' >&2
+    exit 2
+  fi
+  export KNOWLEDGE_SUBJECTREF_V2_TEST_NONCE="$(python3 - <<'PY'
+import secrets
+print(secrets.token_hex(32))
+PY
+)"
+  "$knowledge_pg_bin/psql" -X "$KNOWLEDGE_TEST_DSN" -v ON_ERROR_STOP=1 \
+    -c "CREATE TABLE public.knowledge_subjectref_v2_local_test_gate (
+      nonce text PRIMARY KEY CHECK(nonce ~ '^[0-9a-f]{64}$'),
+      created_at timestamptz NOT NULL DEFAULT clock_timestamp());
+      INSERT INTO public.knowledge_subjectref_v2_local_test_gate(nonce)
+      VALUES('$KNOWLEDGE_SUBJECTREF_V2_TEST_NONCE')" \
+    > "$knowledge_tmp/v2-marker.log" 2>&1
+fi
 if [[ "${KNOWLEDGE_KEEP_EVIDENCE:-0}" == 1 ]]; then
   export KNOWLEDGE_OBS_EVIDENCE_DIR="$knowledge_tmp/observability"
 fi
@@ -41,10 +59,12 @@ if [[ "${KNOWLEDGE_REAL_USER_GATE:-0}" == 1 ]]; then
   export KNOWLEDGE_REAL_USER_RPC_BINARY="$knowledge_tmp/user-rpc"
   export KNOWLEDGE_REAL_USER_API_BINARY="$knowledge_tmp/usercenter"
 fi
-go test -race ./service/knowledge/... -count=1 -v | tee "$knowledge_tmp/test.log"
+GOMAXPROCS=2 go test -mod=readonly -race -p=1 ./service/knowledge/... -count=1 -v \
+  -run "${KNOWLEDGE_TEST_FILTER:-.}" | tee "$knowledge_tmp/test.log"
 go vet ./service/knowledge/...
 if [[ "${KNOWLEDGE_REAL_USER_GATE:-0}" == 1 ]]; then
-  go test -race ./service/user/user/... -count=1 -v | tee "$knowledge_tmp/user-test.log"
+  GOMAXPROCS=2 go test -mod=readonly -race -p=1 ./service/user/user/... -count=1 -v \
+    -run "${KNOWLEDGE_TEST_FILTER:-.}" | tee "$knowledge_tmp/user-test.log"
   go vet ./service/user/user/...
 fi
 git diff --check
