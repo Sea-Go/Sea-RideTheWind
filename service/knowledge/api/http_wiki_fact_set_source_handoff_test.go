@@ -45,6 +45,12 @@ type wikiFactSetCrossSourceReport struct {
 	SourceProofResultSHA      string   `json:"sourceproof_result_sha256,omitempty"`
 	SourceProofODSPrefixSHA   string   `json:"sourceproof_ods_prefix_sha256,omitempty"`
 	SourceProofDCIndexSHA     string   `json:"sourceproof_dc_index_sha256,omitempty"`
+	OfflineDWDParentVerified  bool     `json:"offline_dwd_parent_verified,omitempty"`
+	OfflineDWDManifestSHA     string   `json:"offline_dwd_manifest_sha256,omitempty"`
+	OfflineDWDCHReportSHA     string   `json:"offline_dwd_ch_report_sha256,omitempty"`
+	OfflineDWDCHStopSHA       string   `json:"offline_dwd_ch_stop_sha256,omitempty"`
+	OfflineDWDADSFacts        int      `json:"offline_dwd_ads_facts,omitempty"`
+	OfflineDWDQualityState    string   `json:"offline_dwd_quality_state,omitempty"`
 	Catalogs                  int      `json:"catalogs"`
 	Judgments                 int      `json:"judgments"`
 	TechnicalSkips            int      `json:"technical_skips"`
@@ -267,7 +273,9 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 	}
 	writeRealFactSet0600(t, fixturePath, append(fixture, '\n'))
 	sourceProofRoot := os.Getenv("SEA_BTW_SOURCEPROOF_READER_ROOT")
+	dwdRoot := os.Getenv("SEA_BTW_WIKI_DWD_SOURCE_ROOT")
 	sourceProofResultPath := filepath.Join(dir, "btw-real-wiki-sourceproof-result.json")
+	var dwdBundleDir string
 	consumerScript := "internal/warehouse/wikiqualitysource/acceptance.sh"
 	consumerRoot := btwRoot
 	consumerEnv := append(os.Environ(), "SEA_RTW_REAL_WIKI_FACT_SET_FIXTURE="+fixturePath)
@@ -301,6 +309,12 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		consumerRoot = sourceProofRoot
 		consumerEnv = append(consumerEnv,
 			"SEA_BTW_SOURCEPROOF_REAL_FIXTURE="+sourceFixturePath)
+	}
+	if dwdRoot != "" {
+		dwdBundleDir = preparePersistentWikiDWDBundle(t,
+			os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"))
+		consumerEnv = append(consumerEnv,
+			"SEA_BTW_WIKI_DWD_EVIDENCE_DIR="+dwdBundleDir)
 	}
 	consumer := exec.CommandContext(ctx, "bash", consumerScript)
 	consumer.Dir = consumerRoot
@@ -433,6 +447,13 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		t.Fatalf("Catalog ODS changed manual published Release: %+v %+v %v",
 			beforeRelease, afterRelease, err)
 	}
+	var dwdEvidence realWikiDWDEvidence
+	if dwdRoot != "" {
+		dwdEvidence = verifyAndBuildRealWikiDWD(t, ctx, dwdRoot,
+			os.Getenv("SEA_BTW_WIKI_DWD_RUNTIME_ROOT"),
+			os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"), dwdBundleDir,
+			catalog, sourceProofResult, dcProof.IndexJCSSHA, delivered, technical)
+	}
 	if evidenceDir := os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"); evidenceDir != "" {
 		if err := os.MkdirAll(evidenceDir, 0700); err != nil {
 			t.Fatal(err)
@@ -440,6 +461,9 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		reportVersion := "sea.wiki.fact-set-cross-source.v2"
 		if sourceProofRoot != "" {
 			reportVersion = "sea.wiki.fact-set-cross-source.v3"
+		}
+		if dwdRoot != "" {
+			reportVersion = "sea.wiki.fact-set-cross-source.v4"
 		}
 		report, err := json.Marshal(wikiFactSetCrossSourceReport{
 			SchemaVersion:        reportVersion,
@@ -466,6 +490,12 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 			SourceProofResultSHA:      sourceProofResultSHA,
 			SourceProofODSPrefixSHA:   sourceProofResult.ODSPrefixSHA256,
 			SourceProofDCIndexSHA:     sourceProofResult.DCIndexSHA256,
+			OfflineDWDParentVerified:  dwdEvidence.ParentVerified,
+			OfflineDWDManifestSHA:     dwdEvidence.ManifestSHA,
+			OfflineDWDCHReportSHA:     dwdEvidence.CHReportSHA,
+			OfflineDWDCHStopSHA:       dwdEvidence.CHStopSHA,
+			OfflineDWDADSFacts:        dwdEvidence.ADSFacts,
+			OfflineDWDQualityState:    dwdEvidence.QualityState,
 			Judgments:                 judgments, TechnicalSkips: technical, ODSAckOffset: cursor,
 			ManualWikiHead: afterManualHead, CatalogWikiHead: afterCatalogHead,
 			PublishedReleaseID:    afterRelease.ActiveReleaseId,
