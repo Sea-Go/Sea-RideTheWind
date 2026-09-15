@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,6 +16,7 @@ import (
 	"time"
 
 	jsoncanonicalizer "github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
+	"github.com/google/uuid"
 	"sea-try-go/service/knowledge/api/internal/model"
 	"sea-try-go/service/knowledge/api/internal/mqs"
 	"sea-try-go/service/knowledge/api/internal/object"
@@ -35,25 +39,74 @@ type wikiExternalConsumerRuntime struct {
 }
 
 type wikiExternalConsumerReport struct {
-	SchemaVersion       string `json:"schema_version"`
-	CompileID           string `json:"compile_id"`
-	SourceRevisionID    string `json:"source_revision_id"`
-	WikiRevisionID      string `json:"wiki_revision_id"`
-	RTWAcceptResultHash string `json:"rtw_accept_result_hash"`
-	DCJobID             string `json:"dc_job_id"`
-	DCJobInputHash      string `json:"dc_job_input_hash"`
-	DCAttemptID         string `json:"dc_attempt_id"`
-	DCLeaseEpoch        string `json:"dc_lease_epoch"`
-	DCCancelVersion     string `json:"dc_cancel_version"`
-	DCState             string `json:"dc_state"`
-	CandidateContentSHA string `json:"candidate_content_sha256"`
-	ManifestSHA         string `json:"manifest_sha256"`
-	DCResultHash        string `json:"dc_result_hash"`
-	RTWEditHead         string `json:"rtw_edit_head"`
-	DCCompletedAttempts int    `json:"dc_completed_attempts"`
-	PublishedReleases   int    `json:"published_releases"`
-	FixedModelFixture   bool   `json:"fixed_model_fixture"`
-	ProductionVerified  bool   `json:"production_verified"`
+	SchemaVersion          string            `json:"schema_version"`
+	CompileID              string            `json:"compile_id"`
+	SourceRevisionID       string            `json:"source_revision_id"`
+	WikiRevisionID         string            `json:"wiki_revision_id"`
+	WikiTitle              string            `json:"wiki_title"`
+	WikiSourceRefs         []types.SourceRef `json:"wiki_source_refs"`
+	RTWAcceptResultHash    string            `json:"rtw_accept_result_hash"`
+	DCJobID                string            `json:"dc_job_id"`
+	DCJobInputHash         string            `json:"dc_job_input_hash"`
+	DCAttemptID            string            `json:"dc_attempt_id"`
+	DCLeaseEpoch           string            `json:"dc_lease_epoch"`
+	DCCancelVersion        string            `json:"dc_cancel_version"`
+	DCState                string            `json:"dc_state"`
+	CandidateContentSHA    string            `json:"candidate_content_sha256"`
+	ManifestSHA            string            `json:"manifest_sha256"`
+	DCResultHash           string            `json:"dc_result_hash"`
+	RTWEditHead            string            `json:"rtw_edit_head"`
+	DCCompletedAttempts    int               `json:"dc_completed_attempts"`
+	PublishedReleases      int               `json:"published_releases"`
+	FixedModelFixture      bool              `json:"fixed_model_fixture"`
+	DCModelGatewayReported bool              `json:"dc_model_gateway_reported"`
+	DCModelUserID          string            `json:"dc_model_user_id,omitempty"`
+	DCModelConfigurationID string            `json:"dc_model_configuration_id,omitempty"`
+	ProductionVerified     bool              `json:"production_verified"`
+}
+
+type wikiExternalModelEvidence struct {
+	SchemaVersion        string `json:"schema_version"`
+	ProviderKind         string `json:"provider_kind"`
+	UserID               string `json:"user_id"`
+	ModelConfigurationID string `json:"model_configuration_id"`
+	LogicalModel         string `json:"logical_model"`
+	ModelCallComplete    bool   `json:"model_call_complete"`
+	FixedModelFixture    bool   `json:"fixed_model_fixture"`
+}
+
+type wikiDCNativeRuntime struct {
+	SchemaVersion        string `json:"schema_version"`
+	Endpoint             string `json:"endpoint"`
+	AccessToken          string `json:"access_token"`
+	LogicalModel         string `json:"logical_model"`
+	PhysicalModel        string `json:"physical_model"`
+	ModelConfigurationID string `json:"model_configuration_id"`
+	UserID               string `json:"user_id"`
+	PostgresDSN          string `json:"postgres_dsn"`
+	ReadyAt              string `json:"ready_at"`
+	ReleaseFile          string `json:"release_file"`
+	UsageReceiptFile     string `json:"usage_receipt_file"`
+}
+
+func readWikiPrivateFixture(t *testing.T, path string, out any) {
+	t.Helper()
+	if !filepath.IsAbs(path) {
+		t.Fatal("Wiki external model fixture path is not task-owned absolute")
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
+		t.Fatal("Wiki external model fixture must be a private regular file")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || len(raw) == 0 || len(raw) > 4096 {
+		t.Fatal("Wiki external model fixture unreadable or unbounded")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(out) != nil || decoder.Decode(new(any)) != io.EOF {
+		t.Fatal("Wiki external model fixture has an unexpected schema")
+	}
 }
 
 // This explicit holder keeps an actual RTW REST process, DC Jobs process and
@@ -145,6 +198,52 @@ func holdWikiCompileExternalConsumer(t *testing.T, source *model.Store,
 			t.Fatal("external BTW Wiki consumer did not release task-owned services")
 		}
 	}
+	modelMode := os.Getenv("KNOWLEDGE_WIKI_EXTERNAL_MODEL_MODE")
+	modelEvidencePath := filepath.Join(evidence, "wiki-external-model-evidence.json")
+	fixedModelFixture := true
+	var modelGatewayReported bool
+	var modelUserID, modelConfigurationID string
+	switch modelMode {
+	case "", "fixed_fixture":
+		if _, err := os.Lstat(modelEvidencePath); err == nil {
+			t.Fatal("fixed Wiki fixture reported an unexpected DC model invocation")
+		} else if !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("fixed Wiki fixture model evidence state unavailable")
+		}
+	case "real_dc":
+		var native wikiDCNativeRuntime
+		readWikiPrivateFixture(t, os.Getenv("SEA_WIKI_NATIVE_DC_RUNTIME_FILE"), &native)
+		u, err := url.Parse(native.Endpoint)
+		if err != nil || u.Scheme != "http" || u.Hostname() != "127.0.0.1" ||
+			u.Port() == "" || u.Path != "/v1" || u.RawQuery != "" ||
+			u.Fragment != "" || u.User != nil ||
+			native.SchemaVersion != "sea.dc.local-chat-consumer.v1" ||
+			native.LogicalModel != "knowledge-wiki-compiler" ||
+			!strings.HasPrefix(native.AccessToken, "wh_access_") {
+			t.Fatal("actual Wiki DC Gateway runtime was not the published local model")
+		}
+		modelID, modelErr := uuid.Parse(native.ModelConfigurationID)
+		userID, userErr := uuid.Parse(native.UserID)
+		if modelErr != nil || userErr != nil ||
+			modelID.String() != native.ModelConfigurationID ||
+			userID.String() != native.UserID {
+			t.Fatal("actual Wiki DC Gateway account and model IDs were not canonical")
+		}
+		var proof wikiExternalModelEvidence
+		readWikiPrivateFixture(t, modelEvidencePath, &proof)
+		if proof.SchemaVersion != "sea.wiki.external-model-evidence.v1" ||
+			proof.ProviderKind != "dc_model_gateway" ||
+			proof.LogicalModel != native.LogicalModel ||
+			proof.UserID != native.UserID ||
+			proof.ModelConfigurationID != native.ModelConfigurationID ||
+			!proof.ModelCallComplete || proof.FixedModelFixture {
+			t.Fatal("external BTW model completion did not match DC native session")
+		}
+		fixedModelFixture, modelGatewayReported = false, true
+		modelUserID, modelConfigurationID = native.UserID, native.ModelConfigurationID
+	default:
+		t.Fatal("Wiki external model mode did not name a supported fixture or real DC")
+	}
 	accepted, err := source.GetCompile(ctx, c.CompileId)
 	if err != nil || accepted.State != "ACCEPTED" || accepted.RevisionId == "" ||
 		accepted.InputHash != c.InputHash || accepted.ResultHash == "" {
@@ -155,7 +254,7 @@ func holdWikiCompileExternalConsumer(t *testing.T, source *model.Store,
 		revision.EntityId != c.PageId || revision.CreatedBy != "btw.compile/"+c.CompileId ||
 		revision.Withdrawn ||
 		revision.ContentHash != object.Hash([]byte(revision.Content)) ||
-		!strings.HasPrefix(revision.Content, "#") || len(revision.SourceRefs) != 1 ||
+		strings.TrimSpace(revision.Content) == "" || len(revision.SourceRefs) != 1 ||
 		revision.SourceRefs[0].RevisionId != original.RevisionId ||
 		revision.SourceRefs[0].Locator != "paragraph:1" {
 		t.Fatalf("external BTW Wiki revision did not retain the original RTW source: revision=%s err=%v", accepted.RevisionId, err)
@@ -233,14 +332,20 @@ func holdWikiCompileExternalConsumer(t *testing.T, source *model.Store,
 	}
 	report := wikiExternalConsumerReport{SchemaVersion: "sea.wiki.cross-acceptance.v1",
 		CompileID: c.CompileId, SourceRevisionID: original.RevisionId,
-		WikiRevisionID: revision.RevisionId, RTWAcceptResultHash: accepted.ResultHash,
-		DCJobID: jobID, DCJobInputHash: jobInputHash, DCState: state,
+		WikiRevisionID: revision.RevisionId, WikiTitle: revision.Title,
+		WikiSourceRefs:      append([]types.SourceRef(nil), revision.SourceRefs...),
+		RTWAcceptResultHash: accepted.ResultHash,
+		DCJobID:             jobID, DCJobInputHash: jobInputHash, DCState: state,
 		DCAttemptID: dcAttemptID, DCLeaseEpoch: strconv.FormatInt(dcLeaseEpoch, 10),
 		DCCancelVersion:     strconv.FormatInt(dcCancelVersion, 10),
 		CandidateContentSHA: revision.ContentHash, ManifestSHA: manifestHash,
 		DCResultHash: dcResultHash, RTWEditHead: editHead,
 		DCCompletedAttempts: acceptedAttempts, PublishedReleases: published,
-		FixedModelFixture: true, ProductionVerified: false}
+		FixedModelFixture:      fixedModelFixture,
+		DCModelGatewayReported: modelGatewayReported,
+		DCModelUserID:          modelUserID,
+		DCModelConfigurationID: modelConfigurationID,
+		ProductionVerified:     false}
 	reportBytes, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		t.Fatal(err)
@@ -249,6 +354,16 @@ func holdWikiCompileExternalConsumer(t *testing.T, source *model.Store,
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(evidence, "wiki-result-manifest-jcs.json"), manifestBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(evidence, "wiki-accepted-markdown.md"), []byte(revision.Content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	sourceBytes, err := source.Objects.Get(ctx, original.ObjectKey, original.ContentHash)
+	if err != nil || object.Hash(sourceBytes) != original.ContentHash {
+		t.Fatal("fixed RTW source object could not be retained for Wiki quality review")
+	}
+	if err := os.WriteFile(filepath.Join(evidence, "wiki-fixed-source.txt"), sourceBytes, 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("external Wiki consumer completed RTW revision %s and DC result %s", revision.RevisionId, manifestHash)
