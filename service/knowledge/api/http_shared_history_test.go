@@ -94,7 +94,15 @@ func waitSharedProductHistory(t *testing.T, stage string, ready productHistorySh
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Remove(paths[index]) })
-	deadline := time.NewTimer(4 * time.Minute)
+	stageTimeout := 4 * time.Minute
+	switch os.Getenv("KNOWLEDGE_SHARED_HISTORY_STAGE_TIMEOUT") {
+	case "":
+	case "10m":
+		stageTimeout = 10 * time.Minute
+	default:
+		t.Fatal("invalid shared history test stage timeout")
+	}
+	deadline := time.NewTimer(stageTimeout)
 	defer deadline.Stop()
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
