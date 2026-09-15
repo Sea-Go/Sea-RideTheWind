@@ -3,11 +3,13 @@ package communityfact
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"regexp"
 	"strings"
 
+	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -95,3 +97,49 @@ func InstallLocalTracing() *sdktrace.TracerProvider {
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	return provider
 }
+
+// InstallFrameworkLogger routes go-zero lifecycle output (including signal
+// shutdown) through the same process envelope instead of its global console
+// writer. The caller still owns the slog sink.
+func InstallFrameworkLogger(logger *slog.Logger) error {
+	if logger == nil {
+		return errors.New("community framework logger is not configured")
+	}
+	if err := logx.SetUp(logx.LogConf{Mode: "console", Encoding: "json", Level: "info", Stat: false}); err != nil {
+		return err
+	}
+	logx.SetWriter(frameworkLogWriter{logger: logger.With("component", "go-zero", "log_source", "framework")})
+	logx.SetLevel(logx.InfoLevel)
+	return nil
+}
+
+type frameworkLogWriter struct{ logger *slog.Logger }
+
+func (w frameworkLogWriter) write(level slog.Level, value any, fields ...logx.LogField) {
+	attrs := []any{"event", "framework.log." + strings.ToLower(level.String())}
+	for _, field := range fields {
+		key := field.Key
+		switch key {
+		case "trace":
+			key = "trace_id"
+		case "span":
+			key = "span_id"
+		case "caller":
+			key = "code_location"
+		case "timestamp", "service", "environment", "service_version", "instance_id", "message", "component", "log_source":
+			continue
+		}
+		attrs = append(attrs, key, field.Value)
+	}
+	w.logger.Log(context.Background(), level, fmt.Sprint(value), attrs...)
+}
+
+func (w frameworkLogWriter) Alert(v any)                     { w.write(slog.LevelError, v) }
+func (w frameworkLogWriter) Close() error                    { return nil }
+func (w frameworkLogWriter) Debug(v any, f ...logx.LogField) { w.write(slog.LevelDebug, v, f...) }
+func (w frameworkLogWriter) Error(v any, f ...logx.LogField) { w.write(slog.LevelError, v, f...) }
+func (w frameworkLogWriter) Info(v any, f ...logx.LogField)  { w.write(slog.LevelInfo, v, f...) }
+func (w frameworkLogWriter) Severe(v any)                    { w.write(slog.LevelError, v) }
+func (w frameworkLogWriter) Slow(v any, f ...logx.LogField)  { w.write(slog.LevelWarn, v, f...) }
+func (w frameworkLogWriter) Stack(v any)                     { w.write(slog.LevelError, v) }
+func (w frameworkLogWriter) Stat(v any, f ...logx.LogField)  { w.write(slog.LevelInfo, v, f...) }
