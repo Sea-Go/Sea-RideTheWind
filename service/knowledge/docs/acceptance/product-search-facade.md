@@ -1,10 +1,12 @@
 # H02 RTW 产品搜索入口交接
 
-状态：**产品入口 LOCAL_VERIFIED；空证据与有证据跨仓子链 INTEGRATED（2026-09-14）**。隔离 PG、真实 User Center RPC、BTW HTTP/根 Runner 已联验；三路真实索引与线上模型仍未端到端验收。
+状态：**产品入口 LOCAL_VERIFIED；空证据与有证据跨仓子链 INTEGRATED（2026-09-14）；Web→RTW→BTW→DataCenter 同次真实 HTTP 链 INTEGRATED（2026-09-15）**。隔离 PG、真实 User Center RPC、BTW HTTP/根 Runner 与固定 BGE-M3 三路本地精确检索已联验；线上模型、真实规模语料和浏览器视觉仍未验收。
 
 ## 产品接口与所有者
 
 网页和桌宠只调用 JWT 保护的 `POST /v1/knowledge/answer-sessions/:session_id/searches`。JSON 正文只接受 `module_id,query,depth,intelligence,idempotency_key`。`depth` 为 `fast|detailed`，`intelligence` 为 `low|medium|high`；`idempotency_key` 为 8–128 字节 ASCII 字母、数字、`_`、`.`、`-`。RTW 经 User Center JWT 与实时 User RPC 得到 `rtw.identity/platform/<UID>`，从人工当前发布取完整三路 `SearchSnapshot`。客户端传入主体、快照、搜索 ID 或答案 ID 会在路由解析阶段被拒绝。
+
+这里的产品身份只有 **RTW User Center（`rtw-user-center`）权威来源 + User Center 全局 UID**。现有内部 SubjectRef/存储为兼容既有三段合同，仍编码成 `rtw.identity/platform/<UID>`；其中 `platform` 是固定 realm 常量，不是组织、空间或付费租户。产品接口、User Center 账号和本次交接都不引入可变 `tenant_id`，也不允许客户端提交或推断租户字段。
 
 RTW 用固定 Go JSON 字段顺序 `module_id,query,depth,intelligence` 的 SHA256 小写十六进制值做 `request_hash`。它与完整 SubjectRef、逻辑会话、幂等键在 `knowledge_product_search_operations` 中一次绑定固定快照、`search_id` 和 `answer_id`。同键同正文复用原行；同键异正文 HTTP 409。RTW 发往 BTW 的私有 `/v1/search/summary` 正文只有前四字段，另带单值 `X-Sea-Search-Scope`。签名 payload 及 HMAC 线格式按 Sea-Docs H02 合同；签发 Unix 秒，TTL 120 秒，服务端配置密钥至少 32 字节，HTTP 禁止重定向转发。
 
@@ -37,3 +39,9 @@ RTW 用固定 Go JSON 字段顺序 `module_id,query,depth,intelligence` 的 SHA2
 在隔离 PostgreSQL、真实 RTW go-zero HTTP 与独立 BTW HTTP 子进程中，RTW 用已人工发布的 release/index manifest 固定快照；父测试只把其中 chunk 的 `revision_id/chunk_id/quote_hash` 交给 BTW 子进程，不传答案或伪造引用。BTW 使用 RTW Worker API 重新读取当前快照、同版原文，在现有 `Delivery` 中再次核对定位和哈希、持久接纳引用，收到 RTW receipt 后通过原生 tRPC-Agent-Go Graph/LLMAgent/Runner 运行固定模型替身并提交产品轮次。RTW façade 从自己的 PG 验证 `knowledge_search_citations`、`knowledge_answer_citations`、`knowledge_accepted_answers` 后返回含真实 quote、evidence ID 与 receipt 的 200 `succeeded`；同键 POST、GET 完全一致，他人 GET 为 404。该子链也保留原来的 `insufficient` 空证据分支。
 
 命令：`KNOWLEDGE_KEEP_EVIDENCE=1 KNOWLEDGE_REAL_USER_GATE=1 SEA_BTW_PRODUCT_SEARCH_ROOT=<BTW 独立 worktree 绝对路径> bash service/knowledge/scripts/acceptance.sh`，包含知识与 User Center 模块 race 全测、vet，实测退出码 0；`TestRealHTTPKnowledgeWorkflowWithUserCenter` 与 gRPC 替身版本均 PASS。此候选由**隔离测试中真实发布的 chunk 确定性注入**，并未测试三路真实检索的召回；模型是固定响应替身，未验证线上模型质量。可将“RTW 签发 → BTW 有证据成功 → RTW 接纳后公开”的子链记为 `INTEGRATED`，H02/H07 全量仍为 `PARTIAL`。
+
+## 网页同次真实 HTTP 联验
+
+2026-09-15 由 Web 仓 `scripts/knowledge-live-search-acceptance.cjs` 编排真实 User Center 两账号、生产 Next BFF、RTW、BTW 正式 `cmd/api`、DataCenter 固定官方 BGE-M3 Dense/Sparse/Multi-vector 表示和 RTW 隔离 PostgreSQL。同一 owner JWT 经 BFF 完成产品 POST、同键重放和固定 GET；RTW 从自己的 PostgreSQL 核验答案、引用、主体与会话，另一全局 UID 对固定操作和答案均为 404、同会话历史为空。来源撤回前后，同一引用由 `available` 变为 `unavailable`，历史答案正文保持同一 SHA256。
+
+最终报告 `/private/tmp/sea-web-live-search-final-pass-20260915113215-51465/report.json` 为 `passed`，SHA256 为 `3fb132882ac876aa8b4c6a15e0d6f49198198f4b273b48af7db4d2e73974d144`；RTW/DataCenter 子进程和编排脚本均退出 0，且没有残留联验进程。报告不含 JWT、口令、DSN 或签名密钥。这次以真实 HTTP 验证生产页面路由壳和 BFF，没有运行真实浏览器 DOM、`sessionStorage` 或视觉验收；固定模型与两块隔离语料也不代表模型质量、检索相关性或规模效果。
