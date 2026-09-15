@@ -113,7 +113,7 @@ func TestLikeFactsStateTransitionRetryAndReorder(t *testing.T) {
 		t.Fatalf("expected four accepted transitions, got %d: %+v", len(facts), facts)
 	}
 	for i, id := range []string{"100", "101", "103", "105"} {
-		wire := readLikeDelivery(t, db, "rtw.like/"+id)
+		wire := readLikeDelivery(t, db, "rtw.like."+id)
 		if wire.AggregateID != "like-state/101/article/200" || wire.AggregateVersion != int64(i+1) {
 			t.Fatalf("like transition version %d: %+v", i, wire)
 		}
@@ -144,8 +144,8 @@ func TestLikeFactsStateTransitionRetryAndReorder(t *testing.T) {
 	if len(readLikeFacts(t, db, "200")) != 6 {
 		t.Fatal("ordered batch did not record both transitions")
 	}
-	if readLikeDelivery(t, db, "rtw.like/106").AggregateVersion != 5 ||
-		readLikeDelivery(t, db, "rtw.like/107").AggregateVersion != 6 {
+	if readLikeDelivery(t, db, "rtw.like.106").AggregateVersion != 5 ||
+		readLikeDelivery(t, db, "rtw.like.107").AggregateVersion != 6 {
 		t.Fatal("like batch did not allocate contiguous transactional fact versions")
 	}
 	conflict := likePayload("100", 3)
@@ -174,7 +174,7 @@ func TestUnversionedLegacyLikeFactBlocksNewAggregateVersion(t *testing.T) {
 func TestLikeFactFailureRollsBackInboxAndState(t *testing.T) {
 	db := factTestDB(t)
 	model := NewLikeRecordModel(db)
-	if err := db.Create(&LikeDomainFactOutbox{EventID: "rtw.like/108", EventType: "conflict", Payload: `{}`}).Error; err != nil {
+	if err := db.Create(&LikeDomainFactOutbox{EventID: "rtw.like.108", EventType: "conflict", Payload: `{}`}).Error; err != nil {
 		t.Fatal(err)
 	}
 	conflicting := likePayload("108", 1)
@@ -214,8 +214,8 @@ func TestLikeFactVersionsArePerUserTarget(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct{ id, aggregate string }{
-		{"rtw.like/501", "like-state/101/article/501"},
-		{"rtw.like/502", "like-state/102/article/501"},
+		{"rtw.like.501", "like-state/101/article/501"},
+		{"rtw.like.502", "like-state/102/article/501"},
 	} {
 		if wire := readLikeDelivery(t, db, tc.id); wire.AggregateID != tc.aggregate || wire.AggregateVersion != 1 {
 			t.Fatalf("independent like state stream: %+v", wire)
@@ -246,7 +246,7 @@ func TestConcurrentLikeMessageIdempotency(t *testing.T) {
 		}
 	}
 	var count int64
-	if err := db.Model(&LikeDomainFactOutbox{}).Where("event_id = ?", "rtw.like/200").Count(&count).Error; err != nil || count != 1 {
+	if err := db.Model(&LikeDomainFactOutbox{}).Where("event_id = ?", "rtw.like.200").Count(&count).Error; err != nil || count != 1 {
 		t.Fatalf("concurrent duplicate emitted wrong fact count=%d err=%v", count, err)
 	}
 }
@@ -263,7 +263,7 @@ func TestAmbiguousLegacyLikeStateDoesNotEmitFact(t *testing.T) {
 		t.Fatal("ambiguous legacy state was interpreted as a new accepted fact")
 	}
 	var count int64
-	if err := db.Model(&LikeDomainFactOutbox{}).Where("event_id = ?", "rtw.like/300").Count(&count).Error; err != nil || count != 0 {
+	if err := db.Model(&LikeDomainFactOutbox{}).Where("event_id = ?", "rtw.like.300").Count(&count).Error; err != nil || count != 0 {
 		t.Fatalf("legacy state emitted fact count=%d err=%v", count, err)
 	}
 }

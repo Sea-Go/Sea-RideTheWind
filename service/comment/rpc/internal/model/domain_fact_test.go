@@ -96,8 +96,8 @@ func TestCommentFactsCommitRetryAndRetract(t *testing.T) {
 	if err := model.InsertCommentTx(ctx, root, 0); err != nil {
 		t.Fatal(err)
 	}
-	created := readCommentFact(t, db, "rtw.comment/1001/created")
-	if wire := readCommentDelivery(t, db, "rtw.comment/1001/created"); wire.AggregateID != "1001" || wire.AggregateVersion != 1 {
+	created := readCommentFact(t, db, "rtw.comment.1001.created")
+	if wire := readCommentDelivery(t, db, "rtw.comment.1001.created"); wire.AggregateID != "1001" || wire.AggregateVersion != 1 {
 		t.Fatalf("comment create version: %+v", wire)
 	}
 	if created.SubjectRef != "rtw.identity/platform/101" || created.TargetRevision != nil ||
@@ -115,7 +115,7 @@ func TestCommentFactsCommitRetryAndRetract(t *testing.T) {
 	if err := model.InsertCommentTx(ctx, reply, 1); err != nil {
 		t.Fatal(err)
 	}
-	if fact := readCommentFact(t, db, "rtw.comment/1002/created"); fact.ParentCommentID != "1001" || fact.VisibilityState != 1 {
+	if fact := readCommentFact(t, db, "rtw.comment.1002.created"); fact.ParentCommentID != "1001" || fact.VisibilityState != 1 {
 		t.Fatalf("reply fact lost parent or audit state: %+v", fact)
 	}
 	if _, err := model.DeleteCommentTx(ctx, 1002, 303, "article", "wrong"); !errors.Is(err, ErrorCommentNotFound) {
@@ -130,8 +130,8 @@ func TestCommentFactsCommitRetryAndRetract(t *testing.T) {
 			t.Fatalf("delete retry %d: count=%d err=%v", i, remaining, err)
 		}
 	}
-	deleted := readCommentFact(t, db, "rtw.comment/1002/deleted")
-	if wire := readCommentDelivery(t, db, "rtw.comment/1002/deleted"); wire.AggregateID != "1002" || wire.AggregateVersion != 2 {
+	deleted := readCommentFact(t, db, "rtw.comment.1002.deleted")
+	if wire := readCommentDelivery(t, db, "rtw.comment.1002.deleted"); wire.AggregateID != "1002" || wire.AggregateVersion != 2 {
 		t.Fatalf("comment retract version: %+v", wire)
 	}
 	if deleted.SubjectRef != "rtw.identity/platform/303" || deleted.OperatorRef != "rtw.identity/platform/202" || deleted.Operation != "retract" {
@@ -196,7 +196,7 @@ func TestCommentFactFailureRollsBackBusinessState(t *testing.T) {
 	db := factTestDB(t)
 	model := NewCommentModel(db)
 	ctx := context.Background()
-	if err := db.Create(&CommentDomainFactOutbox{EventID: "rtw.comment/1003/created", EventType: "conflict", Payload: `{}`}).Error; err != nil {
+	if err := db.Create(&CommentDomainFactOutbox{EventID: "rtw.comment.1003.created", EventType: "conflict", Payload: `{}`}).Error; err != nil {
 		t.Fatal(err)
 	}
 	msg := kqtypes.CommentKafkaMsg{CommentId: 1003, UserId: 101, OwnerId: 202,
