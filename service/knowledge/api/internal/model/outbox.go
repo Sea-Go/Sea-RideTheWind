@@ -46,12 +46,19 @@ func (s *Store) DispatchOne(ctx context.Context, sender Sender) (sent bool, resu
 	}
 	defer tx.Rollback(context.Background())
 	var raw, correlationRaw []byte
-	query := "SELECT payload,correlation FROM knowledge_outbox WHERE delivered_at IS NULL ORDER BY created_at,event_id FOR UPDATE SKIP LOCKED LIMIT 1"
+	// PostgreSQL now() gives same created_at to several events from one
+	// CreateCompile transaction. Its module aggregate_version preserves the
+	// old supersede fence before the new requested event in the default H04
+	// route as well as the opt-in Jobs route.
+	query := `SELECT payload,correlation FROM knowledge_outbox WHERE delivered_at IS NULL
+	 ORDER BY created_at,(payload->>'aggregate_version')::bigint,event_id
+	 FOR UPDATE SKIP LOCKED LIMIT 1`
 	if s.wikiCompileJobs {
 		query = `SELECT payload,correlation FROM knowledge_outbox WHERE delivered_at IS NULL
 		 AND event_type NOT IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1',
 		 'knowledge.wiki.compile.superseded.v1')
-		 ORDER BY created_at,event_id FOR UPDATE SKIP LOCKED LIMIT 1`
+		 ORDER BY created_at,(payload->>'aggregate_version')::bigint,event_id
+		 FOR UPDATE SKIP LOCKED LIMIT 1`
 	}
 	err = tx.QueryRow(ctx, query).Scan(&raw, &correlationRaw)
 	if errors.Is(err, pgx.ErrNoRows) {
