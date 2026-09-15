@@ -28,6 +28,16 @@ export RTW_LIKE_FACT_TEST_DSN="host=$tmp_dir port=$pg_port dbname=rtw_like_fact_
 export RTW_LIKE_CONSUMER_FACT_TEST_DSN="host=$tmp_dir port=$pg_port dbname=rtw_like_consumer_fact_test sslmode=disable"
 
 cd "$repo_root"
+for entrypoint in \
+  service/comment/rpc/cmd/fact-dispatch/main.go service/comment/rpc/cmd/fact-authority/main.go \
+  service/like/rpc/cmd/fact-dispatch/main.go service/like/rpc/cmd/fact-authority/main.go; do
+  rg -q 'func main\(\) \{ os.Exit\(execute\(\)\) \}' "$entrypoint"
+  if rg -q 'os.Exit\(1\)' "$entrypoint"; then
+    printf 'tracing shutdown can be skipped in %s\n' "$entrypoint" >&2
+    exit 1
+  fi
+  rg -q 'defer tracing.Shutdown\(context.Background\(\)\)' "$entrypoint"
+done
 go test -mod=readonly -race -count=1 \
   ./service/comment/rpc/internal/model \
   ./service/like/rpc/internal/model \
