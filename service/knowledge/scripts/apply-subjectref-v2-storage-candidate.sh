@@ -15,10 +15,10 @@ KNOWLEDGE_PREFLIGHT_DSN="$KNOWLEDGE_SUBJECTREF_V2_DSN" \
   go run -mod=readonly ./service/knowledge/cmd/subjectref-preflight \
     -report "$knowledge_evidence/preflight.json" \
     > "$knowledge_evidence/preflight.stdout" 2> "$knowledge_evidence/preflight.stderr"
-psql "$KNOWLEDGE_SUBJECTREF_V2_DSN" -v ON_ERROR_STOP=1 \
+psql -X "$KNOWLEDGE_SUBJECTREF_V2_DSN" -v ON_ERROR_STOP=1 \
   -f service/knowledge/scripts/migrate-subjectref-v2-storage.sql \
   > "$knowledge_evidence/migration.log" 2>&1
-psql "$KNOWLEDGE_SUBJECTREF_V2_DSN" -v ON_ERROR_STOP=1 -At -c \
+psql -X "$KNOWLEDGE_SUBJECTREF_V2_DSN" -v ON_ERROR_STOP=1 -At -c \
   "SELECT (SELECT count(*) FROM knowledge_answer_sessions_subject_v2),
           (SELECT count(*) FROM knowledge_accepted_answers_subject_v2),
           (SELECT count(*) FROM knowledge_product_search_operations_subject_v2),
