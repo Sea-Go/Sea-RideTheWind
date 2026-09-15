@@ -605,6 +605,11 @@ func TestFavoriteDeliveryTwoUsersSharedAuthorityFixture(t *testing.T) {
 		}
 	}
 	store := favoriteFactStore(t)
+	mode := os.Getenv("FAVORITE_TWO_SUBJECTREF_MODE")
+	if mode != "" && mode != "v2-mixed" {
+		t.Fatalf("unknown two-user SubjectRef test mode %q", mode)
+	}
+	v2Writer := NewFavoriteModel(store.conn, WithSubjectRefV2Facts())
 	authorityURL, authorityToken := startFavoriteAuthorityProcess(t, store)
 	ctx := context.Background()
 	endpoint, dcURL, dcToken := os.Getenv("FAVORITE_DC_URL")+"/v1/events", os.Getenv("FAVORITE_DC_URL"), os.Getenv("FAVORITE_DC_TOKEN")
@@ -620,7 +625,11 @@ func TestFavoriteDeliveryTwoUsersSharedAuthorityFixture(t *testing.T) {
 			t.Fatal(err)
 		}
 		revision := item.target + ":r1"
-		if err := store.InsertFavorite(ctx, &FavoriteItem{FavoriteId: item.favorite, FolderId: item.folder,
+		writer := store
+		if mode == "v2-mixed" && item.user == 1001 {
+			writer = v2Writer
+		}
+		if err := writer.InsertFavorite(ctx, &FavoriteItem{FavoriteId: item.favorite, FolderId: item.folder,
 			UserId: item.user, TargetType: "article", TargetId: item.target, TargetRevision: &revision}); err != nil {
 			t.Fatal(err)
 		}
@@ -640,16 +649,32 @@ func TestFavoriteDeliveryTwoUsersSharedAuthorityFixture(t *testing.T) {
 		fmt.Sprintf("favorite.%d.v2", u1Favorite),
 	}
 	userIDs := []string{"1001", "1002", "1001"}
+	schemaVersions := []int{1, 1, 1}
+	if mode == "v2-mixed" {
+		schemaVersions = []int{2, 1, 2}
+	}
 	receipts := make([]FavoriteTechnicalReceipt, 0, len(ids))
 	for i, id := range ids {
 		receipt := readFavoriteDCReceipt(t, &http.Client{Timeout: 3 * time.Second}, dcURL, dcToken, id)
-		status, fact := readFavoriteAuthority(t, authorityURL, authorityToken, favoriteProducer, id)
-		if receipt.Offset != int64(i+1) || status != 200 || fact.SourceEventHash != receipt.InputHash ||
-			fact.TechnicalReceipt.ReceiptID != receipt.ReceiptID || fact.SubjectRef.SubjectID != userIDs[i] {
-			t.Fatalf("two-user source item %d differs: offset=%d status=%d subject=%s", i, receipt.Offset, status, fact.SubjectRef.SubjectID)
+		status := 0
+		sourceHash, sourceReceipt, sourceUID, predecessor := "", FavoriteTechnicalReceipt{}, "", ""
+		if schemaVersions[i] == 2 {
+			var fact FavoriteAuthorityFactV2
+			status, fact = readFavoriteAuthorityV2(t, authorityURL, authorityToken, favoriteProducer, id)
+			sourceHash, sourceReceipt, sourceUID, predecessor = fact.SourceEventHash,
+				fact.TechnicalReceipt, fact.SubjectRef.SubjectID, fact.PredecessorEventID
+		} else {
+			var fact FavoriteAuthorityFact
+			status, fact = readFavoriteAuthority(t, authorityURL, authorityToken, favoriteProducer, id)
+			sourceHash, sourceReceipt, sourceUID, predecessor = fact.SourceEventHash,
+				fact.TechnicalReceipt, fact.SubjectRef.SubjectID, fact.PredecessorEventID
 		}
-		if i == 2 && fact.PredecessorEventID != ids[0] {
-			t.Fatalf("u1 retract predecessor %q differs", fact.PredecessorEventID)
+		if receipt.Offset != int64(i+1) || status != 200 || sourceHash != receipt.InputHash ||
+			sourceReceipt.ReceiptID != receipt.ReceiptID || sourceUID != userIDs[i] {
+			t.Fatalf("two-user source item %d differs: offset=%d status=%d subject=%s", i, receipt.Offset, status, sourceUID)
+		}
+		if i == 2 && predecessor != ids[0] {
+			t.Fatalf("u1 retract predecessor %q differs", predecessor)
 		}
 		receipts = append(receipts, receipt)
 	}
@@ -661,7 +686,11 @@ func TestFavoriteDeliveryTwoUsersSharedAuthorityFixture(t *testing.T) {
 		Producer       string                     `json:"producer"`
 		EventIDs       []string                   `json:"event_ids"`
 		Receipts       []FavoriteTechnicalReceipt `json:"receipts"`
-	}{authorityURL, authorityToken, dcURL, dcToken, favoriteProducer, ids, receipts}
+		SchemaVersions []int                      `json:"schema_versions,omitempty"`
+	}{authorityURL, authorityToken, dcURL, dcToken, favoriteProducer, ids, receipts, nil}
+	if mode == "v2-mixed" {
+		ready.SchemaVersions = schemaVersions
+	}
 	if err := writeFavoriteSharedReady(readyPath, ready); err != nil {
 		t.Fatal(err)
 	}
