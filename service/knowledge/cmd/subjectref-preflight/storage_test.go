@@ -306,3 +306,27 @@ func TestSubjectRefV2StorageReplayRejectsCatalogDrift(t *testing.T) {
 		})
 	}
 }
+
+func TestSubjectRefV2StorageReplayRejectsWeakKeyColumn(t *testing.T) {
+	for _, tc := range []struct{ name, damage string }{
+		{"uid-default", `ALTER TABLE knowledge_answer_sessions_subject_v2
+ ALTER COLUMN subject_id SET DEFAULT '42'`},
+		{"ordinal-identity", `ALTER TABLE knowledge_accepted_answers_subject_v2
+ ALTER COLUMN accepted_ordinal ADD GENERATED ALWAYS AS IDENTITY`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := fixtureDB(t)
+			if err := applyStorageMigration(t, conn); err != nil {
+				t.Fatal(err)
+			}
+			_, err := conn.Exec(context.Background(), tc.damage)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := applyStorageMigration(t, conn); err == nil ||
+				!strings.Contains(err.Error(), "column shape changed") {
+				t.Fatalf("catalog replay accepted weak key column %s: %v", tc.name, err)
+			}
+		})
+	}
+}
