@@ -20,6 +20,42 @@ const (
 )
 
 var ErrFavoriteOwnerMismatch = errors.New("favorite owner mismatch")
+var ErrFavoriteFactMigrationBlocked = errors.New("favorite fact history must be reconciled before retract")
+
+// FavoriteLegacyFactMarker is an explicit migration-owner approval for one
+// pre-Outbox business row. Absence of an assert alone can never prove a row is
+// legacy; these anchors must match the locked live row before a factless delete.
+type FavoriteLegacyFactMarker struct {
+	FavoriteID           int64   `gorm:"column:favorite_id;primaryKey"`
+	UserID               int64   `gorm:"column:user_id"`
+	FolderID             int64   `gorm:"column:folder_id"`
+	TargetType           string  `gorm:"column:target_type"`
+	TargetID             string  `gorm:"column:target_id"`
+	TargetRevision       *string `gorm:"column:target_revision"`
+	SourceSnapshotSHA256 string  `gorm:"column:source_snapshot_sha256"`
+	ApprovalRef          string  `gorm:"column:approval_ref"`
+}
+
+func (FavoriteLegacyFactMarker) TableName() string { return "favorite_legacy_fact_marker" }
+
+// The marker digest binds all fields that determine ownership and the frozen
+// Favorite target. IDs are strings so the JCS digest remains exact for large
+// Snowflake values. Mutable title/cover are intentionally outside this key.
+func favoriteLegacySnapshotHash(item FavoriteItem) (string, error) {
+	body, err := json.Marshal(struct {
+		FavoriteID     string  `json:"favorite_id"`
+		UserID         string  `json:"user_id"`
+		FolderID       string  `json:"folder_id"`
+		TargetType     string  `json:"target_type"`
+		TargetID       string  `json:"target_id"`
+		TargetRevision *string `json:"target_revision"`
+	}{strconv.FormatInt(item.FavoriteId, 10), strconv.FormatInt(item.UserId, 10),
+		strconv.FormatInt(item.FolderId, 10), item.TargetType, item.TargetId, item.TargetRevision})
+	if err != nil {
+		return "", err
+	}
+	return favoriteJCSHash(body)
+}
 
 type FavoriteFactOutbox struct {
 	EventID             string `gorm:"primaryKey;type:varchar(128)"`
@@ -173,11 +209,38 @@ func (m *FavoriteModel) newFavoriteOutbox(item FavoriteItem, version int64, oper
 	}
 }
 
-func favoriteAssertionSchema(tx *gorm.DB, item FavoriteItem) (int, error) {
+func favoriteAssertionSchema(tx *gorm.DB, item FavoriteItem) (schema int, approvedLegacy bool, err error) {
 	var row FavoriteFactOutbox
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("favorite_id = ? AND aggregate_version = 1", item.FavoriteId).Take(&row).Error; err != nil {
-		return 0, err
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, false, err
+		}
+		var marker FavoriteLegacyFactMarker
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("favorite_id = ?", item.FavoriteId).Take(&marker).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return 0, false, ErrFavoriteFactMigrationBlocked
+			}
+			return 0, false, err
+		}
+		snapshotHash, hashErr := favoriteLegacySnapshotHash(item)
+		if hashErr != nil || marker.FavoriteID != item.FavoriteId || marker.UserID != item.UserId ||
+			marker.FolderID != item.FolderId || marker.TargetType != item.TargetType ||
+			marker.TargetID != item.TargetId || !sameFavoriteRevision(marker.TargetRevision, item.TargetRevision) ||
+			!favoriteReceiptHash.MatchString(marker.SourceSnapshotSHA256) ||
+			marker.SourceSnapshotSHA256 != snapshotHash || marker.ApprovalRef == "" {
+			return 0, false, ErrFavoriteFactMigrationBlocked
+		}
+		var orphanCount int64
+		if err := tx.Model(&FavoriteFactOutbox{}).
+			Where("favorite_id = ? AND aggregate_version = 2", item.FavoriteId).Count(&orphanCount).Error; err != nil {
+			return 0, false, err
+		}
+		if orphanCount != 0 {
+			return 0, false, ErrFavoriteFactMigrationBlocked
+		}
+		return 0, true, nil
 	}
 	var event FavoriteWireEvent
 	if strictFavoriteJSON([]byte(row.Payload), &event) != nil ||
@@ -185,20 +248,20 @@ func favoriteAssertionSchema(tx *gorm.DB, item FavoriteItem) (int, error) {
 		event.EventType != "rtw.favorite.assert" || event.AggregateID != strconv.FormatInt(item.FavoriteId, 10) ||
 		(event.SchemaVersion != 1 && event.SchemaVersion != 2) ||
 		!validFavoriteDelivery(row, event) {
-		return 0, ErrFavoriteFactUnavailable
+		return 0, false, ErrFavoriteFactMigrationBlocked
 	}
 	var payload authorityPayload
 	if strictFavoriteJSON(event.Payload, &payload) != nil {
-		return 0, ErrFavoriteFactUnavailable
+		return 0, false, ErrFavoriteFactMigrationBlocked
 	}
 	subject, ok := favoriteSubjectV1(event.SchemaVersion, payload.Subject)
 	folderID, folderOK := parseAuthorityID(payload.FolderID)
 	if !ok || !folderOK || subject.SubjectID != strconv.FormatInt(item.UserId, 10) ||
 		folderID != item.FolderId || payload.TargetType != item.TargetType ||
 		payload.TargetID != item.TargetId || !sameFavoriteRevision(payload.TargetRevision, item.TargetRevision) {
-		return 0, ErrFavoriteFactUnavailable
+		return 0, false, ErrFavoriteFactMigrationBlocked
 	}
-	return event.SchemaVersion, nil
+	return event.SchemaVersion, false, nil
 }
 
 // InsertFavorite commits the existing favorite ID and its business fact in
@@ -250,9 +313,12 @@ func (m *FavoriteModel) DeleteFavoriteByFavoriteId(ctx context.Context, favorite
 		if item.UserId != userID {
 			return ErrFavoriteOwnerMismatch
 		}
-		schema, err := favoriteAssertionSchema(tx, item)
+		schema, legacy, err := favoriteAssertionSchema(tx, item)
 		if err != nil {
 			return err
+		}
+		if legacy {
+			return tx.Where("favorite_id = ?", favoriteID).Delete(&FavoriteItem{}).Error
 		}
 		fact, err := m.newFavoriteOutbox(item, 2, "retract", time.Now(), schema)
 		if err != nil {
@@ -289,9 +355,12 @@ func (m *FavoriteModel) DeleteFolderCascade(ctx context.Context, folderID, userI
 			return err
 		}
 		for _, item := range items {
-			schema, err := favoriteAssertionSchema(tx, item)
+			schema, legacy, err := favoriteAssertionSchema(tx, item)
 			if err != nil {
 				return err
+			}
+			if legacy {
+				continue
 			}
 			fact, err := m.newFavoriteOutbox(item, 2, "retract", time.Now(), schema)
 			if err != nil {

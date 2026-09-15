@@ -80,8 +80,12 @@ func (l *DeleteFavoriteFolderLogic) DeleteFavoriteFolder(in *favoritepb.DeleteFa
 
 	if dbErr = l.svcCtx.FavoriteModel.DeleteFolderCascade(ctx, in.GetFolderId(), in.GetUserId()); dbErr != nil {
 		span.RecordError(dbErr)
-		metrics.ObserveDBError(folderModule, "delete", "db")
 		metrics.ObserveOp(folderModule, folderDelete, resultFail)
+		if errors.Is(dbErr, model.ErrFavoriteFactMigrationBlocked) {
+			logger.LogBusinessErr(ctx, favoritecommon.ErrorFavoriteHistoryBlocked, dbErr, userLogOption(in.GetUserId()))
+			return nil, favoritecommon.GRPCError(codes.FailedPrecondition, favoritecommon.ErrorFavoriteHistoryBlocked)
+		}
+		metrics.ObserveDBError(folderModule, "delete", "db")
 		logger.LogBusinessErr(ctx, favoritecommon.ErrorDbUpdate, dbErr, userLogOption(in.GetUserId()))
 		return nil, favoritecommon.GRPCError(codes.Internal, favoritecommon.ErrorDbUpdate)
 	}

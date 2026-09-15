@@ -49,8 +49,10 @@ export FAVORITE_DC_TOKEN="$PLATFORM_SERVICE_TOKEN"
 (cd "$favorite_dc_root" && go build -mod=readonly -o "$favorite_tmp/dc-platform" ./cmd/platform)
 (cd "$favorite_repo" && go build -mod=readonly -o "$favorite_tmp/favorite-fact-dispatch" ./service/favorite/rpc/cmd/fact-dispatch)
 (cd "$favorite_repo" && go build -mod=readonly -o "$favorite_tmp/favorite-fact-authority" ./service/favorite/rpc/cmd/fact-authority)
+(cd "$favorite_repo" && go build -mod=readonly -o "$favorite_tmp/favorite-fact-legacy-preflight" ./service/favorite/rpc/cmd/fact-legacy-preflight)
 export FAVORITE_DISPATCH_BIN="$favorite_tmp/favorite-fact-dispatch"
 export FAVORITE_AUTHORITY_BIN="$favorite_tmp/favorite-fact-authority"
+export FAVORITE_LEGACY_PREFLIGHT_BIN="$favorite_tmp/favorite-fact-legacy-preflight"
 "$favorite_tmp/dc-platform" -listen "127.0.0.1:$favorite_dc_port" -migrate >"$favorite_tmp/dc-platform.log" 2>&1 &
 favorite_dc_pid=$!
 favorite_ready=false

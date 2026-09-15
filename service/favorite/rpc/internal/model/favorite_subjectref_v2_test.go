@@ -1,9 +1,13 @@
 package model
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"net/url"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -149,5 +153,273 @@ func TestFavoriteSubjectRefV2AuthorityAndBadFrozenVersions(t *testing.T) {
 		if payload.SchemaVersion == 2 && ok {
 			t.Fatalf("bad v2 payload passed source checks: %s", bad)
 		}
+	}
+}
+
+func TestFavoriteLegacyBusinessRowWithoutAssertBlocksRetractAndCascade(t *testing.T) {
+	store := favoriteFactStore(t)
+	ctx := context.Background()
+	const folderID int64 = 9121
+	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: folderID, UserId: 1001, Name: "legacy gap"}); err != nil {
+		t.Fatal(err)
+	}
+	legacy := FavoriteItem{FavoriteId: 9122, FolderId: folderID, UserId: 1001,
+		TargetType: "article", TargetId: "old-without-assert"}
+	if err := store.conn.Create(&legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteFavoriteByFavoriteId(ctx, legacy.FavoriteId, legacy.UserId); !errors.Is(err, ErrFavoriteFactMigrationBlocked) {
+		t.Fatalf("old owner row was deleted without a frozen assert: %v", err)
+	}
+	var items, rows int64
+	if err := store.conn.Model(&FavoriteItem{}).Where("favorite_id = ?", legacy.FavoriteId).Count(&items).Error; err != nil || items != 1 {
+		t.Fatalf("legacy business row disappeared: count=%d err=%v", items, err)
+	}
+	if err := store.conn.Model(&FavoriteFactOutbox{}).Where("favorite_id = ?", legacy.FavoriteId).Count(&rows).Error; err != nil || rows != 0 {
+		t.Fatalf("blocked old row fabricated a fact: count=%d err=%v", rows, err)
+	}
+	if report, err := store.FavoriteLegacyPreflight(ctx); err != nil || report.Clear() ||
+		report.MissingAssert != 1 || report.Blocked != 1 || report.ApprovedLegacy != 0 {
+		t.Fatalf("unapproved old row passed migration release gate: %+v %v", report, err)
+	}
+	// A folder cascade may have staged a valid new retract earlier in the
+	// transaction. Encountering any old unmapped item must roll all of it back.
+	if err := store.InsertFavorite(ctx, &FavoriteItem{FavoriteId: 9120, FolderId: folderID,
+		UserId: 1001, TargetType: "article", TargetId: "new-with-assert"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteFolderCascade(ctx, folderID, 1001); !errors.Is(err, ErrFavoriteFactMigrationBlocked) {
+		t.Fatalf("folder with missing historical assert was deleted: %v", err)
+	}
+	if err := store.conn.Model(&FavoriteItem{}).Where("folder_id = ?", folderID).Count(&items).Error; err != nil || items != 2 {
+		t.Fatalf("folder cascade partially deleted item: count=%d err=%v", items, err)
+	}
+	if err := store.conn.Model(&FavoriteFactOutbox{}).Where("favorite_id IN ?", []int64{9120, 9122}).Count(&rows).Error; err != nil || rows != 1 {
+		t.Fatalf("folder cascade leaked a retract or old assert: count=%d err=%v", rows, err)
+	}
+	var folders int64
+	if err := store.conn.Model(&FavoriteFolder{}).Where("folder_id = ?", folderID).Count(&folders).Error; err != nil || folders != 1 {
+		t.Fatalf("blocked cascade removed its folder: count=%d err=%v", folders, err)
+	}
+	hash, err := favoriteLegacySnapshotHash(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := FavoriteLegacyFactMarker{FavoriteID: legacy.FavoriteId, UserID: legacy.UserId,
+		FolderID: legacy.FolderId, TargetType: legacy.TargetType, TargetID: legacy.TargetId,
+		TargetRevision: legacy.TargetRevision, SourceSnapshotSHA256: hash,
+		ApprovalRef: "test-reviewed-pre-outbox-row/9122"}
+	if err := store.conn.Create(&marker).Error; err != nil {
+		t.Fatal(err)
+	}
+	if report, err := store.FavoriteLegacyPreflight(ctx); err != nil || !report.Clear() ||
+		report.MissingAssert != 1 || report.ApprovedLegacy != 1 {
+		t.Fatalf("source-matched marker failed migration release gate: %+v %v", report, err)
+	}
+	if err := store.DeleteFolderCascade(ctx, folderID, 1001); err != nil {
+		t.Fatalf("explicit reviewed legacy marker failed to restore delete: %v", err)
+	}
+	if err := store.conn.Model(&FavoriteFolder{}).Where("folder_id = ?", folderID).Count(&folders).Error; err != nil || folders != 0 {
+		t.Fatalf("approved cascade retained folder: count=%d err=%v", folders, err)
+	}
+	if err := store.conn.Model(&FavoriteItem{}).Where("folder_id = ?", folderID).Count(&items).Error; err != nil || items != 0 {
+		t.Fatalf("approved cascade retained item: count=%d err=%v", items, err)
+	}
+	if err := store.conn.Model(&FavoriteFactOutbox{}).Where("favorite_id = ?", legacy.FavoriteId).Count(&rows).Error; err != nil || rows != 0 {
+		t.Fatalf("approved legacy delete fabricated an orphan retract: count=%d err=%v", rows, err)
+	}
+	if err := store.conn.Model(&FavoriteFactOutbox{}).Where("favorite_id = ?", 9120).Count(&rows).Error; err != nil || rows != 2 {
+		t.Fatalf("approved cascade omitted valid new retract: count=%d err=%v", rows, err)
+	}
+}
+
+func TestFavoriteLegacyMarkerCannotApproveDifferentOwnerOrTarget(t *testing.T) {
+	store := favoriteFactStore(t)
+	ctx := context.Background()
+	item := FavoriteItem{FavoriteId: 9132, FolderId: 9131, UserId: 1001,
+		TargetType: "article", TargetId: "old-article"}
+	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: item.FolderId, UserId: item.UserId, Name: "wrong marker"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.conn.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	wrong := item
+	wrong.UserId = 1002
+	hash, err := favoriteLegacySnapshotHash(wrong)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := FavoriteLegacyFactMarker{FavoriteID: item.FavoriteId, UserID: wrong.UserId,
+		FolderID: item.FolderId, TargetType: item.TargetType, TargetID: item.TargetId,
+		SourceSnapshotSHA256: hash, ApprovalRef: "test-wrong-owner"}
+	if err := store.conn.Create(&marker).Error; err != nil {
+		t.Fatal(err)
+	}
+	if report, err := store.FavoriteLegacyPreflight(ctx); err != nil || report.Clear() || report.Blocked != 1 {
+		t.Fatalf("wrong-UID marker passed release gate: %+v %v", report, err)
+	}
+	if err := store.DeleteFavoriteByFavoriteId(ctx, item.FavoriteId, item.UserId); !errors.Is(err, ErrFavoriteFactMigrationBlocked) {
+		t.Fatalf("wrong UID marker approved old item: %v", err)
+	}
+	var count int64
+	if err := store.conn.Model(&FavoriteItem{}).Where("favorite_id = ?", item.FavoriteId).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("wrong marker deleted old item: count=%d err=%v", count, err)
+	}
+	if err := store.conn.Model(&FavoriteFactOutbox{}).Where("favorite_id = ?", item.FavoriteId).Count(&count).Error; err != nil || count != 0 {
+		t.Fatalf("wrong marker fabricated a retract: count=%d err=%v", count, err)
+	}
+}
+
+func TestFavoriteLegacyPreflightRejectsOrphanRetract(t *testing.T) {
+	store := favoriteFactStore(t)
+	ctx := context.Background()
+	item := FavoriteItem{FavoriteId: 9142, FolderId: 9141, UserId: 1001,
+		TargetType: "article", TargetId: "historical-orphan"}
+	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: item.FolderId, UserId: item.UserId, Name: "orphan"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.conn.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	hash, err := favoriteLegacySnapshotHash(item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := FavoriteLegacyFactMarker{FavoriteID: item.FavoriteId, UserID: item.UserId,
+		FolderID: item.FolderId, TargetType: item.TargetType, TargetID: item.TargetId,
+		SourceSnapshotSHA256: hash, ApprovalRef: "test-orphan-must-block"}
+	if err := store.conn.Create(&marker).Error; err != nil {
+		t.Fatal(err)
+	}
+	retract, err := favoriteOutbox(item, 2, "retract", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.conn.Create(&retract).Error; err != nil {
+		t.Fatal(err)
+	}
+	report, err := store.FavoriteLegacyPreflight(ctx)
+	if err != nil || report.Clear() || report.OrphanRetracts != 1 {
+		t.Fatalf("existing orphan retract passed migration cutover: %+v %v", report, err)
+	}
+	if err := store.DeleteFavoriteByFavoriteId(ctx, item.FavoriteId, item.UserId); !errors.Is(err, ErrFavoriteFactMigrationBlocked) {
+		t.Fatalf("legacy marker overrode an existing orphan retract: %v", err)
+	}
+	var count int64
+	if err := store.conn.Model(&FavoriteItem{}).Where("favorite_id = ?", item.FavoriteId).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("orphan blocker deleted business row: count=%d err=%v", count, err)
+	}
+}
+
+func TestFavoriteEstablishedBadAssertCannotUseLegacyMarker(t *testing.T) {
+	store := favoriteFactStore(t)
+	ctx := context.Background()
+	item := FavoriteItem{FavoriteId: 9162, FolderId: 9161, UserId: 1001,
+		TargetType: "article", TargetId: "invalid-established-source"}
+	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: item.FolderId, UserId: item.UserId, Name: "bad assert"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.conn.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	hash, err := favoriteLegacySnapshotHash(item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := FavoriteLegacyFactMarker{FavoriteID: item.FavoriteId, UserID: item.UserId,
+		FolderID: item.FolderId, TargetType: item.TargetType, TargetID: item.TargetId,
+		SourceSnapshotSHA256: hash, ApprovalRef: "test-marker-must-not-override-assert"}
+	if err := store.conn.Create(&marker).Error; err != nil {
+		t.Fatal(err)
+	}
+	asserted, err := favoriteOutbox(item, 1, "assert", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	asserted.Payload = strings.Replace(asserted.Payload,
+		`"subject_id":"1001"`, `"subject_id":"1002"`, 1)
+	if !strings.Contains(asserted.Payload, `"subject_id":"1002"`) {
+		t.Fatal("bad established Outbox fixture did not change owner")
+	}
+	if err := store.conn.Create(&asserted).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteFavoriteByFavoriteId(ctx, item.FavoriteId, item.UserId); !errors.Is(err, ErrFavoriteFactMigrationBlocked) {
+		t.Fatalf("valid marker overrode an invalid established source: %v", err)
+	}
+	var itemCount, outboxCount int64
+	if err := store.conn.Model(&FavoriteItem{}).Where("favorite_id = ?", item.FavoriteId).Count(&itemCount).Error; err != nil || itemCount != 1 {
+		t.Fatalf("bad source deleted business row: count=%d err=%v", itemCount, err)
+	}
+	if err := store.conn.Model(&FavoriteFactOutbox{}).Where("favorite_id = ?", item.FavoriteId).Count(&outboxCount).Error; err != nil || outboxCount != 1 {
+		t.Fatalf("bad source fabricated a retract: count=%d err=%v", outboxCount, err)
+	}
+}
+
+func TestFavoriteLegacyPreflightProcessBlocksAndClears(t *testing.T) {
+	bin := os.Getenv("FAVORITE_LEGACY_PREFLIGHT_BIN")
+	if bin == "" {
+		t.Skip("use acceptance-dc.sh for isolated legacy preflight executable")
+	}
+	store := favoriteFactStore(t)
+	ctx := context.Background()
+	item := FavoriteItem{FavoriteId: 9152, FolderId: 9151, UserId: 1001,
+		TargetType: "article", TargetId: "review-required"}
+	if err := store.InsertFolder(ctx, &FavoriteFolder{FolderId: item.FolderId, UserId: item.UserId, Name: "process gate"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.conn.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	var schema string
+	if err := store.conn.Raw("SELECT current_schema()").Scan(&schema).Error; err != nil {
+		t.Fatal(err)
+	}
+	address, err := url.Parse(os.Getenv("FAVORITE_TEST_DSN"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := address.Query()
+	query.Set("search_path", schema)
+	address.RawQuery = query.Encode()
+	run := func() (FavoriteLegacyPreflightReport, int) {
+		t.Helper()
+		command := exec.Command(bin)
+		command.Env = append(os.Environ(), "FAVORITE_DATABASE_URL="+address.String())
+		var output, diagnostics bytes.Buffer
+		command.Stdout, command.Stderr = &output, &diagnostics
+		err := command.Run()
+		exit := 0
+		if err != nil {
+			var failed *exec.ExitError
+			if !errors.As(err, &failed) {
+				t.Fatalf("preflight process failed to start: %v", err)
+			}
+			exit = failed.ExitCode()
+		}
+		var report FavoriteLegacyPreflightReport
+		diagnosticLines := bytes.SplitN(bytes.TrimSpace(diagnostics.Bytes()), []byte("\n"), 2)
+		if json.Unmarshal(output.Bytes(), &report) != nil ||
+			len(diagnosticLines) == 0 || !json.Valid(diagnosticLines[0]) {
+			t.Fatalf("preflight process did not provide JSON evidence: report=%s diagnostics=%s", output.Bytes(), diagnostics.Bytes())
+		}
+		return report, exit
+	}
+	if report, exit := run(); exit != 2 || report.Clear() || report.Blocked != 1 {
+		t.Fatalf("preflight executable let unapproved source through: exit=%d report=%+v", exit, report)
+	}
+	hash, err := favoriteLegacySnapshotHash(item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := FavoriteLegacyFactMarker{FavoriteID: item.FavoriteId, UserID: item.UserId,
+		FolderID: item.FolderId, TargetType: item.TargetType, TargetID: item.TargetId,
+		SourceSnapshotSHA256: hash, ApprovalRef: "test-reviewed-pre-outbox/9152"}
+	if err := store.conn.Create(&marker).Error; err != nil {
+		t.Fatal(err)
+	}
+	if report, exit := run(); exit != 0 || !report.Clear() || report.ApprovedLegacy != 1 {
+		t.Fatalf("preflight executable ignored reviewed marker: exit=%d report=%+v", exit, report)
 	}
 }
