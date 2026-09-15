@@ -12,13 +12,20 @@ import (
 // LikeDomainFactOutbox is append-only and is not consumed by the legacy hot
 // ranking relay. A separate H09.a delivery adapter must claim it later.
 type LikeDomainFactOutbox struct {
-	EventID          string    `gorm:"column:event_id;primaryKey;type:varchar(128)"`
-	EventType        string    `gorm:"column:event_type;type:varchar(64);not null"`
-	Payload          string    `gorm:"column:payload;type:jsonb;not null"`
-	AggregateID      *string   `gorm:"column:aggregate_id;type:varchar(128);uniqueIndex:uk_like_fact_stream"`
-	FactVersion      *int64    `gorm:"column:fact_version;uniqueIndex:uk_like_fact_stream"`
-	DeliveryEnvelope *string   `gorm:"column:delivery_envelope;type:jsonb"`
-	CreatedAt        time.Time `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP"`
+	EventID             string     `gorm:"column:event_id;primaryKey;type:varchar(128)"`
+	EventType           string     `gorm:"column:event_type;type:varchar(64);not null"`
+	Payload             string     `gorm:"column:payload;type:jsonb;not null"`
+	AggregateID         *string    `gorm:"column:aggregate_id;type:varchar(128);uniqueIndex:uk_like_fact_stream"`
+	FactVersion         *int64     `gorm:"column:fact_version;uniqueIndex:uk_like_fact_stream"`
+	DeliveryEnvelope    *string    `gorm:"column:delivery_envelope;type:jsonb"`
+	DeliveryStatus      int32      `gorm:"column:delivery_status;not null;default:0;index"`
+	RetryCount          int32      `gorm:"column:retry_count;not null;default:0"`
+	TechnicalReceiptID  string     `gorm:"column:technical_receipt_id;type:varchar(128);not null;default:''"`
+	TechnicalInputHash  string     `gorm:"column:technical_input_hash;type:char(64);not null;default:''"`
+	TechnicalOffset     int64      `gorm:"column:technical_offset;not null;default:0"`
+	TechnicalReceivedAt *time.Time `gorm:"column:technical_received_at"`
+	DeliveredAt         *time.Time `gorm:"column:delivered_at"`
+	CreatedAt           time.Time  `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP"`
 }
 
 func (LikeDomainFactOutbox) TableName() string { return "like_domain_fact_outbox" }
