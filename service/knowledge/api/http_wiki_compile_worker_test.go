@@ -202,6 +202,10 @@ func TestWikiCompilePrivateHTTPAcceptReadsSharedOriginalAndMovesEditHead(t *test
 	if fetched.CompileId != compile.CompileId || fetched.State != "BUILDING" || fetched.InputHash != compile.InputHash {
 		t.Fatal("private RTW compile was not the committed fixed ticket")
 	}
+	if os.Getenv("KNOWLEDGE_WIKI_HOLD_FOR_BTW") == "1" {
+		holdWikiCompileExternalConsumer(t, source, directory, root, base, c.WorkerToken, compile, original)
+		return
+	}
 	expiry := time.Now().Add(2 * time.Minute).UTC().Format(time.RFC3339Nano)
 	claim := types.ClaimCompileReq{CompileId: compile.CompileId, Generation: compile.Generation,
 		InputHash: compile.InputHash, AttemptId: "wiki-http-attempt", LeaseEpoch: 1,
