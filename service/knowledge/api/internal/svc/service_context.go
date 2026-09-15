@@ -3,6 +3,7 @@ package svc
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -41,6 +42,16 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	}
 	if c.SubjectRefV2Writes.Enabled && c.Mode == "pro" {
 		return nil, fmt.Errorf("SubjectRef v2 continuous-write candidate is limited to a marked local test database")
+	}
+	if c.WikiCompileJobs.Enabled {
+		u, err := url.Parse(c.WikiCompileJobs.Endpoint)
+		if err != nil || u == nil || u.Scheme != "http" || u.User != nil ||
+			u.RawQuery != "" || u.Fragment != "" || u.Path != "/v1/jobs" ||
+			net.ParseIP(u.Hostname()) == nil || !net.ParseIP(u.Hostname()).IsLoopback() ||
+			c.WikiCompileJobs.Token == "" || c.WikiCompileJobs.IntervalMillis < 100 ||
+			(c.Mode != "dev" && c.Mode != "test") {
+			return nil, fmt.Errorf("Wiki Compile DC Jobs candidate requires dev/test and an explicit loopback /v1/jobs service endpoint")
+		}
 	}
 	for _, version := range []string{c.SearchSummary.ScopeVersion, c.SearchTools.ScopeVersion} {
 		if version != "" && version != "v1" && version != "v2" {
@@ -81,6 +92,12 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	pc, err := pgxpool.ParseConfig(c.Postgres.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("invalid postgres configuration")
+	}
+	if c.WikiCompileJobs.Enabled {
+		ip := net.ParseIP(pc.ConnConfig.Host)
+		if ip == nil || !ip.IsLoopback() {
+			return nil, fmt.Errorf("Wiki Compile Jobs candidate requires a task-owned loopback PostgreSQL")
+		}
 	}
 	if c.Postgres.MaxConnections < 2 {
 		return nil, fmt.Errorf("postgres pool requires at least two connections")
@@ -129,6 +146,9 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	if c.SubjectRefV2Writes.Enabled {
 		storeOptions = append(storeOptions, model.WithContinuousSubjectRefV2Writes())
 	}
+	if c.WikiCompileJobs.Enabled {
+		storeOptions = append(storeOptions, model.WithWikiCompileJobs())
+	}
 	store := model.New(pool, objects, storeOptions...)
 	if c.Postgres.Migrate {
 		if err = store.Migrate(ctx); err != nil {
@@ -140,6 +160,11 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	}
 	if c.SubjectRefV2Writes.Enabled {
 		if err = store.CheckContinuousSubjectRefV2Writes(ctx, c.SubjectRefV2Writes.LocalTestNonce); err != nil {
+			return fail(err)
+		}
+	}
+	if c.WikiCompileJobs.Enabled {
+		if err = store.CheckWikiCompileJobCandidate(ctx); err != nil {
 			return fail(err)
 		}
 	}

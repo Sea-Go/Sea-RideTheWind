@@ -170,6 +170,16 @@ func run(c config.Config) (result error) {
 			mqs.Run(lifecycle, ctx.Store, sender, time.Duration(c.Delivery.IntervalMillis)*time.Millisecond)
 		}()
 	}
+	if c.WikiCompileJobs.Enabled {
+		transport := &mqs.WikiCompileHTTPTransport{Endpoint: c.WikiCompileJobs.Endpoint,
+			Token: c.WikiCompileJobs.Token, Client: &http.Client{Timeout: 10 * time.Second}}
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			mqs.RunWikiCompileJobs(lifecycle, ctx.Store, transport,
+				time.Duration(c.WikiCompileJobs.IntervalMillis)*time.Millisecond)
+		}()
+	}
 	handler.ConfigureResponses()
 	server, err := rest.NewServer(c.RestConf, rest.WithRouter(telemetry.NewRouter(observer, c.Name)))
 	if err != nil {
