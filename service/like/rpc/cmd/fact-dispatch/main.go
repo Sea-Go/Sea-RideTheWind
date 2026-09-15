@@ -32,6 +32,9 @@ func execute() int {
 	defer tracing.Shutdown(context.Background())
 	err := meta.Validate()
 	if err == nil {
+		err = communityfact.InstallFrameworkLogger(logger)
+	}
+	if err == nil {
 		err = run(*once, logger)
 	}
 	if err != nil {

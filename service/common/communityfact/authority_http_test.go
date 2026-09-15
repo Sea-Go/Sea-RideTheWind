@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 const testAuthorityToken = "community-authority-test-token-at-least-32-bytes"
@@ -16,6 +18,25 @@ const testAuthorityToken = "community-authority-test-token-at-least-32-bytes"
 func testProcessLogger(output *bytes.Buffer) *slog.Logger {
 	return NewProcessLogger(output, ProcessMetadata{Service: "rtw-community-test", Environment: "test",
 		Version: strings.Repeat("a", 40), InstanceID: "test-1", Component: "community"})
+}
+
+func TestFrameworkLoggerUsesProcessEnvelope(t *testing.T) {
+	previous := logx.Reset()
+	defer logx.SetWriter(previous)
+	var output bytes.Buffer
+	if err := InstallFrameworkLogger(testProcessLogger(&output)); err != nil {
+		t.Fatal(err)
+	}
+	logx.Infow("framework shutdown", logx.Field("caller", "proc/shutdown.go:84"))
+	log := output.String()
+	for _, key := range []string{"timestamp", "level", "service", "environment", "service_version", "instance_id", "component", "log_source", "event", "message"} {
+		if !strings.Contains(log, `"`+key+`":`) {
+			t.Fatalf("framework OBS-r3 key %s missing: %s", key, log)
+		}
+	}
+	if strings.Contains(log, `"@timestamp":`) || !strings.Contains(log, `"code_location":"proc/shutdown.go:84"`) {
+		t.Fatalf("framework logger kept legacy envelope: %s", log)
+	}
 }
 
 func TestAuthorityHandlerUsesInjectedLogger(t *testing.T) {
