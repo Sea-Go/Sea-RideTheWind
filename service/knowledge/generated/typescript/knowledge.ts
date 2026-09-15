@@ -213,10 +213,43 @@ export function createSource(params: components.CreateSourceReqParams, req: comp
 /**
  * @description
  * @param params
+ */
+export function getWikiPageHead(params: components.WikiPageHeadPathParams, module_id: string, page_id: string) {
+	return webapi.get<components.WikiPageHeadEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/head`, params)
+}
+
+/**
+ * @description
+ * @param params
  * @param req
  */
 export function createWiki(params: components.CreateWikiReqParams, req: components.CreateWikiReq, module_id: string, page_id: string) {
 	return webapi.post<components.RevisionEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/revisions`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ * @param req
+ */
+export function judgeWikiFact(params: components.JudgeWikiFactReqParams, req: components.JudgeWikiFactReq, module_id: string, page_id: string, wiki_revision_id: string) {
+	return webapi.post<components.WikiFactJudgmentEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/revisions/${wiki_revision_id}/quality-judgments`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function listWikiFactJudgments(params: components.ListWikiFactJudgmentsReqParams, module_id: string, page_id: string, wiki_revision_id: string) {
+	return webapi.get<components.ListWikiFactJudgmentsEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/revisions/${wiki_revision_id}/quality-judgments`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getWikiFactJudgment(params: components.WikiFactJudgmentPathParams, module_id: string, page_id: string, wiki_revision_id: string, fact_id: string) {
+	return webapi.get<components.WikiFactJudgmentEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/revisions/${wiki_revision_id}/quality-judgments/${fact_id}`, params)
 }
 
 /**
@@ -524,4 +557,12 @@ export function getSearchJudgmentEvent(params: components.SearchJudgmentEventPat
  */
 export function readSearchSource(req: components.ReadSearchSourceReq) {
 	return webapi.post<components.CitationChunkEnvelope>(`/internal/v1/knowledge/search-sources/read`, req)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getWikiQualityEvent(params: components.WikiQualityEventPathParams, event_id: string) {
+	return webapi.get<components.WikiQualityEventEnvelope>(`/internal/v1/knowledge/wiki-quality/events/${event_id}`, params)
 }

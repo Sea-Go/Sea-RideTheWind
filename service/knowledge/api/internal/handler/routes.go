@@ -152,9 +152,29 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Handler: knowledge.CreateSourceHandler(serverCtx),
 				},
 				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/wiki-pages/:page_id/head",
+					Handler: knowledge.GetWikiPageHeadHandler(serverCtx),
+				},
+				{
 					Method:  http.MethodPost,
 					Path:    "/modules/:module_id/wiki-pages/:page_id/revisions",
 					Handler: knowledge.CreateWikiHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/modules/:module_id/wiki-pages/:page_id/revisions/:wiki_revision_id/quality-judgments",
+					Handler: knowledge.JudgeWikiFactHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/wiki-pages/:page_id/revisions/:wiki_revision_id/quality-judgments",
+					Handler: knowledge.ListWikiFactJudgmentsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/wiki-pages/:page_id/revisions/:wiki_revision_id/quality-judgments/:fact_id",
+					Handler: knowledge.GetWikiFactJudgmentHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodPost,
@@ -364,6 +384,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodPost,
 					Path:    "/search-sources/read",
 					Handler: worker.ReadSearchSourceHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/wiki-quality/events/:event_id",
+					Handler: worker.GetWikiQualityEventHandler(serverCtx),
 				},
 			}...,
 		),

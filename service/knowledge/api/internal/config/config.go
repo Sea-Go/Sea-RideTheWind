@@ -50,6 +50,9 @@ type Config struct {
 	SearchJudgments struct {
 		Enabled bool `json:",default=false"`
 	}
+	WikiQualityJudgments struct {
+		Enabled bool `json:",default=false"`
+	}
 	GroundingReviews struct {
 		Enabled bool `json:",default=false"`
 	}

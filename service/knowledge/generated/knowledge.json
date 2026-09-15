@@ -2192,6 +2192,65 @@
         }
       }
     },
+    "/internal/v1/knowledge/wiki-quality/events/{event_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetWikiQualityEvent",
+        "operationId": "workerGetWikiQualityEvent",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "event_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "event_id",
+                    "event_json",
+                    "event_raw_sha256",
+                    "event_jcs_sha256"
+                  ],
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "event_json": {
+                      "type": "string"
+                    },
+                    "event_raw_sha256": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/knowledge/answer-grounding/reviews": {
       "post": {
         "consumes": [
@@ -6798,6 +6857,87 @@
         }
       }
     },
+    "/v1/knowledge/modules/{module_id}/wiki-pages/{page_id}/head": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetWikiPageHead",
+        "operationId": "knowledgeGetWikiPageHead",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "page_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "module_id",
+                    "page_id",
+                    "revision_id",
+                    "base_revision_id",
+                    "content_sha256",
+                    "title",
+                    "created_by",
+                    "withdrawn"
+                  ],
+                  "properties": {
+                    "base_revision_id": {
+                      "type": "string"
+                    },
+                    "content_sha256": {
+                      "type": "string"
+                    },
+                    "created_by": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "withdrawn": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions": {
       "post": {
         "consumes": [
@@ -6957,6 +7097,655 @@
                       "type": "string"
                     },
                     "withdrawn": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions/{wiki_revision_id}/quality-judgments": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ListWikiFactJudgments",
+        "operationId": "knowledgeListWikiFactJudgments",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "page_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "wiki_revision_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "default": 20,
+            "name": "limit",
+            "in": "query",
+            "allowEmptyValue": true
+          },
+          {
+            "type": "string",
+            "name": "cursor",
+            "in": "query",
+            "allowEmptyValue": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "schema_version",
+                          "judgment_id",
+                          "fact_id",
+                          "judge_revision_id",
+                          "judge_revision",
+                          "base_judge_revision_id",
+                          "module_id",
+                          "page_id",
+                          "wiki_revision_id",
+                          "base_wiki_revision_id",
+                          "wiki_origin_kind",
+                          "wiki_content_sha256",
+                          "source_revision_id",
+                          "source_content_sha256",
+                          "locator",
+                          "source_byte_start",
+                          "source_byte_end",
+                          "source_quote",
+                          "source_quote_sha256",
+                          "citation_present",
+                          "assessment",
+                          "rubric_version",
+                          "reason",
+                          "actor_id",
+                          "judged_at",
+                          "source_withdrawn",
+                          "wiki_withdrawn"
+                        ],
+                        "properties": {
+                          "actor_id": {
+                            "type": "string"
+                          },
+                          "assessment": {
+                            "type": "string"
+                          },
+                          "base_judge_revision_id": {
+                            "type": "string"
+                          },
+                          "base_wiki_revision_id": {
+                            "type": "string"
+                          },
+                          "citation_present": {
+                            "type": "boolean"
+                          },
+                          "event_id": {
+                            "type": "string"
+                          },
+                          "event_jcs_sha256": {
+                            "type": "string"
+                          },
+                          "event_raw_sha256": {
+                            "type": "string"
+                          },
+                          "fact_id": {
+                            "type": "string"
+                          },
+                          "grade": {
+                            "type": "string"
+                          },
+                          "judge_revision": {
+                            "type": "string"
+                          },
+                          "judge_revision_id": {
+                            "type": "string"
+                          },
+                          "judged_at": {
+                            "type": "string"
+                          },
+                          "judgment_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "string"
+                          },
+                          "module_id": {
+                            "type": "string"
+                          },
+                          "origin_compile_id": {
+                            "type": "string"
+                          },
+                          "page_id": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "rubric_version": {
+                            "type": "string"
+                          },
+                          "schema_version": {
+                            "type": "string"
+                          },
+                          "source_byte_end": {
+                            "type": "string"
+                          },
+                          "source_byte_start": {
+                            "type": "string"
+                          },
+                          "source_content_sha256": {
+                            "type": "string"
+                          },
+                          "source_quote": {
+                            "type": "string"
+                          },
+                          "source_quote_sha256": {
+                            "type": "string"
+                          },
+                          "source_revision_id": {
+                            "type": "string"
+                          },
+                          "source_withdrawn": {
+                            "type": "boolean"
+                          },
+                          "wiki_claim_sha256": {
+                            "type": "string"
+                          },
+                          "wiki_claim_text": {
+                            "type": "string"
+                          },
+                          "wiki_content_sha256": {
+                            "type": "string"
+                          },
+                          "wiki_origin_kind": {
+                            "type": "string"
+                          },
+                          "wiki_revision_id": {
+                            "type": "string"
+                          },
+                          "wiki_withdrawn": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "JudgeWikiFact",
+        "operationId": "knowledgeJudgeWikiFact",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "page_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "wiki_revision_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "source_revision_id",
+                "source_content_sha256",
+                "locator",
+                "source_quote",
+                "source_quote_sha256",
+                "assessment",
+                "rubric_version",
+                "reason",
+                "idempotency_key"
+              ],
+              "properties": {
+                "assessment": {
+                  "type": "string"
+                },
+                "base_judge_revision_id": {
+                  "type": "string"
+                },
+                "grade": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "locator": {
+                  "type": "string"
+                },
+                "origin_compile_id": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "rubric_version": {
+                  "type": "string"
+                },
+                "source_content_sha256": {
+                  "type": "string"
+                },
+                "source_quote": {
+                  "type": "string"
+                },
+                "source_quote_sha256": {
+                  "type": "string"
+                },
+                "source_revision_id": {
+                  "type": "string"
+                },
+                "wiki_claim_sha256": {
+                  "type": "string"
+                },
+                "wiki_claim_text": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "judgment_id",
+                    "fact_id",
+                    "judge_revision_id",
+                    "judge_revision",
+                    "base_judge_revision_id",
+                    "module_id",
+                    "page_id",
+                    "wiki_revision_id",
+                    "base_wiki_revision_id",
+                    "wiki_origin_kind",
+                    "wiki_content_sha256",
+                    "source_revision_id",
+                    "source_content_sha256",
+                    "locator",
+                    "source_byte_start",
+                    "source_byte_end",
+                    "source_quote",
+                    "source_quote_sha256",
+                    "citation_present",
+                    "assessment",
+                    "rubric_version",
+                    "reason",
+                    "actor_id",
+                    "judged_at",
+                    "source_withdrawn",
+                    "wiki_withdrawn"
+                  ],
+                  "properties": {
+                    "actor_id": {
+                      "type": "string"
+                    },
+                    "assessment": {
+                      "type": "string"
+                    },
+                    "base_judge_revision_id": {
+                      "type": "string"
+                    },
+                    "base_wiki_revision_id": {
+                      "type": "string"
+                    },
+                    "citation_present": {
+                      "type": "boolean"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "event_raw_sha256": {
+                      "type": "string"
+                    },
+                    "fact_id": {
+                      "type": "string"
+                    },
+                    "grade": {
+                      "type": "string"
+                    },
+                    "judge_revision": {
+                      "type": "string"
+                    },
+                    "judge_revision_id": {
+                      "type": "string"
+                    },
+                    "judged_at": {
+                      "type": "string"
+                    },
+                    "judgment_id": {
+                      "type": "string"
+                    },
+                    "locator": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "origin_compile_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "rubric_version": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "source_byte_end": {
+                      "type": "string"
+                    },
+                    "source_byte_start": {
+                      "type": "string"
+                    },
+                    "source_content_sha256": {
+                      "type": "string"
+                    },
+                    "source_quote": {
+                      "type": "string"
+                    },
+                    "source_quote_sha256": {
+                      "type": "string"
+                    },
+                    "source_revision_id": {
+                      "type": "string"
+                    },
+                    "source_withdrawn": {
+                      "type": "boolean"
+                    },
+                    "wiki_claim_sha256": {
+                      "type": "string"
+                    },
+                    "wiki_claim_text": {
+                      "type": "string"
+                    },
+                    "wiki_content_sha256": {
+                      "type": "string"
+                    },
+                    "wiki_origin_kind": {
+                      "type": "string"
+                    },
+                    "wiki_revision_id": {
+                      "type": "string"
+                    },
+                    "wiki_withdrawn": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions/{wiki_revision_id}/quality-judgments/{fact_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetWikiFactJudgment",
+        "operationId": "knowledgeGetWikiFactJudgment",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "page_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "wiki_revision_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "fact_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "judgment_id",
+                    "fact_id",
+                    "judge_revision_id",
+                    "judge_revision",
+                    "base_judge_revision_id",
+                    "module_id",
+                    "page_id",
+                    "wiki_revision_id",
+                    "base_wiki_revision_id",
+                    "wiki_origin_kind",
+                    "wiki_content_sha256",
+                    "source_revision_id",
+                    "source_content_sha256",
+                    "locator",
+                    "source_byte_start",
+                    "source_byte_end",
+                    "source_quote",
+                    "source_quote_sha256",
+                    "citation_present",
+                    "assessment",
+                    "rubric_version",
+                    "reason",
+                    "actor_id",
+                    "judged_at",
+                    "source_withdrawn",
+                    "wiki_withdrawn"
+                  ],
+                  "properties": {
+                    "actor_id": {
+                      "type": "string"
+                    },
+                    "assessment": {
+                      "type": "string"
+                    },
+                    "base_judge_revision_id": {
+                      "type": "string"
+                    },
+                    "base_wiki_revision_id": {
+                      "type": "string"
+                    },
+                    "citation_present": {
+                      "type": "boolean"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "event_raw_sha256": {
+                      "type": "string"
+                    },
+                    "fact_id": {
+                      "type": "string"
+                    },
+                    "grade": {
+                      "type": "string"
+                    },
+                    "judge_revision": {
+                      "type": "string"
+                    },
+                    "judge_revision_id": {
+                      "type": "string"
+                    },
+                    "judged_at": {
+                      "type": "string"
+                    },
+                    "judgment_id": {
+                      "type": "string"
+                    },
+                    "locator": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "origin_compile_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "rubric_version": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "source_byte_end": {
+                      "type": "string"
+                    },
+                    "source_byte_start": {
+                      "type": "string"
+                    },
+                    "source_content_sha256": {
+                      "type": "string"
+                    },
+                    "source_quote": {
+                      "type": "string"
+                    },
+                    "source_quote_sha256": {
+                      "type": "string"
+                    },
+                    "source_revision_id": {
+                      "type": "string"
+                    },
+                    "source_withdrawn": {
+                      "type": "boolean"
+                    },
+                    "wiki_claim_sha256": {
+                      "type": "string"
+                    },
+                    "wiki_claim_text": {
+                      "type": "string"
+                    },
+                    "wiki_content_sha256": {
+                      "type": "string"
+                    },
+                    "wiki_origin_kind": {
+                      "type": "string"
+                    },
+                    "wiki_revision_id": {
+                      "type": "string"
+                    },
+                    "wiki_withdrawn": {
                       "type": "boolean"
                     }
                   }

@@ -335,6 +335,26 @@ type GroundingReviewReceiptEnvelope struct {
 	Data GroundingReviewReceipt `json:"data"`
 }
 
+type JudgeWikiFactReq struct {
+	ModuleId            string `path:"module_id"`
+	PageId              string `path:"page_id"`
+	WikiRevisionId      string `path:"wiki_revision_id"`
+	OriginCompileId     string `json:"origin_compile_id,optional"`
+	SourceRevisionId    string `json:"source_revision_id"`
+	SourceContentSha256 string `json:"source_content_sha256"`
+	Locator             string `json:"locator"`
+	SourceQuote         string `json:"source_quote"`
+	SourceQuoteSha256   string `json:"source_quote_sha256"`
+	WikiClaimText       string `json:"wiki_claim_text,optional"`
+	WikiClaimSha256     string `json:"wiki_claim_sha256,optional"`
+	Assessment          string `json:"assessment"`
+	Grade               string `json:"grade,optional"`
+	RubricVersion       string `json:"rubric_version"`
+	Reason              string `json:"reason"`
+	BaseJudgeRevisionId string `json:"base_judge_revision_id,optional"`
+	IdempotencyKey      string `json:"idempotency_key"`
+}
+
 type ListAcceptedAnswersReq struct {
 	AuthorityId  string `form:"authority_id"`
 	TenantId     string `form:"tenant_id"`
@@ -402,6 +422,25 @@ type ListRevisionsRespEnvelope struct {
 	Code int               `json:"code"`
 	Msg  string            `json:"msg"`
 	Data ListRevisionsResp `json:"data"`
+}
+
+type ListWikiFactJudgmentsEnvelope struct {
+	Code int                       `json:"code"`
+	Msg  string                    `json:"msg"`
+	Data ListWikiFactJudgmentsResp `json:"data"`
+}
+
+type ListWikiFactJudgmentsReq struct {
+	ModuleId       string `path:"module_id"`
+	PageId         string `path:"page_id"`
+	WikiRevisionId string `path:"wiki_revision_id"`
+	Limit          int    `form:"limit,optional,default=20"`
+	Cursor         string `form:"cursor,optional"`
+}
+
+type ListWikiFactJudgmentsResp struct {
+	Items      []WikiFactJudgmentRecord `json:"items"`
+	NextCursor string                   `json:"next_cursor,optional,omitempty"`
 }
 
 type Module struct {
@@ -901,6 +940,95 @@ type ToolSearchResult struct {
 type ToolUsage struct {
 	ReadCalls  int `json:"read_calls"`
 	QuoteRunes int `json:"quote_runes"`
+}
+
+type WikiFactJudgmentEnvelope struct {
+	Code int                    `json:"code"`
+	Msg  string                 `json:"msg"`
+	Data WikiFactJudgmentRecord `json:"data"`
+}
+
+type WikiFactJudgmentPath struct {
+	ModuleId       string `path:"module_id"`
+	PageId         string `path:"page_id"`
+	WikiRevisionId string `path:"wiki_revision_id"`
+	FactId         string `path:"fact_id"`
+}
+
+type WikiFactJudgmentRecord struct {
+	SchemaVersion       string `json:"schema_version"`
+	JudgmentId          string `json:"judgment_id"`
+	FactId              string `json:"fact_id"`
+	JudgeRevisionId     string `json:"judge_revision_id"`
+	JudgeRevision       string `json:"judge_revision"`
+	BaseJudgeRevisionId string `json:"base_judge_revision_id"`
+	ModuleId            string `json:"module_id"`
+	PageId              string `json:"page_id"`
+	WikiRevisionId      string `json:"wiki_revision_id"`
+	BaseWikiRevisionId  string `json:"base_wiki_revision_id"`
+	WikiOriginKind      string `json:"wiki_origin_kind"`
+	OriginCompileId     string `json:"origin_compile_id,optional"`
+	WikiContentSha256   string `json:"wiki_content_sha256"`
+	SourceRevisionId    string `json:"source_revision_id"`
+	SourceContentSha256 string `json:"source_content_sha256"`
+	Locator             string `json:"locator"`
+	SourceByteStart     string `json:"source_byte_start"`
+	SourceByteEnd       string `json:"source_byte_end"`
+	SourceQuote         string `json:"source_quote"`
+	SourceQuoteSha256   string `json:"source_quote_sha256"`
+	WikiClaimText       string `json:"wiki_claim_text,optional"`
+	WikiClaimSha256     string `json:"wiki_claim_sha256,optional"`
+	CitationPresent     bool   `json:"citation_present"`
+	Assessment          string `json:"assessment"`
+	Grade               string `json:"grade,optional"`
+	RubricVersion       string `json:"rubric_version"`
+	Reason              string `json:"reason"`
+	ActorId             string `json:"actor_id"`
+	JudgedAt            string `json:"judged_at"`
+	SourceWithdrawn     bool   `json:"source_withdrawn"`
+	WikiWithdrawn       bool   `json:"wiki_withdrawn"`
+	EventId             string `json:"event_id,optional"`
+	EventRawSha256      string `json:"event_raw_sha256,optional"`
+	EventJcsSha256      string `json:"event_jcs_sha256,optional"`
+}
+
+type WikiPageHeadEnvelope struct {
+	Code int                  `json:"code"`
+	Msg  string               `json:"msg"`
+	Data WikiPageHeadSnapshot `json:"data"`
+}
+
+type WikiPageHeadPath struct {
+	ModuleId string `path:"module_id"`
+	PageId   string `path:"page_id"`
+}
+
+type WikiPageHeadSnapshot struct {
+	ModuleId       string `json:"module_id"`
+	PageId         string `json:"page_id"`
+	RevisionId     string `json:"revision_id"`
+	BaseRevisionId string `json:"base_revision_id"`
+	ContentSha256  string `json:"content_sha256"`
+	Title          string `json:"title"`
+	CreatedBy      string `json:"created_by"`
+	Withdrawn      bool   `json:"withdrawn"`
+}
+
+type WikiQualityEventEnvelope struct {
+	Code int                     `json:"code"`
+	Msg  string                  `json:"msg"`
+	Data WikiQualityEventReceipt `json:"data"`
+}
+
+type WikiQualityEventPath struct {
+	EventId string `path:"event_id"`
+}
+
+type WikiQualityEventReceipt struct {
+	EventId        string `json:"event_id"`
+	EventJson      string `json:"event_json"`
+	EventRawSha256 string `json:"event_raw_sha256"`
+	EventJcsSha256 string `json:"event_jcs_sha256"`
 }
 
 type WithdrawReq struct {
