@@ -23,6 +23,12 @@ func WithObservability(runtime *telemetry.Runtime) Option {
 func WithContinuousSubjectRefV2Writes() Option {
 	return func(s *Store) { s.continuousSubjectRefV2Writes = true }
 }
+
+// WithWikiCompileJobs routes only compile requested/cancelled Outbox events to
+// the DC Jobs technical adapter. Omitted keeps the existing H04 event sender.
+func WithWikiCompileJobs() Option {
+	return func(s *Store) { s.wikiCompileJobs = true }
+}
 func operationID(scope, key string) string { return "command:" + object.Hash([]byte(scope+"/"+key)) }
 func activationKey(req types.ActivateReq) string {
 	if req.IdempotencyKey != "" {
@@ -66,6 +72,15 @@ func ClassifyError(err error) telemetry.ErrorInfo {
 		info.Type = "knowledge.ErrInvalid"
 		info.Outcome = "rejected"
 		info.Level = "warn"
+	case errors.Is(err, ErrWikiCompileJobUnauthorized):
+		info.Code = "DC_JOB_AUTH_FAILED"
+		info.Type = "knowledge.ErrWikiCompileJobUnauthorized"
+		info.Outcome = "rejected"
+		info.Level = "warn"
+	case errors.Is(err, ErrWikiCompileJobUnavailable):
+		info.Code = "DC_JOB_UNAVAILABLE"
+		info.Type = "knowledge.ErrWikiCompileJobUnavailable"
+		info.Outcome = "failed"
 	case errors.Is(err, ErrNotFound):
 		info.Code = "NOT_FOUND"
 		info.Type = "knowledge.ErrNotFound"

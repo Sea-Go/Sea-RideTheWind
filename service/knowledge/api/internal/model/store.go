@@ -35,6 +35,7 @@ type Store struct {
 	continuousSubjectRefV2Writes bool
 	continuousSubjectRefV2Ready  bool
 	scopeVersionReady            bool
+	wikiCompileJobs              bool
 }
 
 func New(db *pgxpool.Pool, objects object.Store, options ...Option) *Store {

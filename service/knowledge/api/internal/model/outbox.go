@@ -46,7 +46,13 @@ func (s *Store) DispatchOne(ctx context.Context, sender Sender) (sent bool, resu
 	}
 	defer tx.Rollback(context.Background())
 	var raw, correlationRaw []byte
-	err = tx.QueryRow(ctx, "SELECT payload,correlation FROM knowledge_outbox WHERE delivered_at IS NULL ORDER BY created_at,event_id FOR UPDATE SKIP LOCKED LIMIT 1").Scan(&raw, &correlationRaw)
+	query := "SELECT payload,correlation FROM knowledge_outbox WHERE delivered_at IS NULL ORDER BY created_at,event_id FOR UPDATE SKIP LOCKED LIMIT 1"
+	if s.wikiCompileJobs {
+		query = `SELECT payload,correlation FROM knowledge_outbox WHERE delivered_at IS NULL
+		 AND event_type NOT IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1')
+		 ORDER BY created_at,event_id FOR UPDATE SKIP LOCKED LIMIT 1`
+	}
+	err = tx.QueryRow(ctx, query).Scan(&raw, &correlationRaw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
