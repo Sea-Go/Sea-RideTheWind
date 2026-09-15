@@ -12,6 +12,7 @@ import (
 	"time"
 
 	rtwjwt "sea-try-go/service/user/common/jwt"
+	shared "sea-try-go/service/user/user/identity"
 	"sea-try-go/service/user/user/rpc/pb"
 
 	"github.com/zeromicro/go-zero/rest/handler"
@@ -70,6 +71,35 @@ func TestResolveSubjectRefFromVerifiedGoZeroJWT(t *testing.T) {
 	h.ServeHTTP(w, bad)
 	if w.Code != http.StatusUnauthorized || reader.called != 0 {
 		t.Fatalf("invalid JWT reached RPC: HTTP=%d calls=%d", w.Code, reader.called)
+	}
+}
+
+func TestResolveSubjectRefV2HasNoTenantOrClientIssuer(t *testing.T) {
+	const secret = "test-only-v2-jwt-secret-with-enough-length"
+	token, err := rtwjwt.GetToken(secret, time.Now().Unix(), 60, 9123)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := &userReaderStub{result: &pb.GetUserResp{Found: true,
+		User: &pb.UserInfo{Uid: 9123, Status: statusPointer(0)}}}
+	var issued shared.SubjectRefV2
+	var resolveErr error
+	h := handler.Authorize(secret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		issued, resolveErr = shared.ResolveSubjectRefV2(r.Context(), reader)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/test/v2/identity",
+		strings.NewReader(`{"issuer":"other.identity","tenant_id":"organization-x","subject_id":"7777"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-User-ID", "7777")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	wire, err := json.Marshal(issued)
+	if w.Code != http.StatusNoContent || resolveErr != nil || reader.called != 1 || reader.got != 9123 ||
+		!shared.ValidSubjectRefV2(issued) || err != nil ||
+		string(wire) != `{"issuer":"rtw.identity","subject_id":"9123"}` {
+		t.Fatalf("v2 issuer escaped User RPC: HTTP=%d wire=%s error=%v calls=%d uid=%d",
+			w.Code, wire, resolveErr, reader.called, reader.got)
 	}
 }
 

@@ -1,5 +1,5 @@
 // Package identity resolves a user from the authenticated usercenter JWT and
-// the authoritative UserService into RTW's single-platform subject namespace.
+// the authoritative UserService into RTW's stable identity namespace.
 package identity
 
 import (
@@ -27,17 +27,32 @@ var (
 const (
 	// AuthorityID is RTW's stable source for user identities.
 	AuthorityID = "rtw.identity"
-	// PlatformTenantID is a namespace for this single-platform deployment.
-	// It is not an organization or a claim obtained from the client.
+	// PlatformTenantID is only the fixed v1 compatibility slot used by old DB
+	// keys. It is not a tenant, organization or claim obtained from the client.
 	PlatformTenantID = "platform"
 )
 
-// SubjectRef is the RTW-issued H01 wire value. The three fields are generated
-// by this service from a verified user, never decoded from a client payload.
+// SubjectRef is the legacy v1 wire value. TenantID is a fixed compatibility
+// slot, never an organization or a client-supplied identity field.
 type SubjectRef struct {
 	AuthorityID string `json:"authority_id"`
 	TenantID    string `json:"tenant_id"`
 	SubjectID   string `json:"subject_id"`
+}
+
+// SubjectRefV2 is issued only from an active User RPC record reached through
+// go-zero's verified usercenter JWT claim. It has no compatibility tenant slot.
+type SubjectRefV2 struct {
+	Issuer    string `json:"issuer"`
+	SubjectID string `json:"subject_id"`
+}
+
+func ValidSubjectRefV2(ref SubjectRefV2) bool {
+	if ref.Issuer != AuthorityID || ref.SubjectID == "" {
+		return false
+	}
+	uid, err := strconv.ParseInt(ref.SubjectID, 10, 64)
+	return err == nil && uid > 0 && strconv.FormatInt(uid, 10) == ref.SubjectID
 }
 
 // UserReader is the narrow authoritative read needed by identity resolution.
@@ -96,9 +111,8 @@ func ResolveUser(ctx context.Context, users UserReader) (*pb.UserInfo, error) {
 	return response.User, nil
 }
 
-// ResolveSubjectRef issues a complete source-side SubjectRef in RTW's current
-// single-platform namespace. A future multi-tenant product needs a new
-// authoritative mapping contract before this value can be changed.
+// ResolveSubjectRef is the one server-owned v1 adapter for old wire and DB
+// keys. A future organization relationship remains separate from identity.
 func ResolveSubjectRef(ctx context.Context, users UserReader) (SubjectRef, error) {
 	user, err := ResolveUser(ctx, users)
 	if err != nil {
@@ -109,4 +123,12 @@ func ResolveSubjectRef(ctx context.Context, users UserReader) (SubjectRef, error
 		TenantID:    PlatformTenantID,
 		SubjectID:   strconv.FormatInt(user.Uid, 10),
 	}, nil
+}
+
+func ResolveSubjectRefV2(ctx context.Context, users UserReader) (SubjectRefV2, error) {
+	user, err := ResolveUser(ctx, users)
+	if err != nil {
+		return SubjectRefV2{}, err
+	}
+	return SubjectRefV2{Issuer: AuthorityID, SubjectID: strconv.FormatInt(user.Uid, 10)}, nil
 }
