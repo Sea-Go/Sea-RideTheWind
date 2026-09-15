@@ -59,7 +59,6 @@ type TechnicalReceipt struct {
 
 type SubjectRef struct {
 	Issuer    string `json:"issuer"`
-	Realm     string `json:"realm"`
 	SubjectID string `json:"subject_id"`
 }
 
@@ -162,5 +161,5 @@ func ParseRTWSubject(value string) (SubjectRef, bool) {
 	if err != nil || uid <= 0 || strconv.FormatInt(uid, 10) != id {
 		return SubjectRef{}, false
 	}
-	return SubjectRef{Issuer: "rtw.identity", Realm: "platform", SubjectID: id}, true
+	return SubjectRef{Issuer: "rtw.identity", SubjectID: id}, true
 }
