@@ -37,7 +37,8 @@ CREATE INDEX IF NOT EXISTS knowledge_outbox_pending ON knowledge_outbox(created_
 CREATE OR REPLACE FUNCTION reject_wiki_compile_outbox_identity_change() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
- IF OLD.event_type IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1')
+ IF OLD.event_type IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1',
+                       'knowledge.wiki.compile.superseded.v1')
     AND (NEW.event_id IS DISTINCT FROM OLD.event_id
       OR NEW.event_type IS DISTINCT FROM OLD.event_type
       OR NEW.aggregate_id IS DISTINCT FROM OLD.aggregate_id

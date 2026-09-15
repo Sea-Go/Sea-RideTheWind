@@ -23,10 +23,12 @@ const WikiCompileJobType = "content.wiki-compile.v1"
 const WikiCompileResourceProfile = "cpu" // local technical claim only; model routing is separate
 const wikiCompileRequestedEvent = "knowledge.wiki.compile.requested.v1"
 const wikiCompileCancelledEvent = "knowledge.wiki.compile.cancelled.v1"
+const wikiCompileSupersededEvent = "knowledge.wiki.compile.superseded.v1"
 const wikiCompileTicketVersion = "rtw.wiki.compile-ticket.v1"
 
 var ErrWikiCompileJobUnavailable = errors.New("DC Wiki Compile job technical service unavailable")
 var ErrWikiCompileJobUnauthorized = errors.New("DC Wiki Compile job service authorization rejected")
+var ErrWikiCompilePredecessorPending = errors.New("previous Wiki Compile job cancellation pending")
 
 // WikiCompileTicket is a scheduling ticket, not a copy of source content or
 // model credentials. BTW must obtain complete guidance and source revisions
