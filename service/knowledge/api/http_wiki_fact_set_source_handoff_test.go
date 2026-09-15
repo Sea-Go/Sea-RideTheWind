@@ -45,6 +45,11 @@ type wikiFactSetCrossSourceReport struct {
 	SourceProofResultSHA      string   `json:"sourceproof_result_sha256,omitempty"`
 	SourceProofODSPrefixSHA   string   `json:"sourceproof_ods_prefix_sha256,omitempty"`
 	SourceProofDCIndexSHA     string   `json:"sourceproof_dc_index_sha256,omitempty"`
+	SourceAsOfAligned         bool     `json:"source_asof_aligned,omitempty"`
+	SourceAsOfVersion         int64    `json:"source_asof_version,omitempty"`
+	SourceAsOfCandidateSHA    string   `json:"source_asof_candidate_sha256,omitempty"`
+	SourceAsOfReceiptSHA      string   `json:"source_asof_receipt_sha256,omitempty"`
+	QualityState              string   `json:"quality_state,omitempty"`
 	OfflineDWDParentVerified  bool     `json:"offline_dwd_parent_verified,omitempty"`
 	OfflineDWDManifestSHA     string   `json:"offline_dwd_manifest_sha256,omitempty"`
 	OfflineDWDCHReportSHA     string   `json:"offline_dwd_ch_report_sha256,omitempty"`
@@ -70,6 +75,7 @@ type wikiFactSetCrossSourceReport struct {
 // prefix and the same BTW quality consumer must store Catalog before ACK.
 // It never labels an admin declaration as objectively complete or D07 passed.
 func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
+	request httpRequest,
 	rtwURL, workerToken, adminToken, moduleID, manualWikiID, publishedReleaseID string,
 	catalog types.WikiFactSetRecord, required []types.WikiFactJudgmentRecord,
 	baseline types.WikiFactJudgmentRecord) {
@@ -79,6 +85,8 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		return // DC's platform root may be shared by another Holder selector.
 	}
 	dcRoot := os.Getenv("SEA_DC_EVENT_PLATFORM_ROOT")
+	sourceProofRoot := os.Getenv("SEA_BTW_SOURCEPROOF_READER_ROOT")
+	asofRoot := os.Getenv("SEA_BTW_WIKI_ASOF_READER_ROOT")
 	if dcRoot == "" || !filepath.IsAbs(btwRoot) || !filepath.IsAbs(dcRoot) {
 		t.Fatal("FactSet Holder requires absolute fixed BTW and DC source roots")
 	}
@@ -251,6 +259,20 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		t.Fatalf("baseline quality and Catalog producer offsets misordered: baseline=%d Catalog=%d",
 			baselineOffset, catalogOffset)
 	}
+	var workerAsOfCandidate types.WikiQualitySourceVersionCandidate
+	if asofRoot != "" {
+		if sourceProofRoot == "" || filepath.Clean(asofRoot) != filepath.Clean(sourceProofRoot) ||
+			accepted != 14 || last != 14 || technical != 10 {
+			t.Fatal("as-of Holder requires the one fourteen-offset FactSet/SourceProof producer fixture")
+		}
+		var sourceVersion int64
+		if err := store.DB.QueryRow(ctx, `SELECT event_sequence FROM knowledge_modules WHERE id=$1`,
+			moduleID).Scan(&sourceVersion); err != nil || sourceVersion != 14 {
+			t.Fatalf("RTW current source V is not the fixed module V14: %d %v", sourceVersion, err)
+		}
+		workerAsOfCandidate = readRealWorkerWikiAsOfCandidate(t,
+			request, workerToken, moduleID, catalog, required, sourceVersion)
+	}
 	resultPath := filepath.Join(dir, "btw-real-wiki-fact-set-result.json")
 	fixturePath := filepath.Join(dir, "btw-real-wiki-fact-set-fixture.json")
 	fixture, err := json.Marshal(struct {
@@ -272,10 +294,10 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		t.Fatal(err)
 	}
 	writeRealFactSet0600(t, fixturePath, append(fixture, '\n'))
-	sourceProofRoot := os.Getenv("SEA_BTW_SOURCEPROOF_READER_ROOT")
 	dwdRoot := os.Getenv("SEA_BTW_WIKI_DWD_SOURCE_ROOT")
 	sourceProofResultPath := filepath.Join(dir, "btw-real-wiki-sourceproof-result.json")
 	var dwdBundleDir string
+	var asofWitnessDir string
 	consumerScript := "internal/warehouse/wikiqualitysource/acceptance.sh"
 	consumerRoot := btwRoot
 	consumerEnv := append(os.Environ(), "SEA_RTW_REAL_WIKI_FACT_SET_FIXTURE="+fixturePath)
@@ -309,6 +331,16 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		consumerRoot = sourceProofRoot
 		consumerEnv = append(consumerEnv,
 			"SEA_BTW_SOURCEPROOF_REAL_FIXTURE="+sourceFixturePath)
+	}
+	if asofRoot != "" {
+		if filepath.Clean(consumerRoot) != filepath.Clean(asofRoot) ||
+			consumerScript != "internal/evaluation/wiki_quality/sourceproof/real-source-acceptance.sh" {
+			t.Fatal("as-of Reader must run last on the same BTW SourceProof PG consumer")
+		}
+		asofWitnessDir = createRealWikiAsOfWitnessDirectory(t,
+			os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"))
+		consumerEnv = append(consumerEnv,
+			"SEA_BTW_WIKI_ASOF_EVIDENCE_DIR="+asofWitnessDir)
 	}
 	if dwdRoot != "" {
 		dwdBundleDir = preparePersistentWikiDWDBundle(t,
@@ -402,6 +434,12 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		t.Fatalf("BTW SourceProof and RTW independent DC HTTP full-prefix index disagree: SourceProof=%s RTW=%s",
 			sourceProofResult.DCIndexSHA256, dcProof.IndexJCSSHA)
 	}
+	var asofEvidence realWikiAsOfEvidence
+	if asofRoot != "" {
+		asofEvidence = verifyRealWikiAsOfEvidence(t, asofWitnessDir,
+			workerAsOfCandidate, moduleID, catalog, required,
+			sourceProofResult, dcProof, int64(delivered))
+	}
 	afterCatalog, err := sets.GetWikiFactSetEvent(ctx, catalog.EventId)
 	if err != nil || afterCatalog.EventJson != catalogWire.EventJson ||
 		afterCatalog.EventRawSha256 != catalogWire.EventRawSha256 ||
@@ -469,6 +507,9 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		if dwdRoot != "" {
 			reportVersion = "sea.wiki.fact-set-cross-source.v4"
 		}
+		if asofRoot != "" {
+			reportVersion = "sea.wiki.fact-set-cross-source.v5"
+		}
 		report, err := json.Marshal(wikiFactSetCrossSourceReport{
 			SchemaVersion:        reportVersion,
 			FactSetRevisionID:    catalog.FactSetRevisionId,
@@ -494,6 +535,11 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 			SourceProofResultSHA:      sourceProofResultSHA,
 			SourceProofODSPrefixSHA:   sourceProofResult.ODSPrefixSHA256,
 			SourceProofDCIndexSHA:     sourceProofResult.DCIndexSHA256,
+			SourceAsOfAligned:         asofRoot != "",
+			SourceAsOfVersion:         asofEvidence.SourceVersion,
+			SourceAsOfCandidateSHA:    asofEvidence.CandidateSHA256,
+			SourceAsOfReceiptSHA:      asofEvidence.ReceiptSHA256,
+			QualityState:              asofEvidence.QualityState,
 			OfflineDWDParentVerified:  dwdEvidence.ParentVerified,
 			OfflineDWDManifestSHA:     dwdEvidence.ManifestSHA,
 			OfflineDWDCHReportSHA:     dwdEvidence.CHReportSHA,

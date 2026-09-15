@@ -614,7 +614,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		t.Fatal(state)
 	}
 	if factSetHolder {
-		runRealWikiFactSetHandoff(t, dir, s, base, c.WorkerToken, token,
+		runRealWikiFactSetHandoff(t, dir, s, request, base, c.WorkerToken, token,
 			m.Id, w.RevisionId, r.ReleaseId, catalog, catalogJudgments, quality)
 	}
 	runRealWikiQualityHandoff(t, dir, s, base, c.WorkerToken,
