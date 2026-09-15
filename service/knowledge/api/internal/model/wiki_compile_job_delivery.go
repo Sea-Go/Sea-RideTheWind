@@ -55,8 +55,9 @@ func (s *Store) CheckWikiCompileJobCandidate(ctx context.Context) error {
 	return nil
 }
 
-// DispatchWikiCompileJobOnce is the optional technical lane for only the two
-// Compile Outbox event types. The ordinary H04 dispatcher excludes them while
+// DispatchWikiCompileJobOnce is the optional technical lane for the requested,
+// administrator-cancelled and superseded Compile Outbox event types. The
+// ordinary H04 dispatcher excludes them while
 // this lane is enabled; every other event retains its original event sender.
 // RTW Compile.State/Revision/Release are never changed by a DC job receipt.
 func (s *Store) DispatchWikiCompileJobOnce(ctx context.Context, transport WikiCompileJobTransport) (sent bool, resultErr error) {
