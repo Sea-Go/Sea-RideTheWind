@@ -153,7 +153,7 @@ func TestWikiCompileDCJobDelivery(t *testing.T) {
 		t.Fatal(err)
 	}
 	dc := startRealDCJobPlatform(t, t.TempDir(), dcRoot)
-	var responseLost, propagatedTrace atomic.Bool
+	var responseLost, cancelResponseLost, propagatedTrace atomic.Bool
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("traceparent") != "" {
 			propagatedTrace.Store(true)
@@ -173,6 +173,11 @@ func TestWikiCompileDCJobDelivery(t *testing.T) {
 		if r.Method == http.MethodPost && r.URL.Path == "/v1/jobs" &&
 			upstream.StatusCode == http.StatusCreated && responseLost.CompareAndSwap(false, true) {
 			w.WriteHeader(http.StatusServiceUnavailable) // DC already committed the original job.
+			return
+		}
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/cancel") &&
+			upstream.StatusCode == http.StatusOK && cancelResponseLost.CompareAndSwap(false, true) {
+			w.WriteHeader(http.StatusServiceUnavailable) // DC cancellation already fenced the attempt.
 			return
 		}
 		for key, values := range upstream.Header {
@@ -306,8 +311,16 @@ func TestWikiCompileDCJobDelivery(t *testing.T) {
 	if err != nil || cancelled.State != "CANCELLED" || cancelled.CancelVersion != 1 {
 		t.Fatalf("RTW cancellation not business-authoritative: %+v %v", cancelled, err)
 	}
+	if sent, err := store.DispatchWikiCompileJobOnce(ctx, transport); !errors.Is(err, model.ErrWikiCompileJobUnavailable) || sent {
+		t.Fatalf("lost DC cancellation reply became RTW technical ACK: %t %v", sent, err)
+	}
+	var localCancelVersion int64
+	if err := base.DB.QueryRow(ctx, "SELECT cancel_version FROM knowledge_compile_jobs WHERE compile_id=$1",
+		c.CompileId).Scan(&localCancelVersion); err != nil || localCancelVersion != 0 {
+		t.Fatalf("uncertain cancellation changed RTW sidecar: %d %v", localCancelVersion, err)
+	}
 	if sent, err := store.DispatchWikiCompileJobOnce(ctx, transport); err != nil || !sent {
-		t.Fatalf("RTW cancelled Outbox did not fence DC Job: %t %v", sent, err)
+		t.Fatalf("same-key DC cancellation replay failed to ACK RTW source: %t %v", sent, err)
 	}
 	job, err = transport.Get(ctx, jobID)
 	if err != nil || job.CancelVersion != 1 || job.State != "cancel_requested" {
