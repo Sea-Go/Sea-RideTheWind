@@ -7,11 +7,27 @@ import (
 )
 
 type FavoriteModel struct {
-	conn *gorm.DB
+	conn              *gorm.DB
+	subjectRefV2Facts bool
 }
 
-func NewFavoriteModel(db *gorm.DB) *FavoriteModel {
-	return &FavoriteModel{conn: db}
+type FavoriteModelOption func(*FavoriteModel)
+
+// WithSubjectRefV2Facts affects only newly created favorites. A retract always
+// inherits the schema frozen in that favorite's assertion, including after a
+// process changes this option. The default keeps the v1 wire unchanged.
+func WithSubjectRefV2Facts() FavoriteModelOption {
+	return func(m *FavoriteModel) { m.subjectRefV2Facts = true }
+}
+
+func NewFavoriteModel(db *gorm.DB, opts ...FavoriteModelOption) *FavoriteModel {
+	m := &FavoriteModel{conn: db}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(m)
+		}
+	}
+	return m
 }
 
 func (m *FavoriteModel) InsertFolder(ctx context.Context, folder *FavoriteFolder) error {

@@ -32,19 +32,29 @@ type FavoriteAuthorityFact struct {
 	SourceEventHash    string                   `json:"source_event_hash"`
 }
 
+// FavoriteAuthorityFactV2 is returned only by the versioned private reader.
+// The source EventSpec and its DC receipt/hash are still the original evidence.
+type FavoriteAuthorityFactV2 struct {
+	Event              FavoriteWireEvent        `json:"event"`
+	SubjectRef         FavoriteSubjectRefV2     `json:"subject_ref"`
+	PredecessorEventID string                   `json:"predecessor_event_id,omitempty"`
+	TechnicalReceipt   FavoriteTechnicalReceipt `json:"technical_receipt"`
+	SourceEventHash    string                   `json:"source_event_hash"`
+}
+
 type authorityPayload struct {
-	SchemaVersion  int                `json:"schema_version"`
-	EventID        string             `json:"event_id"`
-	Subject        FavoriteSubjectRef `json:"subject_ref"`
-	TargetType     string             `json:"target_type"`
-	TargetID       string             `json:"target_id"`
-	TargetRevision *string            `json:"target_revision"`
-	Operation      string             `json:"operation"`
-	SourceRef      string             `json:"source_ref"`
-	EventTime      string             `json:"event_time"`
-	AvailableAt    string             `json:"available_at"`
-	FavoriteID     json.RawMessage    `json:"favorite_id"`
-	FolderID       json.RawMessage    `json:"folder_id"`
+	SchemaVersion  int             `json:"schema_version"`
+	EventID        string          `json:"event_id"`
+	Subject        json.RawMessage `json:"subject_ref"`
+	TargetType     string          `json:"target_type"`
+	TargetID       string          `json:"target_id"`
+	TargetRevision *string         `json:"target_revision"`
+	Operation      string          `json:"operation"`
+	SourceRef      string          `json:"source_ref"`
+	EventTime      string          `json:"event_time"`
+	AvailableAt    string          `json:"available_at"`
+	FavoriteID     json.RawMessage `json:"favorite_id"`
+	FolderID       json.RawMessage `json:"folder_id"`
 }
 
 func strictFavoriteJSON(raw []byte, value any) error {
@@ -90,6 +100,29 @@ func sameFavoriteRevision(left, right *string) bool {
 	return *left == *right
 }
 
+// favoriteSubjectV1 normalizes the two exact source-owned shapes for internal
+// business checks. It never changes the source EventSpec or its JCS hash.
+func favoriteSubjectV1(schema int, raw json.RawMessage) (FavoriteSubjectRef, bool) {
+	var legacy FavoriteSubjectRef
+	switch schema {
+	case 1:
+		if strictFavoriteJSON(raw, &legacy) != nil || legacy.AuthorityID != "rtw.identity" ||
+			legacy.TenantID != "platform" {
+			return FavoriteSubjectRef{}, false
+		}
+	case 2:
+		var v2 FavoriteSubjectRefV2
+		if strictFavoriteJSON(raw, &v2) != nil || v2.Issuer != "rtw.identity" {
+			return FavoriteSubjectRef{}, false
+		}
+		legacy = FavoriteSubjectRef{AuthorityID: v2.Issuer, TenantID: "platform", SubjectID: v2.SubjectID}
+	default:
+		return FavoriteSubjectRef{}, false
+	}
+	uid, err := strconv.ParseInt(legacy.SubjectID, 10, 64)
+	return legacy, err == nil && uid > 0 && strconv.FormatInt(uid, 10) == legacy.SubjectID
+}
+
 func authoritativeFavoriteRow(row FavoriteFactOutbox) (FavoriteAuthorityFact, authorityPayload, bool) {
 	if row.Status != FavoriteFactSent || row.DeliveredAt == nil || row.TechnicalReceivedAt == nil ||
 		row.TechnicalReceiptID == "" || row.TechnicalOffset < 1 || !favoriteReceiptHash.MatchString(row.TechnicalInputHash) {
@@ -105,11 +138,9 @@ func authoritativeFavoriteRow(row FavoriteFactOutbox) (FavoriteAuthorityFact, au
 	}
 	favoriteID, favoriteOK := parseAuthorityID(payload.FavoriteID)
 	folderID, folderOK := parseAuthorityID(payload.FolderID)
-	uid, uidErr := strconv.ParseInt(payload.Subject.SubjectID, 10, 64)
+	subject, subjectOK := favoriteSubjectV1(event.SchemaVersion, payload.Subject)
 	if !favoriteOK || !folderOK || favoriteID != row.FavoriteID || folderID <= 0 ||
-		uidErr != nil || uid <= 0 || strconv.FormatInt(uid, 10) != payload.Subject.SubjectID ||
-		payload.Subject.AuthorityID != "rtw.identity" || payload.Subject.TenantID != "platform" ||
-		payload.SchemaVersion != 1 || payload.EventID != event.EventID ||
+		!subjectOK || payload.SchemaVersion != event.SchemaVersion || payload.EventID != event.EventID ||
 		payload.TargetType == "" || payload.TargetID == "" ||
 		payload.SourceRef != fmt.Sprintf("rtw.favorite/%d", row.FavoriteID) ||
 		payload.EventTime != event.OccurredAt || payload.AvailableAt != event.OccurredAt {
@@ -137,7 +168,7 @@ func authoritativeFavoriteRow(row FavoriteFactOutbox) (FavoriteAuthorityFact, au
 		TechnicalStatus: "accepted", ReceiptID: row.TechnicalReceiptID,
 		InputHash: row.TechnicalInputHash, Offset: row.TechnicalOffset,
 		ReceivedAt: row.TechnicalReceivedAt.UTC().Format(time.RFC3339Nano)}
-	result := FavoriteAuthorityFact{Event: event, SubjectRef: payload.Subject,
+	result := FavoriteAuthorityFact{Event: event, SubjectRef: subject,
 		TechnicalReceipt: receipt, SourceEventHash: hash}
 	if row.AggregateVersion == 2 {
 		result.PredecessorEventID = fmt.Sprintf("favorite.%d.v1", row.FavoriteID)
@@ -158,6 +189,22 @@ func favoriteJCSHash(raw []byte) (string, error) {
 // caller cannot supply or override a subject. Retractions must match the
 // source-owned, DC-accepted assertion for the same owner and target.
 func (m *FavoriteModel) AuthoritativeFavoriteFact(ctx context.Context, producer, eventID string) (FavoriteAuthorityFact, error) {
+	return m.authoritativeFavoriteFact(ctx, producer, eventID, 1)
+}
+
+func (m *FavoriteModel) AuthoritativeFavoriteFactV2(ctx context.Context, producer, eventID string) (FavoriteAuthorityFactV2, error) {
+	fact, err := m.authoritativeFavoriteFact(ctx, producer, eventID, 2)
+	if err != nil {
+		return FavoriteAuthorityFactV2{}, err
+	}
+	return FavoriteAuthorityFactV2{Event: fact.Event,
+		SubjectRef:         FavoriteSubjectRefV2{Issuer: fact.SubjectRef.AuthorityID, SubjectID: fact.SubjectRef.SubjectID},
+		PredecessorEventID: fact.PredecessorEventID, TechnicalReceipt: fact.TechnicalReceipt,
+		SourceEventHash: fact.SourceEventHash}, nil
+}
+
+func (m *FavoriteModel) authoritativeFavoriteFact(ctx context.Context, producer, eventID string,
+	expectedSchema int) (FavoriteAuthorityFact, error) {
 	if m == nil || m.conn == nil || producer != favoriteProducer || eventID == "" ||
 		len(eventID) > 128 || strings.ContainsAny(eventID, "/\\?&#") {
 		return FavoriteAuthorityFact{}, ErrFavoriteFactUnavailable
@@ -171,7 +218,7 @@ func (m *FavoriteModel) AuthoritativeFavoriteFact(ctx context.Context, producer,
 		return FavoriteAuthorityFact{}, ErrFavoriteFactUnavailable
 	}
 	fact, payload, ok := authoritativeFavoriteRow(row)
-	if !ok {
+	if !ok || fact.Event.SchemaVersion != expectedSchema {
 		return FavoriteAuthorityFact{}, ErrFavoriteFactUnavailable
 	}
 	if row.AggregateVersion != 2 {
@@ -184,7 +231,7 @@ func (m *FavoriteModel) AuthoritativeFavoriteFact(ctx context.Context, producer,
 			return FavoriteAuthorityFact{}, query.Error
 		}
 		if query.RowsAffected == 1 {
-			uid, _ := strconv.ParseInt(payload.Subject.SubjectID, 10, 64)
+			uid, _ := strconv.ParseInt(fact.SubjectRef.SubjectID, 10, 64)
 			folderID, _ := parseAuthorityID(payload.FolderID)
 			if item.UserId != uid || item.FolderId != folderID ||
 				item.TargetType != payload.TargetType || item.TargetId != payload.TargetID ||
@@ -223,7 +270,8 @@ func (m *FavoriteModel) AuthoritativeFavoriteFact(ctx context.Context, producer,
 	prior, priorPayload, ok := authoritativeFavoriteRow(predecessor)
 	priorFolderID, priorFolderOK := parseAuthorityID(priorPayload.FolderID)
 	folderID, folderOK := parseAuthorityID(payload.FolderID)
-	if !ok || prior.TechnicalReceipt.Offset >= fact.TechnicalReceipt.Offset ||
+	if !ok || prior.Event.SchemaVersion != expectedSchema ||
+		prior.TechnicalReceipt.Offset >= fact.TechnicalReceipt.Offset ||
 		prior.SubjectRef != fact.SubjectRef || priorPayload.TargetType != payload.TargetType ||
 		priorPayload.TargetID != payload.TargetID || priorPayload.SourceRef != payload.SourceRef ||
 		!priorFolderOK || !folderOK || priorFolderID != folderID ||

@@ -45,6 +45,13 @@ type FavoriteSubjectRef struct {
 	SubjectID   string `json:"subject_id"`
 }
 
+// FavoriteSubjectRefV2 contains only the RTW-owned identity pair. The legacy
+// fixed platform slot is deliberately absent from the v2 EventSpec.
+type FavoriteSubjectRefV2 struct {
+	Issuer    string `json:"issuer"`
+	SubjectID string `json:"subject_id"`
+}
+
 type favoriteFactPayload struct {
 	SchemaVersion  int                `json:"schema_version"`
 	EventID        string             `json:"event_id"`
@@ -60,6 +67,21 @@ type favoriteFactPayload struct {
 	// integers above 2^53, while production Snowflake IDs exceed that range.
 	FavoriteID string `json:"favorite_id"`
 	FolderID   string `json:"folder_id"`
+}
+
+type favoriteFactPayloadV2 struct {
+	SchemaVersion  int                  `json:"schema_version"`
+	EventID        string               `json:"event_id"`
+	Subject        FavoriteSubjectRefV2 `json:"subject_ref"`
+	TargetType     string               `json:"target_type"`
+	TargetID       string               `json:"target_id"`
+	TargetRevision *string              `json:"target_revision"`
+	Operation      string               `json:"operation"`
+	SourceRef      string               `json:"source_ref"`
+	EventTime      string               `json:"event_time"`
+	AvailableAt    string               `json:"available_at"`
+	FavoriteID     string               `json:"favorite_id"`
+	FolderID       string               `json:"folder_id"`
 }
 
 type favoriteEvent struct {
@@ -103,6 +125,82 @@ func favoriteOutbox(item FavoriteItem, version int64, operation string, now time
 		AggregateVersion: version, Payload: string(body), Status: FavoriteFactPending}, nil
 }
 
+func favoriteOutboxV2(item FavoriteItem, version int64, operation string, now time.Time) (FavoriteFactOutbox, error) {
+	if item.FavoriteId <= 0 || item.FolderId <= 0 || item.UserId <= 0 || item.TargetType == "" || item.TargetId == "" ||
+		(version != 1 && version != 2) || (operation != "assert" && operation != "retract") ||
+		(item.TargetRevision != nil && (item.TargetType != "article" || *item.TargetRevision == "")) {
+		return FavoriteFactOutbox{}, errors.New("invalid favorite fact")
+	}
+	eventID := fmt.Sprintf("favorite.%d.v%d", item.FavoriteId, version)
+	at := now.UTC().Format(time.RFC3339Nano)
+	payload := favoriteFactPayloadV2{SchemaVersion: 2, EventID: eventID,
+		Subject:    FavoriteSubjectRefV2{Issuer: "rtw.identity", SubjectID: strconv.FormatInt(item.UserId, 10)},
+		TargetType: item.TargetType, TargetID: item.TargetId, TargetRevision: item.TargetRevision,
+		Operation: operation, SourceRef: fmt.Sprintf("rtw.favorite/%d", item.FavoriteId),
+		EventTime: at, AvailableAt: at, FavoriteID: strconv.FormatInt(item.FavoriteId, 10),
+		FolderID: strconv.FormatInt(item.FolderId, 10)}
+	// The outer v2 schema is explicit as well. There is still exactly one
+	// frozen event for each aggregate version and one DC idempotency key.
+	event := struct {
+		EventID          string                `json:"event_id"`
+		EventType        string                `json:"event_type"`
+		SchemaVersion    int                   `json:"schema_version"`
+		Producer         string                `json:"producer"`
+		AggregateID      string                `json:"aggregate_id"`
+		AggregateVersion int64                 `json:"aggregate_version"`
+		OperationID      string                `json:"operation_id"`
+		OccurredAt       string                `json:"occurred_at"`
+		Payload          favoriteFactPayloadV2 `json:"payload"`
+	}{eventID, "rtw.favorite." + operation, 2, favoriteProducer,
+		strconv.FormatInt(item.FavoriteId, 10), version, eventID, at, payload}
+	body, err := json.Marshal(event)
+	if err != nil {
+		return FavoriteFactOutbox{}, err
+	}
+	return FavoriteFactOutbox{EventID: eventID, FavoriteID: item.FavoriteId,
+		AggregateVersion: version, Payload: string(body), Status: FavoriteFactPending}, nil
+}
+
+func (m *FavoriteModel) newFavoriteOutbox(item FavoriteItem, version int64, operation string,
+	now time.Time, schema int) (FavoriteFactOutbox, error) {
+	switch schema {
+	case 1:
+		return favoriteOutbox(item, version, operation, now)
+	case 2:
+		return favoriteOutboxV2(item, version, operation, now)
+	default:
+		return FavoriteFactOutbox{}, errors.New("unsupported favorite fact schema")
+	}
+}
+
+func favoriteAssertionSchema(tx *gorm.DB, item FavoriteItem) (int, error) {
+	var row FavoriteFactOutbox
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("favorite_id = ? AND aggregate_version = 1", item.FavoriteId).Take(&row).Error; err != nil {
+		return 0, err
+	}
+	var event FavoriteWireEvent
+	if strictFavoriteJSON([]byte(row.Payload), &event) != nil ||
+		event.EventID != row.EventID || event.AggregateVersion != 1 ||
+		event.EventType != "rtw.favorite.assert" || event.AggregateID != strconv.FormatInt(item.FavoriteId, 10) ||
+		(event.SchemaVersion != 1 && event.SchemaVersion != 2) ||
+		!validFavoriteDelivery(row, event) {
+		return 0, ErrFavoriteFactUnavailable
+	}
+	var payload authorityPayload
+	if strictFavoriteJSON(event.Payload, &payload) != nil {
+		return 0, ErrFavoriteFactUnavailable
+	}
+	subject, ok := favoriteSubjectV1(event.SchemaVersion, payload.Subject)
+	folderID, folderOK := parseAuthorityID(payload.FolderID)
+	if !ok || !folderOK || subject.SubjectID != strconv.FormatInt(item.UserId, 10) ||
+		folderID != item.FolderId || payload.TargetType != item.TargetType ||
+		payload.TargetID != item.TargetId || !sameFavoriteRevision(payload.TargetRevision, item.TargetRevision) {
+		return 0, ErrFavoriteFactUnavailable
+	}
+	return event.SchemaVersion, nil
+}
+
 // InsertFavorite commits the existing favorite ID and its business fact in
 // the same owner database. An already saved folder target fails its unique key
 // before an outbox row can be committed.
@@ -122,7 +220,11 @@ func (m *FavoriteModel) InsertFavorite(ctx context.Context, item *FavoriteItem) 
 		if err := tx.Create(item).Error; err != nil {
 			return err
 		}
-		fact, err := favoriteOutbox(*item, 1, "assert", time.Now())
+		schema := 1
+		if m.subjectRefV2Facts {
+			schema = 2
+		}
+		fact, err := m.newFavoriteOutbox(*item, 1, "assert", time.Now(), schema)
 		if err != nil {
 			return err
 		}
@@ -148,7 +250,11 @@ func (m *FavoriteModel) DeleteFavoriteByFavoriteId(ctx context.Context, favorite
 		if item.UserId != userID {
 			return ErrFavoriteOwnerMismatch
 		}
-		fact, err := favoriteOutbox(item, 2, "retract", time.Now())
+		schema, err := favoriteAssertionSchema(tx, item)
+		if err != nil {
+			return err
+		}
+		fact, err := m.newFavoriteOutbox(item, 2, "retract", time.Now(), schema)
 		if err != nil {
 			return err
 		}
@@ -183,7 +289,11 @@ func (m *FavoriteModel) DeleteFolderCascade(ctx context.Context, folderID, userI
 			return err
 		}
 		for _, item := range items {
-			fact, err := favoriteOutbox(item, 2, "retract", time.Now())
+			schema, err := favoriteAssertionSchema(tx, item)
+			if err != nil {
+				return err
+			}
+			fact, err := m.newFavoriteOutbox(item, 2, "retract", time.Now(), schema)
 			if err != nil {
 				return err
 			}

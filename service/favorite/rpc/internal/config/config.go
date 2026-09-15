@@ -14,4 +14,6 @@ type Config struct {
 	}
 	UserRpc    zrpc.RpcClientConf
 	ArticleRpc zrpc.RpcClientConf
+	// SubjectRefV2Facts is an explicit local candidate switch. Omitted is v1.
+	SubjectRefV2Facts bool `json:",optional"`
 }
