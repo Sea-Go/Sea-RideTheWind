@@ -321,6 +321,10 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 	consumer.Env = consumerEnv
 	output, consumerErr := consumer.CombinedOutput()
 	outputPath := filepath.Join(dir, "btw-real-wiki-fact-set-consumer.log")
+	if dwdRoot != "" {
+		outputPath = filepath.Join(os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"),
+			"wiki-factset-dwd-btw-consumer.log")
+	}
 	writeRealFactSet0600(t, outputPath, output)
 	if consumerErr != nil {
 		t.Fatalf("BTW same quality consumer rejected original Catalog prefix: %v; task-log=%s",
