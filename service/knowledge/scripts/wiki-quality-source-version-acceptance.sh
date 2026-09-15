@@ -14,12 +14,21 @@ fi
 evidence_dir="$(mktemp -d "${TMPDIR:-/tmp}/sea-wiki-source-version.XXXXXX")"
 printf 'Wiki source-version evidence: %s\n' "$evidence_dir"
 pg_started=false
+pg_attempted=false
 finish() {
   original_status=$?
   trap - EXIT
   final_status="$original_status"
-  if [[ "$pg_started" == true ]]; then
-    if ! "$pg_bin/pg_ctl" -D "$evidence_dir/pg" -m fast stop > "$evidence_dir/stop.log" 2>&1; then
+  if [[ "$pg_started" == true || "$pg_attempted" == true ]]; then
+    set +e
+    "$pg_bin/pg_ctl" -D "$evidence_dir/pg" status > "$evidence_dir/status-before-stop.log" 2>&1
+    before_stop_status=$?
+    set -e
+    if [[ "$before_stop_status" == 0 ]]; then
+      if ! "$pg_bin/pg_ctl" -D "$evidence_dir/pg" -m fast stop > "$evidence_dir/stop.log" 2>&1; then
+        final_status=2
+      fi
+    elif [[ "$pg_started" == true || "$before_stop_status" != 3 ]]; then
       final_status=2
     fi
     set +e
@@ -45,6 +54,7 @@ PY
 )"
 "$pg_bin/initdb" -D "$evidence_dir/pg" -A trust --no-locale -U sea_wiki_source_test \
   > "$evidence_dir/initdb.log" 2>&1
+pg_attempted=true
 "$pg_bin/pg_ctl" -D "$evidence_dir/pg" -l "$evidence_dir/postgres.log" \
   -o "-h 127.0.0.1 -p $port -k $evidence_dir" start \
   > "$evidence_dir/start.log" 2>&1
