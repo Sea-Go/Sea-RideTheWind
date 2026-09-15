@@ -1862,6 +1862,12 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 				if record["outcome"] == nil || record["duration_ms"] == nil {
 					t.Fatalf("v2 historical terminal stage lost outcome/duration: %#v", record)
 				}
+				if strings.HasSuffix(event, ".succeeded") {
+					uid, ok := record["subject_id"].(string)
+					if !ok || (uid != fmt.Sprintf("%d", productUID) && uid != fmt.Sprintf("%d", otherUID)) {
+						t.Fatalf("v2 success stage lost bounded User Center UID: %#v", record)
+					}
+				}
 			}
 		}
 		if event == "http.request.completed" && record["route"] == "unmatched" && record["method"] == "POST" && record["status"] == float64(404) {
