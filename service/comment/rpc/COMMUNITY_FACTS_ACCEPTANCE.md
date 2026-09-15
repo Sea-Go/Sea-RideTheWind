@@ -20,9 +20,9 @@
 
 ## 部署、恢复和界限
 
-先在评论、点赞各自数据库依序执行 `internal/model/migrations/001_*.sql` 与 `002_*_dc_wire.sql`，再启动对应 RPC/消费者；迁移重复执行幂等。`002` 的 `NOT VALID` 约束保留既有旧行供后续辨析，但禁止旧版消费者在迁移后继续追加无出站 envelope 的事实，因此切换时须先停旧消费者。新评论或点赞事实若无法写 outbox，业务 PG 事务回滚；不可手工删 outbox 来“修复”卡住的消息。消费者失败应通过 Kafka 重试或隔离死信进行恢复，不能凭日志冒充事实；当前未证明 Kafka broker 的实际重投配置。
+先在评论、点赞各自数据库依序执行 `internal/model/migrations/001_*.sql`、`002_*_dc_wire.sql` 与 `003_*_fact_delivery.sql`，再启动对应 RPC/消费者、`cmd/fact-dispatch` 和 `cmd/fact-authority`；迁移重复执行幂等。`002` 的 `NOT VALID` 约束保留既有旧行供后续辨析，但禁止旧版消费者在迁移后继续追加无出站 envelope 的事实；`003` 只允许派发状态与技术回执变化，冻结事件身份、业务载荷和 envelope。切换时须先停旧消费者。新评论或点赞事实若无法写 outbox，业务 PG 事务回滚；不可手工删 outbox 来“修复”卡住的消息。消费者失败应通过 Kafka 重试或隔离死信进行恢复，不能凭日志冒充事实；当前未证明 Kafka broker 的实际重投配置。
 
-历史 `like_record.state=2` 可能是旧消费者写入的“取消赞”操作码，也可能被旧查询解释为点踩；旧 3/4 更不符合新状态表。`last_operation_id=0` 的歧义旧行与非法旧状态会拒绝新事实事务，需按原始消息/Redis 证据单独辨析并做受控迁移。本变更不伪造历史明细或回填 H09.a 事实。Redis 写成功但 Kafka 推送失败仍可能造成暂时或永久不一致；本次只修复**已到达消费者**的 PG 确认边界。DC 真实投递确认、BTW `TrustedFactBinder` 接纳、数仓 ODS/DWD、端到端对账尚未完成，因此 WS02-B/H09.a 整体仍是 `PARTIAL`。
+历史 `like_record.state=2` 可能是旧消费者写入的“取消赞”操作码，也可能被旧查询解释为点踩；旧 3/4 更不符合新状态表。`last_operation_id=0` 的歧义旧行与非法旧状态会拒绝新事实事务，需按原始消息/Redis 证据单独辨析并做受控迁移。本变更不伪造历史明细或回填 H09.a 事实。Redis 写成功但 Kafka 推送失败仍可能造成暂时或永久不一致；本次只修复**已到达消费者**的 PG 确认边界。DC 真实投递与 BTW 权威接纳的本地进程链已验收；真实 Kafka/Redis、数仓 ODS/DWD、线上运行和全量对账尚未完成，因此 WS02-B/H09.a 整体仍是 `PARTIAL`。
 
 ## DataCenter 出站 wire 合同与交接
 
@@ -30,7 +30,7 @@
 
 评论外层 `aggregate_id` 是评论 ID，`comment_fact_stream` 在评论创建/删除/互动同一 PG 事务中逐条分配连续版本；点赞外层 `aggregate_id=like-state/<UID>/<target_type>/<target_id>`，`like_fact_stream` 在该用户目标状态真正变化的事务中分配连续版本。点赞业务载荷中的原 `aggregate_id=<target_type>/<target_id>` 仍指互动目标。两种版本都只是各自生产者事实流版本，不是内容修订、客户端雪花操作 ID，也不是 DataCenter 接收 offset。旧 Outbox 若对同一聚合仍有 `delivery_envelope IS NULL` 行，新事实事务拒绝提交，需先依据原始事实次序和消息证据做受控迁移；不可将所有旧行填 `1`、随意删旧行或绕开拒发门禁。新派发器只能 claim 非空 envelope，旧行不得发往 DC。
 
-本切片没有评论/点赞派发器和收据持久化，也未证明线上 Kafka/Redis 或 BTW 摄取。它交给 H09 派发层的准确字段是 `delivery_envelope`、`event_id`、`aggregate_id`、`fact_version`；DataCenter 回执须匹配 `producer/event_id`，原体重放返回首次 `receipt_id/input_hash/offset`。接收 201/200 仅表示技术接纳，不等于业务事实已经进入 DWD 或可训练。
+当前评论与点赞各有独立 `fact-dispatch`，按聚合版本顺序原样发送冻结 envelope，并把匹配的 DataCenter `receipt_id/input_hash/offset/received_at` 落回源 Outbox；失败响应保留同一事件待重试，非法冻结体进入 blocked。独立 `fact-authority` 只读取已落匹配回执且仍能由领域状态证明的事实。对外主体 wire v2 只有 `{issuer:"rtw.identity",subject_id:<UID>}`，没有 realm 或 tenant 字段；业务载荷中的 `rtw.identity/platform/<UID>` 是既有 v1 规范来源字符串。EventID 使用可被 DC 回执路径安全读取的点分键，`source_ref` 仍保留领域路径语义。接收 201/200 仅表示技术接纳，不等于业务事实已经进入 DWD 或可训练。
 
 ## 验收证据
 
@@ -39,3 +39,7 @@
 `go test -mod=readonly -race -count=1 ./service/comment/rpc/... ./service/like/rpc/...`、对应 `go vet` 和 `go mod verify` 均退出 0。此验收是 RTW 源事务与消费端的隔离 PG 子链，未声称真实 Kafka/Redis、DC 交付、BTW 接纳或线上运行。
 
 设置 `SEA_DC_PLATFORM_ROOT` 为已核对的 DataCenter 独立工作树后，同一脚本额外构建并启动真实 `cmd/platform -migrate`，对隔离 PG 中真实 RTW 评论四版与点赞六版共十条冻结 envelope 执行 HTTP 接纳。2026-09-14 的本地验收退出 0：两个 producer 各自从 offset 1 开始；评论 source watermark 连续到 4；相同 ID 同体重放回原 receipt/hash/offset；同 ID 改体、另一 ID 占用同聚合版本均为 409，字符串 schema 与空聚合版本均为 400。此处是实际 DC HTTP 契约子验收，不是 RTW 派发器/回执落库验收。
+
+2026-09-15 使用 BTW `cmd/worker/community_fact_acceptance.sh` 的同次进程验收退出 0。固定提交为 DataCenter `f59a676a3439f66122e0ec579cd22f030719e058`、RTW 运行代码 `58468c1d4d0fd5708bc0c9726a94ef252cb588eb`、BTW 运行代码 `6050ab8ca84ac8225442571a985c071113336041`；最终报告 SHA-256 为 `269cf7d12c1b01f3181bfb38636c4623f838bedfa8177e74e913876a6002eeb8`。真实 RTW 业务事务产生评论 create、like、unlike、delete 四条和目标 like、unlike 两条；两个派发器落回各自从 1 开始的 DC 全局 producer offset，两个 authority 进程再供 BTW 逐条核验。RTW 源 PG 六行均保持 `target_revision=null/revision_status=unknown`，评论同时保持 `search_evidence=false`。
+
+四个新进程的每行日志已解析并要求 `timestamp/level/service/environment/service_version/instance_id/component/log_source/event/message`；终态要求 `outcome/duration_ms`，authority 从 BTW 注入的 W3C Context 获得 trace/span。go-zero signal 日志经注入 Writer 进入同一 envelope，业务层不依赖 package-level `slog`。本项观测状态是 `LOCAL_VERIFIED`：验收证明结构化日志和 Context 关联，没有证明 RTW OTLP 导出或线上 Collector 接收。
