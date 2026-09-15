@@ -26,6 +26,14 @@ func wikiFactSetHolderMode() (bool, error) {
 		filepath.Clean(readerRoot) != filepath.Clean(btwRoot)) {
 		return false, errors.New("FactSet SourceProof reader must use the same fixed BTW source tree")
 	}
+	if readerRoot != "" {
+		script := filepath.Join(readerRoot,
+			"internal/evaluation/wiki_quality/sourceproof/real-source-acceptance.sh")
+		info, err := os.Lstat(script)
+		if err != nil || !info.Mode().IsRegular() {
+			return false, errors.New("FactSet SourceProof reader script is missing from fixed BTW tree")
+		}
+	}
 	if os.Getenv("SEA_BTW_WIKI_QUALITY_CONSUMER_ROOT") != "" ||
 		os.Getenv("SEA_BTW_SEARCHSOURCE_CONSUMER_ROOT") != "" ||
 		os.Getenv("KNOWLEDGE_FACT_SET_REAL_HTTP") == "1" {
@@ -51,7 +59,7 @@ func TestWikiFactSetHolderSelectorRejectsIncompleteOrSharedModes(t *testing.T) {
 		{"Reader without Holder rejected", "", "/tmp/dc-root", "", "", "", "/tmp/btw-root", false, true},
 		{"Reader different BTW tree is invalid", "/tmp/btw-root", "/tmp/dc-root", "", "", "", "/tmp/other-root", false, true},
 		{"Reader relative root is invalid", "/tmp/btw-root", "/tmp/dc-root", "", "", "", "relative-reader", false, true},
-		{"Reader same fixed BTW root", "/tmp/btw-root", "/tmp/dc-root", "", "", "", "/tmp/btw-root", true, false},
+		{"Reader same root without script rejected before PG", "/tmp/btw-root", "/tmp/dc-root", "", "", "", "/tmp/btw-root", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("SEA_BTW_WIKI_FACT_SET_CONSUMER_ROOT", tc.btw)
@@ -65,5 +73,31 @@ func TestWikiFactSetHolderSelectorRejectsIncompleteOrSharedModes(t *testing.T) {
 				t.Fatalf("early Holder selector misrouted shared DC/quality/qrel: selected=%v err=%v", selected, err)
 			}
 		})
+	}
+}
+
+func TestWikiFactSetHolderSourceProofReaderNeedsFixedScriptBeforePG(t *testing.T) {
+	root := t.TempDir()
+	script := filepath.Join(root,
+		"internal/evaluation/wiki_quality/sourceproof/real-source-acceptance.sh")
+	if err := os.MkdirAll(filepath.Dir(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SEA_BTW_WIKI_FACT_SET_CONSUMER_ROOT", root)
+	t.Setenv("SEA_BTW_SOURCEPROOF_READER_ROOT", root)
+	t.Setenv("SEA_DC_EVENT_PLATFORM_ROOT", t.TempDir())
+	t.Setenv("SEA_BTW_WIKI_QUALITY_CONSUMER_ROOT", "")
+	t.Setenv("SEA_BTW_SEARCHSOURCE_CONSUMER_ROOT", "")
+	t.Setenv("KNOWLEDGE_FACT_SET_REAL_HTTP", "")
+	selected, err := wikiFactSetHolderMode()
+	if selected || err == nil {
+		t.Fatalf("missing BTW Reader script reached disposable PG: %v %v", selected, err)
+	}
+	if err := os.WriteFile(script, []byte("#!/usr/bin/env bash\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	selected, err = wikiFactSetHolderMode()
+	if !selected || err != nil {
+		t.Fatalf("fixed ordinary BTW Reader script was rejected: %v %v", selected, err)
 	}
 }
