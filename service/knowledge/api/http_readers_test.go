@@ -70,8 +70,16 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 		t.Fatal("unbounded body list", revisions)
 	}
 	request("GET", modulePath+"/revisions?limit=1&cursor="+url.QueryEscape(revisions.NextCursor), token, nil, &revisions, 200)
-	if len(revisions.Items) != 1 || revisions.NextCursor != "" {
+	qualityHolder := os.Getenv("SEA_BTW_WIKI_QUALITY_CONSUMER_ROOT") != ""
+	if len(revisions.Items) != 1 || qualityHolder && revisions.NextCursor == "" ||
+		!qualityHolder && revisions.NextCursor != "" {
 		t.Fatal("second page incorrect", revisions)
+	}
+	if qualityHolder {
+		request("GET", modulePath+"/revisions?limit=1&cursor="+url.QueryEscape(revisions.NextCursor), token, nil, &revisions, 200)
+		if len(revisions.Items) != 1 || revisions.NextCursor != "" || revisions.Items[0].Content != "" {
+			t.Fatal("explicit quality Holder third Wiki revision page incorrect", revisions)
+		}
 	}
 	var releases types.ListReleasesResp
 	request("GET", modulePath+"/releases", token, nil, &releases, 200)
@@ -85,7 +93,12 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 	}
 	var compiles types.ListCompilesResp
 	request("GET", modulePath+"/compiles", token, nil, &compiles, 200)
-	if len(compiles.Items) != 1 || compiles.Items[0].CompileId != pending.CompileId {
+	pendingSeen := false
+	for _, c := range compiles.Items {
+		pendingSeen = pendingSeen || c.CompileId == pending.CompileId
+	}
+	if !pendingSeen || qualityHolder && len(compiles.Items) != 2 ||
+		!qualityHolder && len(compiles.Items) != 1 {
 		t.Fatal(compiles)
 	}
 	// Details support polling after a command and expose a real terminal state.

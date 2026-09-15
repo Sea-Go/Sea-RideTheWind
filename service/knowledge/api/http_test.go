@@ -415,6 +415,66 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		object.Hash(qualityJCS) != quality.EventJcsSha256 {
 		t.Fatalf("private Worker original Event/JCS hashes differ from admin source: %+v %v", qualityEvent, err)
 	}
+	// A second administrator label targets an AI-accepted Wiki revision on a
+	// separate page. Its FactID is the same Source quote, while judge heads
+	// remain separate by immutable WikiRevisionID for later human comparison.
+	// Add this extra revision only for the explicit source handoff so ordinary
+	// preexisting reader pagination fixtures keep their historical two rows.
+	var aiQuality types.WikiFactJudgmentRecord
+	if os.Getenv("SEA_BTW_WIKI_QUALITY_CONSUMER_ROOT") != "" {
+		if os.Getenv("SEA_DC_EVENT_PLATFORM_ROOT") == "" {
+			t.Fatal("quality source handoff requires both BTW and DC fixed roots")
+		}
+		var aiCompile types.Compile
+		request("POST", "/v1/knowledge/modules/"+m.Id+"/compiles", token,
+			map[string]any{"page_id": "quality-ai-page", "source_revision_ids": []string{a.RevisionId},
+				"guidance": "write only the frozen Evidence fact", "idempotency_key": "quality-http-ai-compile"},
+			&aiCompile, 200)
+		if aiCompile.State != "BUILDING" || len(aiCompile.SourceRevisionIds) != 1 ||
+			aiCompile.SourceRevisionIds[0] != a.RevisionId {
+			t.Fatalf("quality AI Compile did not freeze its Source revision: %+v", aiCompile)
+		}
+		var claimedAI types.Compile
+		request("POST", "/internal/v1/knowledge/compiles/"+aiCompile.CompileId+"/claim", c.WorkerToken,
+			map[string]any{"generation": aiCompile.Generation, "attempt_id": "quality-http-ai-attempt",
+				"lease_epoch": 1, "cancel_version": aiCompile.CancelVersion,
+				"input_hash":       aiCompile.InputHash,
+				"lease_expires_at": time.Now().Add(time.Hour).UTC().Format(time.RFC3339Nano)},
+			&claimedAI, 200)
+		aiMarkdown := "Evidence is the only approved fact."
+		aiObjectKey, aiContentSHA, err := s.Objects.Put(context.Background(), []byte(aiMarkdown))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var acceptedAI types.Compile
+		request("POST", "/internal/v1/knowledge/compiles/"+aiCompile.CompileId+"/results", c.WorkerToken,
+			map[string]any{"state": "READY", "generation": aiCompile.Generation,
+				"attempt_id": "quality-http-ai-attempt", "lease_epoch": 1,
+				"cancel_version": aiCompile.CancelVersion, "input_hash": aiCompile.InputHash,
+				"object_key": aiObjectKey, "content_hash": aiContentSHA, "title": "AI固定事实页",
+				"source_refs": []types.SourceRef{{RevisionId: a.RevisionId, Locator: "paragraph:2"}}},
+			&acceptedAI, 200)
+		if acceptedAI.State != "ACCEPTED" || acceptedAI.RevisionId == "" {
+			t.Fatalf("RTW quality AI source revision was not business-accepted: %+v", acceptedAI)
+		}
+		aiQualityInput := map[string]any{"source_revision_id": a.RevisionId,
+			"source_content_sha256": a.ContentHash, "locator": "paragraph:2",
+			"source_quote": "Evidence", "source_quote_sha256": object.Hash([]byte("Evidence")),
+			"wiki_claim_text": "Evidence", "wiki_claim_sha256": object.Hash([]byte("Evidence")),
+			"origin_compile_id": aiCompile.CompileId, "assessment": "covered", "grade": "3",
+			"rubric_version":  "sea.wiki.fact-coverage.v1",
+			"reason":          "AI accepted Wiki cites the original fixed Evidence paragraph",
+			"idempotency_key": "quality-http-ai-human-judgment"}
+		request("POST", "/v1/knowledge/modules/"+m.Id+
+			"/wiki-pages/quality-ai-page/revisions/"+acceptedAI.RevisionId+"/quality-judgments",
+			token, aiQualityInput, &aiQuality, 200)
+		if aiQuality.WikiOriginKind != "ai_accepted" || aiQuality.OriginCompileId != aiCompile.CompileId ||
+			aiQuality.FactId != quality.FactId || aiQuality.WikiRevisionId == quality.WikiRevisionId ||
+			aiQuality.Grade != "3" || !aiQuality.CitationPresent {
+			t.Fatalf("AI and manual human quality labels lost same fact/different Wiki revisions: %+v %+v",
+				quality, aiQuality)
+		}
+	}
 	realBGE := os.Getenv("SEA_DC_BGE_RUNTIME")
 	retrievalProfiles := testenv.Profiles()
 	if realBGE != "" {
@@ -536,6 +596,8 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if state.PointerRevision != 1 || state.ActiveReleaseId != r.ReleaseId {
 		t.Fatal(state)
 	}
+	runRealWikiQualityHandoff(t, dir, s, base, c.WorkerToken,
+		m.Id, w.RevisionId, r.ReleaseId, quality, aiQuality)
 	if btwRoot := os.Getenv("SEA_BTW_ITEM_CONSUMER_ROOT"); btwRoot != "" {
 		runRealBTWItemPool(t, btwRoot, base, c.WorkerToken, os.Getenv("KNOWLEDGE_TEST_DSN"),
 			m.Id, a.RevisionId, a.EntityId)

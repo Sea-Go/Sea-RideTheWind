@@ -23,10 +23,12 @@ func runRealSearchSourceHandoff(t *testing.T, dir string, store *model.Store, rt
 	first, withdrawn types.SearchJudgmentReceipt) {
 	t.Helper()
 	btwRoot, dcRoot := os.Getenv("SEA_BTW_SEARCHSOURCE_CONSUMER_ROOT"), os.Getenv("SEA_DC_EVENT_PLATFORM_ROOT")
-	if btwRoot == "" && dcRoot == "" {
+	// DC's event platform is shared by independent source Holder modes.
+	// This handoff is selected only by its own BTW consumer root.
+	if btwRoot == "" {
 		return
 	}
-	if btwRoot == "" || dcRoot == "" {
+	if dcRoot == "" {
 		t.Fatal("real search judgment handoff requires both BTW and DC source roots")
 	}
 	platform := startRealDCJobPlatform(t, dir, dcRoot)
