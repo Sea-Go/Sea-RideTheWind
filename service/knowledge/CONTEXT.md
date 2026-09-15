@@ -24,6 +24,18 @@ _避免_：置信分、发布阈值
 针对同一 Wiki 修订和同一来源事实追加的一次重新判断。它独立于 Wiki 正文的编辑修订。
 _避免_：Wiki 修订、Release 版本
 
+**获准来源范围**：
+RTW 从 AI 已接纳 Compile 的完整 SourceRevisionID 集，或从人工 Wiki 同页 base 链的当前可用 SourceRefs 与 AI 祖先完整资料集导出的范围。管理员申报的来源清单必须逐项等于这个范围；正式撤回的祖先资料只退出新范围，历史范围保持原字节。
+_避免_：只摘当前 Wiki 引用、任意挑选若干事实形成高覆盖率
+
+**FactSet 修订**：
+管理员针对固定 Wiki 修订和获准来源范围追加的一份预期事实清单，记录各来源事实的原句 byte span、是否必需和矛盾分组。`facts_complete` 是管理员对所列范围已审全的声明，RTW 逐项校验来源，不能机械证明没有遗漏。
+_避免_：把已到达的单事实评阅数当事实全集
+
+**FactSet head**：
+按模块、页面和获准来源范围独立 CAS 的最新清单指针。同范围的新人工 Wiki 清单可以推进它；历史 AI Wiki 的评测必须钉历史 FactSetRevisionID、目标 WikiRevisionID 与 JCS，不能读取当前 head 冒充旧版本。
+_避免_：Wiki 编辑 head、已发布 Release
+
 **编辑 head**：
 某模块页面目前最新的可编辑 Wiki 修订。head 前移后，先前获接纳的修订仍可作为历史评阅目标。
 _避免_：已发布 Release
@@ -31,3 +43,15 @@ _避免_：已发布 Release
 **已发布 Release**：
 管理员启用并交给检索与问答读者的知识版本。人工事实评阅不会启用它。
 _避免_：编辑 head、已接纳 Compile
+
+```text
+固定AI Compile完整资料 / 人工Wiki同页当前可用base资料
+  → RTW原Source UTF-8对象和段内引文byte span逐项核验
+  → 管理员声明完整的FactSet修订 + 独立scope head CAS
+  → 同事务原EventSpec Outbox与原字节/JCS回查表
+  → DC连续offset → BTW同一消费者Catalog ODS落行后ACK
+  → 历史FactSetRevisionID + 同目标WikiRevisionID + 每个必需Fact当前判断
+  → 资格和真人事实复核齐备才可评估页面质量
+
+Wiki编辑head与手动Release沿原有业务链，FactSet事务不推进它们。
+```
