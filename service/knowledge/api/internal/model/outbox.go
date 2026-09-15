@@ -47,18 +47,19 @@ func (s *Store) DispatchOne(ctx context.Context, sender Sender) (sent bool, resu
 	defer tx.Rollback(context.Background())
 	var raw, correlationRaw []byte
 	// PostgreSQL now() gives same created_at to several events from one
-	// CreateCompile transaction. Its module aggregate_version preserves the
-	// old supersede fence before the new requested event in the default H04
-	// route as well as the opt-in Jobs route.
+	// CreateCompile transaction. Only those Wiki types use their source module
+	// aggregate_version as a tie break; unrelated H04 types keep event_id order.
 	query := `SELECT payload,correlation FROM knowledge_outbox WHERE delivered_at IS NULL
-	 ORDER BY created_at,(payload->>'aggregate_version')::bigint,event_id
+	 ORDER BY created_at,
+	 CASE WHEN event_type IN ('knowledge.wiki.compile.requested.v1',
+	  'knowledge.wiki.compile.cancelled.v1','knowledge.wiki.compile.superseded.v1')
+	 THEN (payload->>'aggregate_version')::bigint END NULLS FIRST,event_id
 	 FOR UPDATE SKIP LOCKED LIMIT 1`
 	if s.wikiCompileJobs {
 		query = `SELECT payload,correlation FROM knowledge_outbox WHERE delivered_at IS NULL
 		 AND event_type NOT IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1',
 		 'knowledge.wiki.compile.superseded.v1')
-		 ORDER BY created_at,(payload->>'aggregate_version')::bigint,event_id
-		 FOR UPDATE SKIP LOCKED LIMIT 1`
+		 ORDER BY created_at,event_id FOR UPDATE SKIP LOCKED LIMIT 1`
 	}
 	err = tx.QueryRow(ctx, query).Scan(&raw, &correlationRaw)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -85,6 +86,9 @@ func (s *Store) DispatchOne(ctx context.Context, sender Sender) (sent bool, resu
 		}
 		finish(resultErr, info, map[string]any{"technical_status": map[bool]string{true: "accepted", false: "unconfirmed"}[sent]})
 	}()
+	if err := checkWikiH04Predecessor(ctx, tx, event); err != nil {
+		return false, err
+	}
 	receipt, err := sender.Send(ctx, event)
 	if err != nil {
 		return false, err
