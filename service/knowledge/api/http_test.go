@@ -1085,6 +1085,17 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatalf("real cited BTW search has no durable RTW receipt: count=%d err=%v", citationRecords, err)
 		}
 		var citedReplay types.ProductSearchResult
+		if webSearch {
+			var browserIdempotencyKey string
+			if err := s.DB.QueryRow(context.Background(), `SELECT operation_key FROM knowledge_product_search_operations
+ WHERE search_id=$1 AND authority_id='rtw.identity' AND tenant_id='platform'
+ AND subject_id=$2 AND session_id='search-facade-session'`, cited.SearchId,
+				fmt.Sprintf("%d", productUID)).Scan(&browserIdempotencyKey); err != nil || browserIdempotencyKey == "" {
+				t.Fatalf("browser-created search did not retain its RTW idempotency authority: key=%q err=%v",
+					browserIdempotencyKey, err)
+			}
+			citedBody["idempotency_key"] = browserIdempotencyKey
+		}
 		request("POST", searchPath, productToken, citedBody, &citedReplay, 200)
 		if !reflect.DeepEqual(citedReplay, cited) || searchFixture.calls.Load() != callsBeforeCited+1 {
 			t.Fatalf("real cited BTW idempotent replay changed answer: %+v calls=%d", citedReplay, searchFixture.calls.Load())
