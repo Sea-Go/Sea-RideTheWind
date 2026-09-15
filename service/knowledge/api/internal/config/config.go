@@ -26,6 +26,7 @@ type Config struct {
 	SearchSummary struct {
 		Endpoint               string `json:",optional"`
 		ScopeKey               string `json:",optional"`
+		ScopeVersion           string `json:",default=v1"`
 		FastTimeoutMillis      int    `json:",default=30000"`
 		DetailedTimeoutMillis  int    `json:",default=90000"`
 		AllowPartial           bool   `json:",default=false"`
@@ -34,6 +35,7 @@ type Config struct {
 	SearchTools struct {
 		Endpoint               string `json:",optional"`
 		ScopeKey               string `json:",optional"`
+		ScopeVersion           string `json:",default=v1"`
 		FastTimeoutMillis      int    `json:",default=30000"`
 		DetailedTimeoutMillis  int    `json:",default=90000"`
 		AllowPartial           bool   `json:",default=false"`

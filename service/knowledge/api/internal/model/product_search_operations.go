@@ -102,7 +102,25 @@ func (s *Store) GetProductSearchByID(ctx context.Context, subject types.Accepted
 // ReserveProductSearch reads an old key first; only a new key observes the
 // moving publication. Concurrent creators converge on one stored operation.
 func (s *Store) ReserveProductSearch(ctx context.Context, subject types.AcceptedSubjectRef, session, key string,
-	input ProductSearchInput) (ProductSearchOperation, error) {
+	input ProductSearchInput, requestedWireVersion ...string) (ProductSearchOperation, error) {
+	requested := "v1"
+	if len(requestedWireVersion) > 1 {
+		return ProductSearchOperation{}, invalid("one search scope version required")
+	}
+	if len(requestedWireVersion) == 1 {
+		requested = requestedWireVersion[0]
+	}
+	if requested == "" {
+		requested = "v1"
+	}
+	if requested != "v1" && requested != "v2" {
+		return ProductSearchOperation{}, invalid("explicit v1 or v2 search scope version required")
+	}
+	if requested == "v2" {
+		if err := s.RequireSearchScopeVersions(); err != nil {
+			return ProductSearchOperation{}, err
+		}
+	}
 	hash, err := input.Hash()
 	if err != nil {
 		return ProductSearchOperation{}, err
@@ -149,6 +167,13 @@ func (s *Store) ReserveProductSearch(ctx context.Context, subject types.Accepted
 	 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending') ON CONFLICT DO NOTHING`
 	insertArgs := []any{subject.AuthorityId, subject.TenantId, subject.SubjectId, session, key, hash, inputRaw, snapshotRaw,
 		"search_" + uuid.NewString(), "answer_" + uuid.NewString()}
+	if requested == "v2" {
+		insertSQL = `INSERT INTO knowledge_product_search_operations
+ (authority_id,tenant_id,subject_id,session_id,operation_key,request_hash,request_json,snapshot,
+  search_id,answer_id,status,scope_version)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11) ON CONFLICT DO NOTHING`
+		insertArgs = append(insertArgs, requested)
+	}
 	if s.continuousSubjectRefV2Writes {
 		err = s.ensureV2Operation(ctx, "knowledge_product_search_operations_subject_v2",
 			subject, session, key, "request_hash", hash, insertSQL, insertArgs...)

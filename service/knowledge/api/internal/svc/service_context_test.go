@@ -47,6 +47,34 @@ func TestContinuousSubjectRefV2CandidateCannotStartInProMode(t *testing.T) {
 	}
 }
 
+func TestV2SearchScopeCannotStartWithoutStageThreeOwnerGate(t *testing.T) {
+	var c config.Config
+	c.Auth.AccessSecret = "admin-test-secret"
+	c.UserAuth.AccessSecret = "user-test-secret"
+	c.WorkerToken = "worker-test-token"
+	c.AdministratorIDs = []string{"1"}
+	c.UserRpc.Endpoints = []string{"127.0.0.1:12345"}
+	c.Mode = "dev"
+	c.SearchSummary.ScopeVersion = "v2"
+	if _, err := NewServiceContext(c, nil); err == nil ||
+		!strings.Contains(err.Error(), "local SubjectRef v2 write gate") {
+		t.Fatalf("v2 Summary scope reached DB or network without owner gate: %v", err)
+	}
+	c.SearchSummary.ScopeVersion = "v1"
+	c.SearchTools.ScopeVersion = "v3"
+	if _, err := NewServiceContext(c, nil); err == nil ||
+		!strings.Contains(err.Error(), "must be v1 or v2") {
+		t.Fatalf("unknown Tool scope version reached DB or network: %v", err)
+	}
+	c.SearchTools.ScopeVersion = "v2"
+	c.SubjectRefV2Writes.Enabled = true
+	c.Mode = "pro"
+	if _, err := NewServiceContext(c, nil); err == nil ||
+		!strings.Contains(err.Error(), "limited to a marked local test database") {
+		t.Fatalf("formal pro mode bypassed Stage3 candidate gate: %v", err)
+	}
+}
+
 func TestContinuousSubjectRefV2CandidateServiceAssemblyRequiresOwnerGate(t *testing.T) {
 	dsn, nonce := os.Getenv("KNOWLEDGE_TEST_DSN"), os.Getenv("KNOWLEDGE_SUBJECTREF_V2_TEST_NONCE")
 	if dsn == "" || nonce == "" {
