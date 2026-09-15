@@ -182,6 +182,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	}
 	c.SearchJudgments.Enabled = true
 	c.WikiQualityJudgments.Enabled = true
+	c.WikiFactSets.Enabled = os.Getenv("KNOWLEDGE_FACT_SET_REAL_HTTP") == "1"
 	c.GroundingReviews.Enabled = true
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
 	if err != nil {
@@ -414,6 +415,10 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		object.Hash([]byte(qualityEvent.EventJson)) != quality.EventRawSha256 ||
 		object.Hash(qualityJCS) != quality.EventJcsSha256 {
 		t.Fatalf("private Worker original Event/JCS hashes differ from admin source: %+v %v", qualityEvent, err)
+	}
+	if c.WikiFactSets.Enabled {
+		runRealHTTPWikiFactSet(t, request, m, a, w, quality,
+			token, nonAdminToken, c.WorkerToken, qualityEvent)
 	}
 	// A second administrator label targets an AI-accepted Wiki revision on a
 	// separate page. Its FactID is the same Source quote, while judge heads
