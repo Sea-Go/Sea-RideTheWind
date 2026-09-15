@@ -87,6 +87,10 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 }
 
 func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
+	factSetHolder, selectionErr := wikiFactSetHolderMode()
+	if selectionErr != nil {
+		t.Fatal(selectionErr) // Before any test schema, source or DC effect.
+	}
 	publishNewRelease := os.Getenv("SEA_BGE_WORKER_PUBLISH_SEARCH") == "1"
 	contract := loadGeneratedHTTPContract(t)
 	s := testenv.Store(t)
@@ -182,7 +186,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	}
 	c.SearchJudgments.Enabled = true
 	c.WikiQualityJudgments.Enabled = true
-	c.WikiFactSets.Enabled = os.Getenv("KNOWLEDGE_FACT_SET_REAL_HTTP") == "1"
+	c.WikiFactSets.Enabled = os.Getenv("KNOWLEDGE_FACT_SET_REAL_HTTP") == "1" || factSetHolder
 	c.GroundingReviews.Enabled = true
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
 	if err != nil {
@@ -417,8 +421,16 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		t.Fatalf("private Worker original Event/JCS hashes differ from admin source: %+v %v", qualityEvent, err)
 	}
 	if c.WikiFactSets.Enabled {
-		runRealHTTPWikiFactSet(t, request, m, a, w, quality,
-			token, nonAdminToken, c.WorkerToken, qualityEvent)
+		if !factSetHolder {
+			runRealHTTPWikiFactSet(t, request, m, a, w, quality,
+				token, nonAdminToken, c.WorkerToken, qualityEvent)
+		}
+	}
+	var catalog types.WikiFactSetRecord
+	var catalogJudgments []types.WikiFactJudgmentRecord
+	if factSetHolder {
+		catalog, catalogJudgments = makeRealWikiFactSetSource(t, request, s,
+			m, a, token, c.WorkerToken)
 	}
 	// A second administrator label targets an AI-accepted Wiki revision on a
 	// separate page. Its FactID is the same Source quote, while judge heads
@@ -600,6 +612,10 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	request("PUT", "/v1/knowledge/modules/"+m.Id+"/activation", token, activation, &state, 200)
 	if state.PointerRevision != 1 || state.ActiveReleaseId != r.ReleaseId {
 		t.Fatal(state)
+	}
+	if factSetHolder {
+		runRealWikiFactSetHandoff(t, dir, s, base, c.WorkerToken,
+			m.Id, w.RevisionId, r.ReleaseId, catalog, catalogJudgments, quality)
 	}
 	runRealWikiQualityHandoff(t, dir, s, base, c.WorkerToken,
 		m.Id, w.RevisionId, r.ReleaseId, quality, aiQuality)
