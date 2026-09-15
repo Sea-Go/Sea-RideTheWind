@@ -31,6 +31,27 @@ CREATE TABLE IF NOT EXISTS knowledge_outbox (
 );
 ALTER TABLE knowledge_outbox ADD COLUMN IF NOT EXISTS correlation jsonb NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS knowledge_outbox_pending ON knowledge_outbox(created_at,event_id) WHERE delivered_at IS NULL;
+-- Wiki Compile source envelopes are frozen once committed. Technical delivery
+-- may set delivered_at, but it cannot edit the business EventID, body or
+-- correlation to change a DC Job's canonical input under the same key.
+CREATE OR REPLACE FUNCTION reject_wiki_compile_outbox_identity_change() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+ IF OLD.event_type IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1')
+    AND (NEW.event_id IS DISTINCT FROM OLD.event_id
+      OR NEW.event_type IS DISTINCT FROM OLD.event_type
+      OR NEW.aggregate_id IS DISTINCT FROM OLD.aggregate_id
+      OR NEW.payload IS DISTINCT FROM OLD.payload
+      OR NEW.correlation IS DISTINCT FROM OLD.correlation
+      OR NEW.created_at IS DISTINCT FROM OLD.created_at
+      OR (OLD.delivered_at IS NOT NULL AND NEW.delivered_at IS DISTINCT FROM OLD.delivered_at)) THEN
+   RAISE EXCEPTION 'frozen Wiki Compile Outbox envelope cannot change';
+ END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS wiki_compile_outbox_identity_immutable ON knowledge_outbox;
+CREATE TRIGGER wiki_compile_outbox_identity_immutable BEFORE UPDATE ON knowledge_outbox
+FOR EACH ROW EXECUTE FUNCTION reject_wiki_compile_outbox_identity_change();
 CREATE TABLE IF NOT EXISTS knowledge_publications (
  module_id text NOT NULL REFERENCES knowledge_modules(id), pointer_revision bigint NOT NULL,
  release_id text NOT NULL REFERENCES knowledge_releases(id), build_id text NOT NULL REFERENCES knowledge_builds(id),
@@ -54,6 +75,23 @@ CREATE TABLE IF NOT EXISTS knowledge_compiles (
  id text PRIMARY KEY, module_id text NOT NULL REFERENCES knowledge_modules(id),
  page_id text NOT NULL, generation bigint NOT NULL, data jsonb NOT NULL,
  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(module_id,page_id,generation)
+);
+
+-- Default-off Wiki Compile -> DC Jobs technical receipts. The source Outbox
+-- EventID/payload remain unchanged; this sidecar stores only the one DC job
+-- accepted for a committed compile request and its optional cancellation.
+CREATE TABLE IF NOT EXISTS knowledge_compile_jobs (
+ compile_id text PRIMARY KEY REFERENCES knowledge_compiles(id),
+ requested_event_id text NOT NULL UNIQUE REFERENCES knowledge_outbox(event_id),
+ requested_operation_id text NOT NULL UNIQUE,
+ source_event_jcs_sha256 char(64) NOT NULL CHECK(source_event_jcs_sha256 ~ '^[a-f0-9]{64}$'),
+ submit_input_hash char(64) NOT NULL CHECK(submit_input_hash ~ '^[a-f0-9]{64}$'),
+ job_id uuid NOT NULL UNIQUE,
+ technical_received_at timestamptz NOT NULL,
+ cancel_event_id text UNIQUE REFERENCES knowledge_outbox(event_id),
+ cancel_version bigint NOT NULL DEFAULT 0 CHECK(cancel_version >= 0),
+ technical_state text NOT NULL DEFAULT 'accepted' CHECK(technical_state IN ('accepted','cancel_requested','cancelled')),
+ created_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- These identities are immutable creation order, not public entity IDs. Creation

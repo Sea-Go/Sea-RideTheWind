@@ -35,6 +35,7 @@ var operations = map[string]bool{
 	"knowledge.module.create": true, "knowledge.source.create": true, "knowledge.wiki.create": true, "knowledge.release.create": true,
 	"knowledge.build.create": true, "knowledge.build.claim": true, "knowledge.build.accept": true, "knowledge.build.cancel": true,
 	"knowledge.compile.create": true, "knowledge.compile.claim": true, "knowledge.compile.accept": true, "knowledge.compile.cancel": true,
+	"knowledge.compile.job.submit": true, "knowledge.compile.job.cancel": true,
 	"knowledge.release.activate": true, "knowledge.content.withdraw": true, "knowledge.outbox.deliver": true,
 	"knowledge.outbox.poll":             true,
 	"knowledge.search.snapshot.current": true, "knowledge.search.source.read": true, "knowledge.search.citations.accept": true, "knowledge.search.citations.get": true,
@@ -51,6 +52,14 @@ var readOnlyOperations = map[string]bool{
 	"knowledge.answer.v2.get": true, "knowledge.answer.v2.list": true, "knowledge.outbox.poll": true,
 	"knowledge.product.search.get": true,
 	"knowledge.reviewer.key.get":   true, "knowledge.answer.grounding.review.get": true,
+}
+
+// DC Jobs delivery commits a technical receipt, not a Wiki business revision.
+// It still has operation counters and spans, but cannot increment the domain
+// transition counter used for Compile/Revision acceptance.
+var technicalOperations = map[string]bool{
+	"knowledge.compile.job.submit": true,
+	"knowledge.compile.job.cancel": true,
 }
 
 func (r *Runtime) PollFailure(ctx context.Context, err error) {
@@ -178,7 +187,7 @@ func (r *Runtime) Begin(ctx context.Context, operation, operationID string, fiel
 		s.fields["duration_ms"] = float64(elapsed.Microseconds()) / 1000
 		r.operations.WithLabelValues(operation, outcome, code).Inc()
 		r.duration.WithLabelValues(operation, outcome).Observe(elapsed.Seconds())
-		if err == nil && !s.replay && !readOnlyOperations[operation] {
+		if err == nil && !s.replay && !readOnlyOperations[operation] && !technicalOperations[operation] {
 			r.committed.WithLabelValues(operation).Inc()
 		}
 		for key, value := range s.fields {
