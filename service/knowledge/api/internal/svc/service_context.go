@@ -42,6 +42,14 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	if c.SubjectRefV2Writes.Enabled && c.Mode == "pro" {
 		return nil, fmt.Errorf("SubjectRef v2 continuous-write candidate is limited to a marked local test database")
 	}
+	for _, version := range []string{c.SearchSummary.ScopeVersion, c.SearchTools.ScopeVersion} {
+		if version != "" && version != "v1" && version != "v2" {
+			return nil, fmt.Errorf("search scope version must be v1 or v2")
+		}
+		if version == "v2" && !c.SubjectRefV2Writes.Enabled {
+			return nil, fmt.Errorf("v2 search scope requires the local SubjectRef v2 write gate")
+		}
+	}
 	if c.SearchSummary.Endpoint != "" || c.SearchSummary.ScopeKey != "" {
 		u, err := url.Parse(c.SearchSummary.Endpoint)
 		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") ||
@@ -127,8 +135,16 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 			return fail(err)
 		}
 	}
+	if err = store.DetectSearchScopeVersions(ctx); err != nil {
+		return fail(err)
+	}
 	if c.SubjectRefV2Writes.Enabled {
 		if err = store.CheckContinuousSubjectRefV2Writes(ctx, c.SubjectRefV2Writes.LocalTestNonce); err != nil {
+			return fail(err)
+		}
+	}
+	if c.SearchSummary.ScopeVersion == "v2" || c.SearchTools.ScopeVersion == "v2" {
+		if err = store.RequireSearchScopeVersions(); err != nil {
 			return fail(err)
 		}
 	}

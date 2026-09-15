@@ -34,6 +34,7 @@ type Store struct {
 	Observability                *telemetry.Runtime
 	continuousSubjectRefV2Writes bool
 	continuousSubjectRefV2Ready  bool
+	scopeVersionReady            bool
 }
 
 func New(db *pgxpool.Pool, objects object.Store, options ...Option) *Store {

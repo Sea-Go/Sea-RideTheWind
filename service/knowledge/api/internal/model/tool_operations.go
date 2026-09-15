@@ -89,7 +89,26 @@ func (s *Store) GetToolParent(ctx context.Context, subject types.AcceptedSubject
 		subject.AuthorityId, subject.TenantId, subject.SubjectId, session, operationID))
 }
 
-func (s *Store) ReserveToolParent(ctx context.Context, subject types.AcceptedSubjectRef, session, key, moduleID string) (ToolParent, error) {
+func (s *Store) ReserveToolParent(ctx context.Context, subject types.AcceptedSubjectRef, session, key, moduleID string,
+	requestedWireVersion ...string) (ToolParent, error) {
+	requested := "v1"
+	if len(requestedWireVersion) > 1 {
+		return ToolParent{}, invalid("one Tool scope version required")
+	}
+	if len(requestedWireVersion) == 1 {
+		requested = requestedWireVersion[0]
+	}
+	if requested == "" {
+		requested = "v1"
+	}
+	if requested != "v1" && requested != "v2" {
+		return ToolParent{}, invalid("explicit v1 or v2 Tool scope version required")
+	}
+	if requested == "v2" {
+		if err := s.RequireSearchScopeVersions(); err != nil {
+			return ToolParent{}, err
+		}
+	}
 	if !validAcceptedSubject(subject) || !validLogicalSessionID(session) || !validToolKey(key) || !citationIdentity(moduleID) {
 		return ToolParent{}, invalid("authenticated session, operation key and module required")
 	}
@@ -136,6 +155,14 @@ func (s *Store) ReserveToolParent(ctx context.Context, subject types.AcceptedSub
 	insertArgs := []any{subject.AuthorityId, subject.TenantId, subject.SubjectId, session, key,
 		operationID, moduleID, raw, snapshotRef, "scope_" + uuid.NewString(), "budget_" + uuid.NewString(),
 		ToolMaxSearchCalls, ToolMaxReadCalls, ToolMaxQuoteRunes}
+	if requested == "v2" {
+		insertSQL = `INSERT INTO knowledge_tool_parents
+ (authority_id,tenant_id,subject_id,session_id,operation_key,operation_id,module_id,snapshot,
+  snapshot_ref,scope_ref,budget_ref,expires_at,search_remaining,read_remaining,quote_remaining,scope_version)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,clock_timestamp()+interval '10 minutes',$12,$13,$14,$15)
+ ON CONFLICT DO NOTHING`
+		insertArgs = append(insertArgs, requested)
+	}
 	if s.continuousSubjectRefV2Writes {
 		err = s.ensureV2Operation(ctx, "knowledge_tool_parents_subject_v2",
 			subject, session, key, "module_id", moduleID, insertSQL, insertArgs...)

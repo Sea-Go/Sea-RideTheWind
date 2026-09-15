@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS knowledge_product_search_operations (
  request_json jsonb NOT NULL, snapshot jsonb NOT NULL,
  search_id text NOT NULL UNIQUE, answer_id text NOT NULL UNIQUE,
  status text NOT NULL CHECK(status IN ('pending','running','failed','committed')),
+ scope_version text NOT NULL DEFAULT 'v1'
+  CONSTRAINT knowledge_product_search_scope_version_ck CHECK(scope_version IN ('v1','v2')),
  attempt bigint NOT NULL DEFAULT 0, lease_token text, lease_until timestamptz,
  last_error_code text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now(),
  updated_at timestamptz NOT NULL DEFAULT now(),
@@ -121,6 +123,8 @@ CREATE TABLE IF NOT EXISTS knowledge_tool_parents (
  session_id text NOT NULL, operation_key text NOT NULL, operation_id text NOT NULL UNIQUE,
  module_id text NOT NULL, snapshot jsonb NOT NULL, snapshot_ref text NOT NULL,
  scope_ref text NOT NULL, budget_ref text NOT NULL UNIQUE, expires_at timestamptz NOT NULL,
+ scope_version text NOT NULL DEFAULT 'v1'
+  CONSTRAINT knowledge_tool_parent_scope_version_ck CHECK(scope_version IN ('v1','v2')),
  search_remaining integer NOT NULL CHECK(search_remaining>=0),
  read_remaining integer NOT NULL CHECK(read_remaining>=0),
  quote_remaining integer NOT NULL CHECK(quote_remaining>=0),
