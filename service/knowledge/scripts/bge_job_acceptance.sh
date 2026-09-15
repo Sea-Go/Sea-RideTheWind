@@ -49,8 +49,8 @@ export SEA_BTW_INDEX_CONSUMER_ROOT SEA_DC_JOB_PLATFORM_ROOT
 export KNOWLEDGE_KEEP_EVIDENCE=1
 knowledge_test_pattern='^TestRealHTTPKnowledgeWorkflow'
 if [[ "${SEA_BGE_WORKER_PUBLISH_SEARCH:-0}" == 1 ]]; then
-  export KNOWLEDGE_REAL_USER_GATE=0
-  knowledge_test_pattern='^TestRealHTTPKnowledgeWorkflow$'
+  export KNOWLEDGE_REAL_USER_GATE=1
+  knowledge_test_pattern='^TestRealHTTPKnowledgeWorkflowWithUserCenter$'
 else
   export KNOWLEDGE_REAL_USER_GATE=1
 fi
