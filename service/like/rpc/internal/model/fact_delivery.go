@@ -49,8 +49,9 @@ func validLikeDelivery(row LikeDomainFactOutbox, event communityfact.Event) bool
 	return err == nil && payloadHash == rowHash
 }
 
-func (m *LikeFactModel) DispatchFactOnce(ctx context.Context, sender communityfact.Sender) (bool, error) {
-	if m == nil || m.db == nil || sender == nil {
+func (m *LikeFactModel) DispatchFactOnce(ctx context.Context, sender communityfact.Sender, logger *slog.Logger) (bool, error) {
+	started := time.Now()
+	if m == nil || m.db == nil || sender == nil || logger == nil {
 		return false, errors.New("like fact dispatcher is not configured")
 	}
 	tx := m.db.WithContext(ctx).Begin()
@@ -81,12 +82,12 @@ func (m *LikeFactModel) DispatchFactOnce(ctx context.Context, sender communityfa
 		if err := tx.Commit().Error; err != nil {
 			return false, err
 		}
-		slog.WarnContext(ctx, "like fact frozen envelope blocked", "event", "like.fact_delivery.blocked",
+		logger.WarnContext(ctx, "like fact frozen envelope blocked", "event", "like.fact_delivery.blocked",
 			"event_id", row.EventID, "producer", likeFactProducer, "outcome", "manual_migration_required",
-			"error_code", "INVALID_FROZEN_ENVELOPE")
+			"duration_ms", float64(time.Since(started).Microseconds())/1000, "error_code", "INVALID_FROZEN_ENVELOPE")
 		return false, communityfact.ErrFrozenEnvelopeBlocked
 	}
-	slog.InfoContext(ctx, "like fact delivery started", "event", "like.fact_delivery.started",
+	logger.InfoContext(ctx, "like fact delivery started", "event", "like.fact_delivery.started",
 		"event_id", event.EventID, "producer", event.Producer, "aggregate_version", event.AggregateVersion)
 	receipt, sendErr := sender.Send(ctx, event, json.RawMessage(*row.DeliveryEnvelope))
 	received, receiptOK := communityfact.ValidateReceipt(event, receipt)
@@ -102,9 +103,9 @@ func (m *LikeFactModel) DispatchFactOnce(ctx context.Context, sender communityfa
 		if err := tx.Commit().Error; err != nil {
 			return false, err
 		}
-		slog.WarnContext(ctx, "like fact delivery deferred", "event", "like.fact_delivery.deferred",
+		logger.WarnContext(ctx, "like fact delivery deferred", "event", "like.fact_delivery.deferred",
 			"event_id", event.EventID, "producer", event.Producer, "outcome", "retryable",
-			"retry_count", row.RetryCount+1)
+			"duration_ms", float64(time.Since(started).Microseconds())/1000, "retry_count", row.RetryCount+1)
 		return false, sendErr
 	}
 	deliveredAt := time.Now().UTC()
@@ -117,8 +118,9 @@ func (m *LikeFactModel) DispatchFactOnce(ctx context.Context, sender communityfa
 	if err := tx.Commit().Error; err != nil {
 		return false, err
 	}
-	slog.InfoContext(ctx, "like fact technical receipt committed", "event", "like.fact_delivery.accepted",
+	logger.InfoContext(ctx, "like fact technical receipt committed", "event", "like.fact_delivery.accepted",
 		"event_id", event.EventID, "producer", event.Producer, "outcome", "succeeded",
+		"duration_ms", float64(time.Since(started).Microseconds())/1000,
 		"receipt_id", receipt.ReceiptID, "offset", receipt.Offset)
 	return true, nil
 }

@@ -50,8 +50,9 @@ func validCommentDelivery(row CommentDomainFactOutbox, event communityfact.Event
 // DispatchFactOnce keeps one source row locked until a matching DataCenter
 // technical receipt is committed. Earlier versions of the same comment stream
 // must be accepted first, so SKIP LOCKED cannot reorder a retract.
-func (m *CommentModel) DispatchFactOnce(ctx context.Context, sender communityfact.Sender) (bool, error) {
-	if m == nil || m.conn == nil || sender == nil {
+func (m *CommentModel) DispatchFactOnce(ctx context.Context, sender communityfact.Sender, logger *slog.Logger) (bool, error) {
+	started := time.Now()
+	if m == nil || m.conn == nil || sender == nil || logger == nil {
 		return false, errors.New("comment fact dispatcher is not configured")
 	}
 	tx := m.conn.WithContext(ctx).Begin()
@@ -82,12 +83,12 @@ func (m *CommentModel) DispatchFactOnce(ctx context.Context, sender communityfac
 		if err := tx.Commit().Error; err != nil {
 			return false, err
 		}
-		slog.WarnContext(ctx, "comment fact frozen envelope blocked", "event", "comment.fact_delivery.blocked",
+		logger.WarnContext(ctx, "comment fact frozen envelope blocked", "event", "comment.fact_delivery.blocked",
 			"event_id", row.EventID, "producer", commentFactProducer, "outcome", "manual_migration_required",
-			"error_code", "INVALID_FROZEN_ENVELOPE")
+			"duration_ms", float64(time.Since(started).Microseconds())/1000, "error_code", "INVALID_FROZEN_ENVELOPE")
 		return false, communityfact.ErrFrozenEnvelopeBlocked
 	}
-	slog.InfoContext(ctx, "comment fact delivery started", "event", "comment.fact_delivery.started",
+	logger.InfoContext(ctx, "comment fact delivery started", "event", "comment.fact_delivery.started",
 		"event_id", event.EventID, "producer", event.Producer, "aggregate_version", event.AggregateVersion)
 	receipt, sendErr := sender.Send(ctx, event, json.RawMessage(*row.DeliveryEnvelope))
 	received, receiptOK := communityfact.ValidateReceipt(event, receipt)
@@ -103,9 +104,9 @@ func (m *CommentModel) DispatchFactOnce(ctx context.Context, sender communityfac
 		if err := tx.Commit().Error; err != nil {
 			return false, err
 		}
-		slog.WarnContext(ctx, "comment fact delivery deferred", "event", "comment.fact_delivery.deferred",
+		logger.WarnContext(ctx, "comment fact delivery deferred", "event", "comment.fact_delivery.deferred",
 			"event_id", event.EventID, "producer", event.Producer, "outcome", "retryable",
-			"retry_count", row.RetryCount+1)
+			"duration_ms", float64(time.Since(started).Microseconds())/1000, "retry_count", row.RetryCount+1)
 		return false, sendErr
 	}
 	deliveredAt := time.Now().UTC()
@@ -118,8 +119,9 @@ func (m *CommentModel) DispatchFactOnce(ctx context.Context, sender communityfac
 	if err := tx.Commit().Error; err != nil {
 		return false, err
 	}
-	slog.InfoContext(ctx, "comment fact technical receipt committed", "event", "comment.fact_delivery.accepted",
+	logger.InfoContext(ctx, "comment fact technical receipt committed", "event", "comment.fact_delivery.accepted",
 		"event_id", event.EventID, "producer", event.Producer, "outcome", "succeeded",
+		"duration_ms", float64(time.Since(started).Microseconds())/1000,
 		"receipt_id", receipt.ReceiptID, "offset", receipt.Offset)
 	return true, nil
 }
