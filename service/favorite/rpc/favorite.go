@@ -2,7 +2,8 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log/slog"
+	"os"
 
 	"sea-try-go/service/common/logger"
 	"sea-try-go/service/common/observability"
@@ -27,6 +28,11 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	if c.SubjectRefV2Facts && c.Mode != service.DevMode && c.Mode != service.TestMode {
+		slog.New(slog.NewJSONHandler(os.Stderr, nil)).Error("favorite v2 fact candidate denied",
+			"event", "favorite.subject_ref_v2.startup_rejected", "error_code", "LOCAL_CANDIDATE_ONLY")
+		os.Exit(2)
+	}
 	logx.MustSetup(c.Log)
 	ctx := svc.NewServiceContext(c)
 	logger.Init(c.Name)
@@ -43,6 +49,15 @@ func main() {
 	s.AddUnaryInterceptors(observability.NewUnaryServerInterceptor(rpcTimeout, observability.SlowThreshold()))
 	defer s.Stop()
 
-	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
+	slog.New(slog.NewJSONHandler(os.Stderr, nil)).Info("favorite rpc starting",
+		"event", "favorite.rpc.starting", "listen_on", c.ListenOn,
+		"subject_ref_version", favoriteSubjectVersion(c.SubjectRefV2Facts))
 	s.Start()
+}
+
+func favoriteSubjectVersion(v2 bool) string {
+	if v2 {
+		return "v2"
+	}
+	return "v1"
 }

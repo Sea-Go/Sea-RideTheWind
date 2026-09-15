@@ -94,7 +94,8 @@ func (s *FavoriteDCEventSender) Send(ctx context.Context, event FavoriteWireEven
 func validFavoriteDelivery(row FavoriteFactOutbox, event FavoriteWireEvent) bool {
 	if event.EventID != row.EventID || event.Producer != "rtw.community.favorite" ||
 		(event.EventType != "rtw.favorite.assert" && event.EventType != "rtw.favorite.retract") ||
-		event.SchemaVersion != 1 || event.AggregateID != fmt.Sprint(row.FavoriteID) ||
+		(event.SchemaVersion != 1 && event.SchemaVersion != 2) ||
+		event.AggregateID != fmt.Sprint(row.FavoriteID) ||
 		event.AggregateVersion != row.AggregateVersion || event.OperationID != row.EventID ||
 		!json.Valid(event.Payload) || len(event.Payload) == 0 || event.Payload[0] != '{' {
 		return false
@@ -109,7 +110,9 @@ func validFavoriteDelivery(row FavoriteFactOutbox, event FavoriteWireEvent) bool
 	}
 	favoriteID, favoriteOK := parseAuthorityID(payload.FavoriteID)
 	_, folderOK := parseAuthorityID(payload.FolderID)
-	return favoriteOK && folderOK && favoriteID == row.FavoriteID
+	_, subjectOK := favoriteSubjectV1(event.SchemaVersion, payload.Subject)
+	return favoriteOK && folderOK && favoriteID == row.FavoriteID &&
+		payload.SchemaVersion == event.SchemaVersion && payload.EventID == event.EventID && subjectOK
 }
 
 func validFavoriteReceipt(event FavoriteWireEvent, receipt FavoriteTechnicalReceipt) (time.Time, bool) {

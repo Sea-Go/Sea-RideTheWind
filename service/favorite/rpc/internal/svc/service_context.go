@@ -26,10 +26,14 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Mode:     c.Postgres.Mode,
 	}
 	db := model.InitDB(dbConfig)
+	var factOptions []model.FavoriteModelOption
+	if c.SubjectRefV2Facts {
+		factOptions = append(factOptions, model.WithSubjectRefV2Facts())
+	}
 
 	return &ServiceContext{
 		Config:        c,
-		FavoriteModel: model.NewFavoriteModel(db),
+		FavoriteModel: model.NewFavoriteModel(db, factOptions...),
 		UserRpc:       userservice.NewUserService(zrpc.MustNewClient(c.UserRpc)),
 		ArticleRpc:    articleservice.NewArticleService(zrpc.MustNewClient(c.ArticleRpc)),
 	}
