@@ -156,6 +156,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	c.SearchTools.Endpoint = toolFixture.server.URL + "/v1/search/tools/search"
 	c.SearchTools.ScopeKey = toolFixtureScopeKey
 	c.SearchJudgments.Enabled = true
+	c.GroundingReviews.Enabled = true
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
 	if err != nil {
 		t.Fatal(err)
@@ -633,6 +634,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if acceptedReplay != accepted {
 		t.Fatalf("HTTP answer replay changed projection: %+v %+v", accepted, acceptedReplay)
 	}
+	runGroundingReviewHTTP(t, request, base, token, nonAdminToken, c.WorkerToken, dir,
+		searchID, answerID, "Evidence is cited.", citations.Evidence[0].EvidenceId,
+		quote, quoteHash, citation.DurableRef)
 	answerQuery := url.Values{"authority_id": {acceptedSubject.AuthorityId}, "tenant_id": {acceptedSubject.TenantId},
 		"subject_id": {acceptedSubject.SubjectId}, "session_id": {commitAnswer.SessionId}}
 	request("GET", "/internal/v1/knowledge/accepted-answers/"+answerID+"?"+answerQuery.Encode(),
