@@ -43,8 +43,51 @@ func (s *Store) CreateCompile(ctx context.Context, actor string, req types.Creat
 			if err = tx.QueryRow(ctx, "SELECT COALESCE(MAX(generation),0)+1 FROM knowledge_compiles WHERE module_id=$1 AND page_id=$2", m.Id, req.PageId).Scan(&generation); err != nil {
 				return types.Compile{}, err
 			}
+			rows, err := tx.Query(ctx, `SELECT id FROM knowledge_compiles WHERE module_id=$1
+			 AND page_id=$2 AND data->>'state'='BUILDING' ORDER BY generation FOR UPDATE`, m.Id, req.PageId)
+			if err != nil {
+				return types.Compile{}, err
+			}
+			var priorIDs []string
+			for rows.Next() {
+				var oldID string
+				if err := rows.Scan(&oldID); err != nil {
+					rows.Close()
+					return types.Compile{}, err
+				}
+				priorIDs = append(priorIDs, oldID)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return types.Compile{}, err
+			}
+			rows.Close()
 			if _, err = tx.Exec(ctx, "UPDATE knowledge_compiles SET data=jsonb_set(data,'{state}','\"SUPERSEDED\"'::jsonb) WHERE module_id=$1 AND page_id=$2 AND data->>'state'='BUILDING'", m.Id, req.PageId); err != nil {
 				return types.Compile{}, err
+			}
+			newCompileID := id("compile")
+			for _, oldID := range priorIDs {
+				prior, err := readJSON[types.Compile](ctx, tx,
+					"SELECT data FROM knowledge_compiles WHERE id=$1 FOR UPDATE", oldID)
+				if err != nil {
+					return types.Compile{}, err
+				}
+				if prior.State != "SUPERSEDED" {
+					return types.Compile{}, conflict("previous Wiki Compile changed during replacement")
+				}
+				prior.CancelVersion++
+				if err := saveJSON(ctx, tx, "UPDATE knowledge_compiles SET data=$2 WHERE id=$1",
+					prior, prior.CompileId); err != nil {
+					return types.Compile{}, err
+				}
+				if err := emit(ctx, tx, wikiCompileSupersededEvent, m.Id, struct {
+					Compile               types.Compile `json:"compile"`
+					ReplacementCompileID  string        `json:"replacement_compile_id"`
+					ReplacementGeneration int64         `json:"replacement_generation"`
+					Reason                string        `json:"reason"`
+				}{prior, newCompileID, generation, "new_generation"}); err != nil {
+					return types.Compile{}, err
+				}
 			}
 			h, err := hashInput(struct {
 				ModuleID string   `json:"module_id"`
@@ -56,7 +99,7 @@ func (s *Store) CreateCompile(ctx context.Context, actor string, req types.Creat
 			if err != nil {
 				return types.Compile{}, err
 			}
-			c := types.Compile{CompileId: id("compile"), ModuleId: m.Id, PageId: req.PageId, BaseRevisionId: req.BaseRevisionId, SourceRevisionIds: req.SourceRevisionIds, Guidance: req.Guidance, InputHash: h, State: "BUILDING", Generation: generation}
+			c := types.Compile{CompileId: newCompileID, ModuleId: m.Id, PageId: req.PageId, BaseRevisionId: req.BaseRevisionId, SourceRevisionIds: req.SourceRevisionIds, Guidance: req.Guidance, InputHash: h, State: "BUILDING", Generation: generation}
 			if err = saveJSON(ctx, tx, "INSERT INTO knowledge_compiles(id,module_id,page_id,generation,data) VALUES($1,$2,$3,$4,$5)", c, c.CompileId, c.ModuleId, c.PageId, c.Generation); err != nil {
 				return c, err
 			}

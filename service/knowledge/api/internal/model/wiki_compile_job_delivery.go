@@ -43,7 +43,8 @@ func (s *Store) CheckWikiCompileJobCandidate(ctx context.Context) error {
 	// be silently treated as the new technical job receipt during this switch.
 	var historical int64
 	if err := s.DB.QueryRow(ctx, `SELECT count(*) FROM knowledge_outbox o
-	 WHERE o.event_type IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1')
+	 WHERE o.event_type IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1',
+	 'knowledge.wiki.compile.superseded.v1')
 	 AND o.delivered_at IS NOT NULL AND NOT EXISTS (
 	  SELECT 1 FROM knowledge_compile_jobs j WHERE j.requested_event_id=o.event_id OR j.cancel_event_id=o.event_id)`).Scan(&historical); err != nil {
 		return err
@@ -69,8 +70,10 @@ func (s *Store) DispatchWikiCompileJobOnce(ctx context.Context, transport WikiCo
 	defer tx.Rollback(context.Background())
 	var raw, correlationRaw []byte
 	err = tx.QueryRow(ctx, `SELECT payload,correlation FROM knowledge_outbox WHERE delivered_at IS NULL
-	 AND event_type IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1')
-	 ORDER BY created_at,event_id FOR UPDATE SKIP LOCKED LIMIT 1`).Scan(&raw, &correlationRaw)
+	 AND event_type IN ('knowledge.wiki.compile.requested.v1','knowledge.wiki.compile.cancelled.v1',
+	 'knowledge.wiki.compile.superseded.v1')
+	 ORDER BY created_at,(payload->>'aggregate_version')::bigint,event_id
+	 FOR UPDATE SKIP LOCKED LIMIT 1`).Scan(&raw, &correlationRaw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -87,7 +90,7 @@ func (s *Store) DispatchWikiCompileJobOnce(ctx context.Context, transport WikiCo
 	}
 	ctx = telemetry.Resume(ctx, correlation, event.OperationID)
 	stageName := "knowledge.compile.job.submit"
-	if event.EventType == wikiCompileCancelledEvent {
+	if event.EventType == wikiCompileCancelledEvent || event.EventType == wikiCompileSupersededEvent {
 		stageName = "knowledge.compile.job.cancel"
 	}
 	ctx, finish := s.Observability.Begin(ctx, stageName, event.OperationID,
@@ -105,7 +108,7 @@ func (s *Store) DispatchWikiCompileJobOnce(ctx context.Context, transport WikiCo
 		if resultErr = s.submitWikiCompileJob(ctx, tx, transport, event, raw); resultErr != nil {
 			return false, resultErr
 		}
-	case wikiCompileCancelledEvent:
+	case wikiCompileCancelledEvent, wikiCompileSupersededEvent:
 		if resultErr = s.cancelWikiCompileJob(ctx, tx, transport, event); resultErr != nil {
 			return false, resultErr
 		}
@@ -135,6 +138,19 @@ func (s *Store) submitWikiCompileJob(ctx context.Context, tx pgx.Tx,
 	}
 	if !frozenWikiCompileFieldsSame(frozen, current) {
 		return conflict("Wiki Compile source changed after the requested Outbox commit")
+	}
+	// SKIP LOCKED can select this new requested row while another dispatcher
+	// owns the old supersede Outbox row. The source replacement event must
+	// have a committed DC cancellation receipt before any new Submit effect.
+	var uncancelledPredecessors int64
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM knowledge_outbox prior
+	 WHERE prior.event_type='knowledge.wiki.compile.superseded.v1'
+	 AND prior.payload->'payload'->>'replacement_compile_id'=$1
+	 AND prior.delivered_at IS NULL`, frozen.CompileId).Scan(&uncancelledPredecessors); err != nil {
+		return err
+	}
+	if uncancelledPredecessors != 0 {
+		return ErrWikiCompilePredecessorPending
 	}
 	submit, ticket, submitHash, err := buildWikiCompileSubmit(event, raw, frozen)
 	if err != nil {
@@ -199,14 +215,41 @@ func readWikiCompileJobRecord(ctx context.Context, tx pgx.Tx, compileID string) 
 func (s *Store) cancelWikiCompileJob(ctx context.Context, tx pgx.Tx,
 	transport WikiCompileJobTransport, event Event) error {
 	var payload struct {
-		Compile types.Compile `json:"compile"`
-		Reason  string        `json:"reason"`
+		Compile               types.Compile `json:"compile"`
+		ReplacementCompileID  string        `json:"replacement_compile_id"`
+		ReplacementGeneration int64         `json:"replacement_generation"`
+		Reason                string        `json:"reason"`
 	}
-	if !validWikiCompileEvent(event, wikiCompileCancelledEvent) ||
-		decodeWikiCompileJSON(event.Payload, &payload) != nil || payload.Compile.State != "CANCELLED" ||
+	if (event.EventType != wikiCompileCancelledEvent && event.EventType != wikiCompileSupersededEvent) ||
+		!validWikiCompileEvent(event, event.EventType) ||
+		decodeWikiCompileJSON(event.Payload, &payload) != nil ||
 		payload.Compile.CancelVersion != 1 || payload.Reason == "" ||
 		payload.Compile.ModuleId != event.AggregateID {
 		return invalid("frozen Wiki Compile cancellation invalid")
+	}
+	expectedState := "CANCELLED"
+	dcReason := "rtw_compile_cancelled"
+	if event.EventType == wikiCompileSupersededEvent {
+		expectedState, dcReason = "SUPERSEDED", "rtw_compile_superseded"
+		if payload.Reason != "new_generation" || payload.ReplacementCompileID == "" ||
+			payload.ReplacementGeneration <= payload.Compile.Generation {
+			return invalid("Wiki Compile replacement linkage invalid")
+		}
+		replacement, err := readJSON[types.Compile](ctx, tx,
+			"SELECT data FROM knowledge_compiles WHERE id=$1", payload.ReplacementCompileID)
+		if errors.Is(err, ErrNotFound) {
+			return conflict("Wiki Compile replacement does not exist in RTW source")
+		}
+		if err != nil {
+			return err
+		}
+		if replacement.ModuleId != payload.Compile.ModuleId ||
+			replacement.PageId != payload.Compile.PageId ||
+			replacement.Generation != payload.ReplacementGeneration {
+			return conflict("Wiki Compile replacement does not exist in RTW source")
+		}
+	} else if payload.ReplacementCompileID != "" || payload.ReplacementGeneration != 0 {
+		return invalid("administrator Wiki Compile cancel cannot carry a replacement")
 	}
 	current, err := readJSON[types.Compile](ctx, tx,
 		"SELECT data FROM knowledge_compiles WHERE id=$1 FOR UPDATE", payload.Compile.CompileId)
@@ -214,7 +257,8 @@ func (s *Store) cancelWikiCompileJob(ctx context.Context, tx pgx.Tx,
 		return err
 	}
 	if !frozenWikiCompileFieldsSame(payload.Compile, current) ||
-		current.State != "CANCELLED" || current.CancelVersion != payload.Compile.CancelVersion {
+		current.State != expectedState || payload.Compile.State != expectedState ||
+		current.CancelVersion != payload.Compile.CancelVersion {
 		return conflict("Wiki Compile cancellation no longer matches source")
 	}
 	stored, err := readWikiCompileJobRecord(ctx, tx, payload.Compile.CompileId)
@@ -237,7 +281,7 @@ func (s *Store) cancelWikiCompileJob(ctx context.Context, tx pgx.Tx,
 		return conflict("DC Wiki Compile original job missing before cancellation")
 	}
 	cancel := WikiCompileJobCancel{OperationID: event.OperationID,
-		ExpectedCancelVersion: 0, Reason: "rtw_compile_cancelled"}
+		ExpectedCancelVersion: 0, Reason: dcReason}
 	receipt, err := transport.Cancel(ctx, stored.JobID, cancel)
 	if err != nil {
 		return err

@@ -72,6 +72,11 @@ func ClassifyError(err error) telemetry.ErrorInfo {
 		info.Type = "knowledge.ErrInvalid"
 		info.Outcome = "rejected"
 		info.Level = "warn"
+	case errors.Is(err, ErrWikiCompilePredecessorPending):
+		info.Code = "PREDECESSOR_CANCEL_PENDING"
+		info.Type = "knowledge.ErrWikiCompilePredecessorPending"
+		info.Outcome = "deferred"
+		info.Level = "warn"
 	case errors.Is(err, ErrWikiCompileJobUnauthorized):
 		info.Code = "DC_JOB_AUTH_FAILED"
 		info.Type = "knowledge.ErrWikiCompileJobUnauthorized"
