@@ -145,3 +145,5 @@ Delivery.Enabled 默认 false。DC 接入后配置独立 `/v1/events` 接收地�
 ### 人工搜索判定来源
 
 管理员对 RTW 已接纳产品搜索和固定发布片段所作的等级判定、重判、撤回、原始 Outbox 事件回查及默认关闭的启用步骤，见 [SEARCH_JUDGMENT_AUTHORITY.md](docs/SEARCH_JUDGMENT_AUTHORITY.md)。这只是人工判定的权威捕获入口；是否具备正式 qrels 覆盖与可计算 Recall/MRR/nDCG，由 BTW evaluation 的独立基准验收决定。
+
+答案 claim 的 Ed25519 审阅公钥登记/撤销、RTW 已接纳答案与 quote 对账、签名回执及 Worker 回查，见 [GROUNDING_REVIEW_AUTHORITY.md](docs/GROUNDING_REVIEW_AUTHORITY.md)。默认关闭；外部 trace/DC 工件仍由 BTW 独立核对。
