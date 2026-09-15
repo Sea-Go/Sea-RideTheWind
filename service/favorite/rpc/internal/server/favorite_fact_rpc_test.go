@@ -13,6 +13,7 @@ import (
 	"sea-try-go/service/article/rpc/articleservice"
 	articlepb "sea-try-go/service/article/rpc/pb"
 	"sea-try-go/service/common/logger"
+	favoritecommon "sea-try-go/service/favorite/common"
 	"sea-try-go/service/favorite/rpc/internal/model"
 	"sea-try-go/service/favorite/rpc/internal/server"
 	"sea-try-go/service/favorite/rpc/internal/svc"
@@ -36,6 +37,31 @@ func (activeUsers) GetUser(_ context.Context, req *userservice.GetUserReq, _ ...
 	active := int64(0)
 	return &userservice.GetUserResp{Found: true,
 		User: &userservice.UserInfo{Uid: req.Uid, Status: &active}}, nil
+}
+
+func TestFavoriteGRPCClassifiesLegacyMissingAssertAsBlocked(t *testing.T) {
+	store, db := favoriteRPCStore(t)
+	ctx := context.Background()
+	if err := store.InsertFolder(ctx, &model.FavoriteFolder{FolderId: 9201, UserId: 1001, Name: "unmapped"}); err != nil {
+		t.Fatal(err)
+	}
+	item := model.FavoriteItem{FavoriteId: 9202, FolderId: 9201, UserId: 1001,
+		TargetType: "article", TargetId: "historical-no-assert"}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	service := server.NewFavoriteServiceServer(&svc.ServiceContext{FavoriteModel: store, UserRpc: activeUsers{}})
+	if result, err := service.DeleteFavorite(ctx, &pb.DeleteFavoriteReq{UserId: 1001, FavoriteId: 9202}); result != nil || status.Code(err) != codes.FailedPrecondition ||
+		favoritecommon.BizCodeFromError(err) != favoritecommon.ErrorFavoriteHistoryBlocked {
+		t.Fatalf("legacy missing assert was not a typed blocker: response=%+v err=%v", result, err)
+	}
+	var itemCount, outboxCount int64
+	if err := db.Model(&model.FavoriteItem{}).Where("favorite_id = ?", 9202).Count(&itemCount).Error; err != nil || itemCount != 1 {
+		t.Fatalf("RPC blocker deleted old item: count=%d err=%v", itemCount, err)
+	}
+	if err := db.Model(&model.FavoriteFactOutbox{}).Where("favorite_id = ?", 9202).Count(&outboxCount).Error; err != nil || outboxCount != 0 {
+		t.Fatalf("RPC blocker created orphan retract: count=%d err=%v", outboxCount, err)
+	}
 }
 
 type publishedArticles struct {
@@ -119,6 +145,13 @@ func favoriteRPCStore(t *testing.T) (*model.FavoriteModel, *gorm.DB) {
 		t.Fatal(err)
 	}
 	if err := db.Exec(string(revisionMigration)).Error; err != nil {
+		t.Fatal(err)
+	}
+	legacyMigration, err := os.ReadFile("../model/004_favorite_legacy_fact_marker.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(string(legacyMigration)).Error; err != nil {
 		t.Fatal(err)
 	}
 	return model.NewFavoriteModel(db), db

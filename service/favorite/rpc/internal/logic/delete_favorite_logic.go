@@ -80,8 +80,12 @@ func (l *DeleteFavoriteLogic) DeleteFavorite(in *favoritepb.DeleteFavoriteReq) (
 
 	if dbErr = l.svcCtx.FavoriteModel.DeleteFavoriteByFavoriteId(ctx, in.GetFavoriteId(), in.GetUserId()); dbErr != nil {
 		span.RecordError(dbErr)
-		metrics.ObserveDBError(itemModule, "delete", "db")
 		metrics.ObserveOp(itemModule, itemDelete, resultFail)
+		if errors.Is(dbErr, model.ErrFavoriteFactMigrationBlocked) {
+			logger.LogBusinessErr(ctx, favoritecommon.ErrorFavoriteHistoryBlocked, dbErr, userLogOption(in.GetUserId()))
+			return nil, favoritecommon.GRPCError(codes.FailedPrecondition, favoritecommon.ErrorFavoriteHistoryBlocked)
+		}
+		metrics.ObserveDBError(itemModule, "delete", "db")
 		logger.LogBusinessErr(ctx, favoritecommon.ErrorDbUpdate, dbErr, userLogOption(in.GetUserId()))
 		return nil, favoritecommon.GRPCError(codes.Internal, favoritecommon.ErrorDbUpdate)
 	}

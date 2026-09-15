@@ -76,6 +76,13 @@ func favoriteFactStore(t *testing.T) *FavoriteModel {
 	if err := db.Exec(string(revisionMigration)).Error; err != nil {
 		t.Fatal(err)
 	}
+	legacyMigration, err := os.ReadFile("004_favorite_legacy_fact_marker.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(string(legacyMigration)).Error; err != nil {
+		t.Fatal(err)
+	}
 	return NewFavoriteModel(db)
 }
 

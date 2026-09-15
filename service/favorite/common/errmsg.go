@@ -34,9 +34,10 @@ const (
 	ErrorFavoriteFolderNameExists = 5203
 
 	// 收藏模块 5300-5399
-	ErrorFavoriteNotFound     = 5301
-	ErrorFavoriteAlreadyExist = 5302
-	ErrorFavoriteTargetEmpty  = 5303
+	ErrorFavoriteNotFound       = 5301
+	ErrorFavoriteAlreadyExist   = 5302
+	ErrorFavoriteTargetEmpty    = 5303
+	ErrorFavoriteHistoryBlocked = 5304
 )
 
 var codeMsg = map[int]string{
@@ -68,9 +69,10 @@ var codeMsg = map[int]string{
 	ErrorFavoriteFolderNameExists: "收藏夹名称已存在",
 
 	// 收藏
-	ErrorFavoriteNotFound:     "收藏记录不存在",
-	ErrorFavoriteAlreadyExist: "该内容已收藏",
-	ErrorFavoriteTargetEmpty:  "收藏目标不能为空",
+	ErrorFavoriteNotFound:       "收藏记录不存在",
+	ErrorFavoriteAlreadyExist:   "该内容已收藏",
+	ErrorFavoriteTargetEmpty:    "收藏目标不能为空",
+	ErrorFavoriteHistoryBlocked: "收藏暂不可撤回",
 }
 
 var bizCodeByMsg = func() map[string]int {
