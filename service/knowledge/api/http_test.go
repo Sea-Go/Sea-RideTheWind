@@ -86,9 +86,6 @@ func TestRealHTTPKnowledgeWorkflow(t *testing.T) {
 
 func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	publishNewRelease := os.Getenv("SEA_BGE_WORKER_PUBLISH_SEARCH") == "1"
-	if publishNewRelease && realUser {
-		t.Fatal("signed publication search fixture currently requires the local active user RPC")
-	}
 	contract := loadGeneratedHTTPContract(t)
 	s := testenv.Store(t)
 	dir := t.TempDir()
@@ -1265,7 +1262,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			commitAnswer.SessionId, answerID, second.AnswerId, accepted.Status, secondAccepted.Status,
 			quote, citations.Evidence[0].EvidenceId, a.RevisionId, quoteHash, "unavailable"))
 	}
-	if realUser {
+	disableRealOwner := func() {
 		// A disabled account is still returned by today's GetUser handler. This
 		// observed counterexample keeps the H02 disable gate open.
 		realUsers.markDisabled(t, productUID)
@@ -1290,6 +1287,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
 		request("GET", citationStatePath, productToken, nil, nil, 403)
 		realUsers.stopRPC(t)
+	}
+	if realUser && !publishNewRelease {
+		disableRealOwner()
 	} else if !publishNewRelease {
 		userServer.Stop()
 	}
@@ -1581,11 +1581,21 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 				c.WorkerToken, token, productToken, otherToken, searchPath,
 				"/v1/knowledge/answer-sessions/search-facade-session/accepted-answers",
 				bgeRuntimeFile, indexModule.Id, h06Baseline, newReleaseForPublish,
-				acceptedBuild, newSource, builtNew)
+				acceptedBuild, newSource, builtNew, realUser, productUID)
+			if realUser {
+				verified, err := realUsers.rpc.GetUser(context.Background(), &pb.GetUserReq{Uid: productUID})
+				if err != nil || !verified.Found || verified.User == nil || verified.User.Uid != productUID {
+					t.Fatalf("real User Center RPC did not verify signed search owner: %+v err=%v", verified, err)
+				}
+			}
 		}
 	}
 	if publishNewRelease {
-		userServer.Stop()
+		if realUser {
+			disableRealOwner()
+		} else {
+			userServer.Stop()
+		}
 		request("GET", productPath, productToken, nil, nil, 503)
 		request("GET", parentPath, productToken, nil, nil, 503)
 		request("GET", citationStatePath, productToken, nil, nil, 503)

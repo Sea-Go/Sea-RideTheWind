@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -135,7 +136,7 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 	dir, btwRoot, rtwBase, workerToken, adminToken, productToken, otherToken,
 	searchPath, historyPath, dcRuntime, moduleID string, baseline h06PublishedBaseline,
 	newRelease types.Release, newBuild types.Build, newSource types.Revision,
-	builtNew realIndexResult) {
+	builtNew realIndexResult, realUserCenter bool, ownerUID int64) {
 	t.Helper()
 	if newRelease.ReleaseId == baseline.Release.ReleaseId || newBuild.Generation != 2 ||
 		newBuild.ReleaseId != newRelease.ReleaseId ||
@@ -165,7 +166,8 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 	}
 	oldBefore := verifySnapshot(baseline.Release.ReleaseId, baseline.Build.Generation, "1",
 		baseline.Built, baseline.Source.RevisionId)
-	signed := func(endpoint, query, key, quote, revisionID, contentID string) types.ProductSearchResult {
+	signed := func(endpoint, query, key, quote, revisionID, contentID string,
+		expectedSnapshot types.SearchSnapshot) types.ProductSearchResult {
 		t.Helper()
 		relay.mu.Lock()
 		relay.forwardURL = endpoint
@@ -174,6 +176,18 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 		var result types.ProductSearchResult
 		request("POST", searchPath, productToken, map[string]any{"module_id": moduleID,
 			"query": query, "depth": "fast", "intelligence": "low", "idempotency_key": key}, &result, 200)
+		relay.mu.Lock()
+		if len(relay.scopes) == 0 {
+			relay.mu.Unlock()
+			t.Fatal("RTW did not sign the formal search")
+		}
+		scope := relay.scopes[len(relay.scopes)-1]
+		relay.mu.Unlock()
+		if scope.SearchID != result.SearchId || scope.AnswerID != result.AnswerId ||
+			scope.Subject.SubjectId != strconv.FormatInt(ownerUID, 10) ||
+			!reflect.DeepEqual(scope.Snapshot, expectedSnapshot) {
+			t.Fatalf("signed owner/SearchID/AnswerID/snapshot differs: scope=%+v result=%+v", scope, result)
+		}
 		if result.Status != "succeeded" || result.SearchId == "" || result.AnswerId == "" ||
 			len(result.Citations) != 1 || result.Citations[0].Quote != quote ||
 			result.Citations[0].RevisionId != revisionID ||
@@ -200,7 +214,7 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 	oldAPI := startRealBTWSearchAPIProcess(t, dir, btwRoot, rtwBase, workerToken,
 		dcRuntime, baseline.Built, baseline.Quote)
 	oldResult := signed(oldAPI.URL, baseline.Quote, "h06-baseline-before", baseline.Quote,
-		baseline.Source.RevisionId, baseline.Source.EntityId)
+		baseline.Source.RevisionId, baseline.Source.EntityId, oldBefore)
 	oldAPI.AssertSignedSearch(t, oldResult.SearchId, oldResult.AnswerId)
 
 	var activated types.ReleaseState
@@ -215,7 +229,7 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 		builtNew, newSource.RevisionId)
 	newAPI := startRealBTWSearchAPIProcess(t, dir, btwRoot, rtwBase, workerToken, dcRuntime, builtNew, "south")
 	newResult := signed(newAPI.URL, "south", "h06-new-release-south", "south",
-		newSource.RevisionId, newSource.EntityId)
+		newSource.RevisionId, newSource.EntityId, newSnapshot)
 	newAPI.AssertSignedSearch(t, newResult.SearchId, newResult.AnswerId)
 	var history types.AcceptedAnswersPage
 	request("GET", historyPath+"?limit=20", productToken, nil, &history, 200)
@@ -252,7 +266,7 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 	rollbackAPI := startRealBTWSearchAPIProcess(t, dir, btwRoot, rtwBase, workerToken,
 		dcRuntime, baseline.Built, baseline.Quote)
 	rollbackResult := signed(rollbackAPI.URL, baseline.Quote, "h06-baseline-after", baseline.Quote,
-		baseline.Source.RevisionId, baseline.Source.EntityId)
+		baseline.Source.RevisionId, baseline.Source.EntityId, oldAfter)
 	rollbackAPI.AssertSignedSearch(t, rollbackResult.SearchId, rollbackResult.AnswerId)
 	request("GET", historyPath+"?limit=20", productToken, nil, &history, 200)
 	foundOld, foundNew, foundRollback := false, false, false
@@ -297,9 +311,14 @@ func runH06PublishedSearchCycle(t *testing.T, s *model.Store,
 		"new_quote":                newResult.Citations[0].Quote,
 		"old_after_quote":          rollbackResult.Citations[0].Quote,
 		"new_answer_revision_only": true, "history_old_new_rollback_present": true,
-		"old_before_api_log": oldAPI.LogEvidencePath,
-		"new_api_log":        newAPI.LogEvidencePath,
-		"old_after_api_log":  rollbackAPI.LogEvidencePath,
+		"real_usercenter_login_rpc": realUserCenter,
+		"real_usercenter_uid":       strconv.FormatInt(ownerUID, 10),
+		"subject_ref": map[string]string{"authority_id": "rtw.identity", "tenant_id": "platform",
+			"subject_id": strconv.FormatInt(ownerUID, 10)},
+		"other_subject_history_empty": true,
+		"old_before_api_log":          oldAPI.LogEvidencePath,
+		"new_api_log":                 newAPI.LogEvidencePath,
+		"old_after_api_log":           rollbackAPI.LogEvidencePath,
 	})
 	if err != nil {
 		t.Fatal(err)
