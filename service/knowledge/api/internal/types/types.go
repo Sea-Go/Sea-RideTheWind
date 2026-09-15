@@ -294,6 +294,46 @@ type CreateWikiReq struct {
 	IdempotencyKey string      `json:"idempotency_key"`
 }
 
+type FactSetFact struct {
+	FactId              string `json:"fact_id"`
+	SourceRevisionId    string `json:"source_revision_id"`
+	SourceContentSha256 string `json:"source_content_sha256"`
+	Locator             string `json:"locator"`
+	SourceByteStart     string `json:"source_byte_start"`
+	SourceByteEnd       string `json:"source_byte_end"`
+	SourceQuote         string `json:"source_quote"`
+	SourceQuoteSha256   string `json:"source_quote_sha256"`
+	Required            bool   `json:"required"`
+	ConflictGroup       string `json:"conflict_group,optional"`
+}
+
+type FactSetInputFact struct {
+	SourceRevisionId  string `json:"source_revision_id"`
+	Locator           string `json:"locator"`
+	SourceQuote       string `json:"source_quote"`
+	SourceQuoteSha256 string `json:"source_quote_sha256"`
+	Required          bool   `json:"required"`
+	ConflictGroup     string `json:"conflict_group,optional"`
+}
+
+type FactSetSourceRevision struct {
+	RevisionId    string `json:"revision_id"`
+	ContentSha256 string `json:"content_sha256"`
+}
+
+type FreezeWikiFactSetReq struct {
+	ModuleId              string                  `path:"module_id"`
+	PageId                string                  `path:"page_id"`
+	WikiRevisionId        string                  `path:"wiki_revision_id"`
+	OriginCompileId       string                  `json:"origin_compile_id,optional"`
+	SourceRevisions       []FactSetSourceRevision `json:"source_revisions"`
+	Facts                 []FactSetInputFact      `json:"facts"`
+	FactsComplete         bool                    `json:"facts_complete"`
+	Reason                string                  `json:"reason"`
+	BaseFactSetRevisionId string                  `json:"base_fact_set_revision_id,optional"`
+	IdempotencyKey        string                  `json:"idempotency_key"`
+}
+
 type GetAcceptedAnswerReq struct {
 	AnswerId    string `path:"answer_id"`
 	AuthorityId string `form:"authority_id"`
@@ -990,6 +1030,69 @@ type WikiFactJudgmentRecord struct {
 	EventId             string `json:"event_id,optional"`
 	EventRawSha256      string `json:"event_raw_sha256,optional"`
 	EventJcsSha256      string `json:"event_jcs_sha256,optional"`
+}
+
+type WikiFactSetEnvelope struct {
+	Code int               `json:"code"`
+	Msg  string            `json:"msg"`
+	Data WikiFactSetRecord `json:"data"`
+}
+
+type WikiFactSetEventEnvelope struct {
+	Code int                     `json:"code"`
+	Msg  string                  `json:"msg"`
+	Data WikiFactSetEventReceipt `json:"data"`
+}
+
+type WikiFactSetEventPath struct {
+	EventId string `path:"event_id"`
+}
+
+type WikiFactSetEventReceipt struct {
+	EventId          string `json:"event_id"`
+	EventJson        string `json:"event_json"`
+	EventRawSha256   string `json:"event_raw_sha256"`
+	EventJcsSha256   string `json:"event_jcs_sha256"`
+	FactSetJcsSha256 string `json:"fact_set_jcs_sha256"`
+}
+
+type WikiFactSetRecord struct {
+	SchemaVersion         string                  `json:"schema_version"`
+	FactSetId             string                  `json:"fact_set_id"`
+	FactSetRevisionId     string                  `json:"fact_set_revision_id"`
+	FactSetRevision       string                  `json:"fact_set_revision"`
+	BaseFactSetRevisionId string                  `json:"base_fact_set_revision_id"`
+	ModuleId              string                  `json:"module_id"`
+	PageId                string                  `json:"page_id"`
+	WikiRevisionId        string                  `json:"wiki_revision_id"`
+	BaseWikiRevisionId    string                  `json:"base_wiki_revision_id"`
+	WikiOriginKind        string                  `json:"wiki_origin_kind"`
+	OriginCompileId       string                  `json:"origin_compile_id,optional"`
+	WikiContentSha256     string                  `json:"wiki_content_sha256"`
+	SourceScopeRevision   string                  `json:"source_scope_revision"`
+	SourceRevisions       []FactSetSourceRevision `json:"source_revisions"`
+	Facts                 []FactSetFact           `json:"facts"`
+	FactsComplete         bool                    `json:"facts_complete"`
+	DeclarationSource     string                  `json:"declaration_source"`
+	ActorId               string                  `json:"actor_id"`
+	Reason                string                  `json:"reason"`
+	FrozenAt              string                  `json:"frozen_at"`
+	FactSetJcsSha256      string                  `json:"fact_set_jcs_sha256"`
+	EventId               string                  `json:"event_id,optional"`
+	EventRawSha256        string                  `json:"event_raw_sha256,optional"`
+	EventJcsSha256        string                  `json:"event_jcs_sha256,optional"`
+}
+
+type WikiFactSetRevisionPath struct {
+	ModuleId          string `path:"module_id"`
+	PageId            string `path:"page_id"`
+	FactSetRevisionId string `path:"fact_set_revision_id"`
+}
+
+type WikiFactSetScopePath struct {
+	ModuleId            string `path:"module_id"`
+	PageId              string `path:"page_id"`
+	SourceScopeRevision string `path:"source_scope_revision"`
 }
 
 type WikiPageHeadEnvelope struct {

@@ -48,7 +48,9 @@ var operations = map[string]bool{
 	"knowledge.search.judgment.event.read": true,
 	"knowledge.wiki.quality.judge":         true, "knowledge.wiki.quality.get": true,
 	"knowledge.wiki.quality.list": true, "knowledge.wiki.quality.event.read": true,
-	"knowledge.wiki.head.get": true,
+	"knowledge.wiki.head.get":        true,
+	"knowledge.wiki.fact-set.freeze": true, "knowledge.wiki.fact-set.scope.get": true,
+	"knowledge.wiki.fact-set.revision.get": true, "knowledge.wiki.fact-set.event.read": true,
 }
 
 var readOnlyOperations = map[string]bool{
@@ -60,6 +62,8 @@ var readOnlyOperations = map[string]bool{
 	"knowledge.search.judgment.event.read": true,
 	"knowledge.wiki.quality.get":           true, "knowledge.wiki.quality.list": true,
 	"knowledge.wiki.quality.event.read": true, "knowledge.wiki.head.get": true,
+	"knowledge.wiki.fact-set.scope.get": true, "knowledge.wiki.fact-set.revision.get": true,
+	"knowledge.wiki.fact-set.event.read": true,
 }
 
 // DC Jobs delivery commits a technical receipt, not a Wiki business revision.

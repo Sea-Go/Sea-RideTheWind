@@ -153,6 +153,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				},
 				{
 					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/wiki-pages/:page_id/fact-set-revisions/:fact_set_revision_id",
+					Handler: knowledge.GetWikiFactSetRevisionHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/modules/:module_id/wiki-pages/:page_id/fact-sets/:source_scope_revision",
+					Handler: knowledge.GetWikiFactSetScopeHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
 					Path:    "/modules/:module_id/wiki-pages/:page_id/head",
 					Handler: knowledge.GetWikiPageHeadHandler(serverCtx),
 				},
@@ -160,6 +170,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodPost,
 					Path:    "/modules/:module_id/wiki-pages/:page_id/revisions",
 					Handler: knowledge.CreateWikiHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/modules/:module_id/wiki-pages/:page_id/revisions/:wiki_revision_id/fact-sets",
+					Handler: knowledge.FreezeWikiFactSetHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodPost,
@@ -384,6 +399,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodPost,
 					Path:    "/search-sources/read",
 					Handler: worker.ReadSearchSourceHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/wiki-fact-sets/events/:event_id",
+					Handler: worker.GetWikiFactSetEventHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodGet,

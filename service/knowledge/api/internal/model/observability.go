@@ -35,6 +35,12 @@ func WithWikiCompileJobs() Option {
 func WithWikiQualityJudgments() Option {
 	return func(s *Store) { s.wikiQualityJudgments = true }
 }
+
+// WithWikiFactSets enables the isolated append-only administrator completeness
+// declaration only after its sidecar schema passes the startup probe.
+func WithWikiFactSets() Option {
+	return func(s *Store) { s.wikiFactSets = true }
+}
 func operationID(scope, key string) string { return "command:" + object.Hash([]byte(scope+"/"+key)) }
 func activationKey(req types.ActivateReq) string {
 	if req.IdempotencyKey != "" {
@@ -113,7 +119,7 @@ func ClassifyError(err error) telemetry.ErrorInfo {
 	return info
 }
 
-var observedFields = map[string]string{"ModuleId": "module_id", "ModuleID": "module_id", "ReleaseId": "release_id", "RevisionId": "revision_id", "ContentRevisionId": "content_revision_id", "BaseRevisionId": "base_revision_id", "JudgmentId": "judgment_id", "JudgeRevisionId": "judge_revision_id", "WikiRevisionId": "wiki_revision_id", "SourceRevisionId": "source_revision_id", "FactId": "fact_id", "EventId": "event_id", "KeyId": "key_id", "CaseSha256": "case_sha256", "ReviewSha256": "review_sha256", "RegistryRevision": "registry_revision", "BuildId": "build_id", "CompileId": "compile_id", "OriginCompileId": "origin_compile_id", "Generation": "generation", "AttemptId": "attempt_id", "LeaseEpoch": "lease_epoch", "CancelVersion": "cancel_version", "ExpectedPointerRevision": "expected_pointer_revision", "PointerRevision": "pointer_revision", "InputHash": "input_hash", "ManifestHash": "manifest_hash", "IndexManifestHash": "artifact_hash", "IndexManifestRef": "artifact_ref", "State": "state", "ActiveReleaseId": "active_release_id", "ActiveBuildId": "active_build_id", "TargetKind": "target_kind", "TargetId": "target_id", "Kind": "revision_kind", "SearchId": "search_id", "ChunkId": "chunk_id", "PackHash": "pack_hash", "PublicationRevision": "publication_revision", "AnswerId": "answer_id", "SessionId": "session_id", "AcceptedOrdinal": "accepted_ordinal"}
+var observedFields = map[string]string{"ModuleId": "module_id", "ModuleID": "module_id", "ReleaseId": "release_id", "RevisionId": "revision_id", "ContentRevisionId": "content_revision_id", "BaseRevisionId": "base_revision_id", "JudgmentId": "judgment_id", "JudgeRevisionId": "judge_revision_id", "WikiRevisionId": "wiki_revision_id", "SourceRevisionId": "source_revision_id", "FactId": "fact_id", "FactSetId": "fact_set_id", "FactSetRevisionId": "fact_set_revision_id", "BaseFactSetRevisionId": "base_fact_set_revision_id", "FactSetRevision": "fact_set_revision", "SourceScopeRevision": "source_scope_revision", "FactSetJcsSha256": "fact_set_jcs_sha256", "FactsComplete": "facts_complete", "EventId": "event_id", "KeyId": "key_id", "CaseSha256": "case_sha256", "ReviewSha256": "review_sha256", "RegistryRevision": "registry_revision", "BuildId": "build_id", "CompileId": "compile_id", "OriginCompileId": "origin_compile_id", "Generation": "generation", "AttemptId": "attempt_id", "LeaseEpoch": "lease_epoch", "CancelVersion": "cancel_version", "ExpectedPointerRevision": "expected_pointer_revision", "PointerRevision": "pointer_revision", "InputHash": "input_hash", "ManifestHash": "manifest_hash", "IndexManifestHash": "artifact_hash", "IndexManifestRef": "artifact_ref", "State": "state", "ActiveReleaseId": "active_release_id", "ActiveBuildId": "active_build_id", "TargetKind": "target_kind", "TargetId": "target_id", "Kind": "revision_kind", "SearchId": "search_id", "ChunkId": "chunk_id", "PackHash": "pack_hash", "PublicationRevision": "publication_revision", "AnswerId": "answer_id", "SessionId": "session_id", "AcceptedOrdinal": "accepted_ordinal"}
 
 // Only fixed scalar identity/version fields are read. Request bodies, source
 // text and source-ref arrays are not marshaled just to extract log attributes.

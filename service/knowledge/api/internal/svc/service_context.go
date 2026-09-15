@@ -152,6 +152,9 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	if c.WikiQualityJudgments.Enabled {
 		storeOptions = append(storeOptions, model.WithWikiQualityJudgments())
 	}
+	if c.WikiFactSets.Enabled {
+		storeOptions = append(storeOptions, model.WithWikiFactSets())
+	}
 	store := model.New(pool, objects, storeOptions...)
 	if c.Postgres.Migrate {
 		if err = store.Migrate(ctx); err != nil {
@@ -183,6 +186,11 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	}
 	if c.WikiQualityJudgments.Enabled {
 		if err = store.CheckWikiQualitySchema(ctx); err != nil {
+			return fail(err)
+		}
+	}
+	if c.WikiFactSets.Enabled {
+		if err = store.CheckWikiFactSetSchema(ctx); err != nil {
 			return fail(err)
 		}
 	}

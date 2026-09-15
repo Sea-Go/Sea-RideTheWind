@@ -2192,6 +2192,69 @@
         }
       }
     },
+    "/internal/v1/knowledge/wiki-fact-sets/events/{event_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetWikiFactSetEvent",
+        "operationId": "workerGetWikiFactSetEvent",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "event_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "event_id",
+                    "event_json",
+                    "event_raw_sha256",
+                    "event_jcs_sha256",
+                    "fact_set_jcs_sha256"
+                  ],
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "event_json": {
+                      "type": "string"
+                    },
+                    "event_raw_sha256": {
+                      "type": "string"
+                    },
+                    "fact_set_jcs_sha256": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/knowledge/wiki-quality/events/{event_id}": {
       "get": {
         "produces": [
@@ -6857,6 +6920,422 @@
         }
       }
     },
+    "/v1/knowledge/modules/{module_id}/wiki-pages/{page_id}/fact-set-revisions/{fact_set_revision_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetWikiFactSetRevision",
+        "operationId": "knowledgeGetWikiFactSetRevision",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "page_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "fact_set_revision_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "fact_set_id",
+                    "fact_set_revision_id",
+                    "fact_set_revision",
+                    "base_fact_set_revision_id",
+                    "module_id",
+                    "page_id",
+                    "wiki_revision_id",
+                    "base_wiki_revision_id",
+                    "wiki_origin_kind",
+                    "wiki_content_sha256",
+                    "source_scope_revision",
+                    "source_revisions",
+                    "facts",
+                    "facts_complete",
+                    "declaration_source",
+                    "actor_id",
+                    "reason",
+                    "frozen_at",
+                    "fact_set_jcs_sha256"
+                  ],
+                  "properties": {
+                    "actor_id": {
+                      "type": "string"
+                    },
+                    "base_fact_set_revision_id": {
+                      "type": "string"
+                    },
+                    "base_wiki_revision_id": {
+                      "type": "string"
+                    },
+                    "declaration_source": {
+                      "type": "string"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "event_raw_sha256": {
+                      "type": "string"
+                    },
+                    "fact_set_id": {
+                      "type": "string"
+                    },
+                    "fact_set_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "fact_set_revision": {
+                      "type": "string"
+                    },
+                    "fact_set_revision_id": {
+                      "type": "string"
+                    },
+                    "facts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "fact_id",
+                          "source_revision_id",
+                          "source_content_sha256",
+                          "locator",
+                          "source_byte_start",
+                          "source_byte_end",
+                          "source_quote",
+                          "source_quote_sha256",
+                          "required"
+                        ],
+                        "properties": {
+                          "conflict_group": {
+                            "type": "string"
+                          },
+                          "fact_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "source_byte_end": {
+                            "type": "string"
+                          },
+                          "source_byte_start": {
+                            "type": "string"
+                          },
+                          "source_content_sha256": {
+                            "type": "string"
+                          },
+                          "source_quote": {
+                            "type": "string"
+                          },
+                          "source_quote_sha256": {
+                            "type": "string"
+                          },
+                          "source_revision_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "facts_complete": {
+                      "type": "boolean"
+                    },
+                    "frozen_at": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "origin_compile_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "source_revisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "revision_id",
+                          "content_sha256"
+                        ],
+                        "properties": {
+                          "content_sha256": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "source_scope_revision": {
+                      "type": "string"
+                    },
+                    "wiki_content_sha256": {
+                      "type": "string"
+                    },
+                    "wiki_origin_kind": {
+                      "type": "string"
+                    },
+                    "wiki_revision_id": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/wiki-pages/{page_id}/fact-sets/{source_scope_revision}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetWikiFactSetScope",
+        "operationId": "knowledgeGetWikiFactSetScope",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "page_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "source_scope_revision",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "fact_set_id",
+                    "fact_set_revision_id",
+                    "fact_set_revision",
+                    "base_fact_set_revision_id",
+                    "module_id",
+                    "page_id",
+                    "wiki_revision_id",
+                    "base_wiki_revision_id",
+                    "wiki_origin_kind",
+                    "wiki_content_sha256",
+                    "source_scope_revision",
+                    "source_revisions",
+                    "facts",
+                    "facts_complete",
+                    "declaration_source",
+                    "actor_id",
+                    "reason",
+                    "frozen_at",
+                    "fact_set_jcs_sha256"
+                  ],
+                  "properties": {
+                    "actor_id": {
+                      "type": "string"
+                    },
+                    "base_fact_set_revision_id": {
+                      "type": "string"
+                    },
+                    "base_wiki_revision_id": {
+                      "type": "string"
+                    },
+                    "declaration_source": {
+                      "type": "string"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "event_raw_sha256": {
+                      "type": "string"
+                    },
+                    "fact_set_id": {
+                      "type": "string"
+                    },
+                    "fact_set_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "fact_set_revision": {
+                      "type": "string"
+                    },
+                    "fact_set_revision_id": {
+                      "type": "string"
+                    },
+                    "facts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "fact_id",
+                          "source_revision_id",
+                          "source_content_sha256",
+                          "locator",
+                          "source_byte_start",
+                          "source_byte_end",
+                          "source_quote",
+                          "source_quote_sha256",
+                          "required"
+                        ],
+                        "properties": {
+                          "conflict_group": {
+                            "type": "string"
+                          },
+                          "fact_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "source_byte_end": {
+                            "type": "string"
+                          },
+                          "source_byte_start": {
+                            "type": "string"
+                          },
+                          "source_content_sha256": {
+                            "type": "string"
+                          },
+                          "source_quote": {
+                            "type": "string"
+                          },
+                          "source_quote_sha256": {
+                            "type": "string"
+                          },
+                          "source_revision_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "facts_complete": {
+                      "type": "boolean"
+                    },
+                    "frozen_at": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "origin_compile_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "source_revisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "revision_id",
+                          "content_sha256"
+                        ],
+                        "properties": {
+                          "content_sha256": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "source_scope_revision": {
+                      "type": "string"
+                    },
+                    "wiki_content_sha256": {
+                      "type": "string"
+                    },
+                    "wiki_origin_kind": {
+                      "type": "string"
+                    },
+                    "wiki_revision_id": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/knowledge/modules/{module_id}/wiki-pages/{page_id}/head": {
       "get": {
         "produces": [
@@ -7098,6 +7577,300 @@
                     },
                     "withdrawn": {
                       "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions/{wiki_revision_id}/fact-sets": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "FreezeWikiFactSet",
+        "operationId": "knowledgeFreezeWikiFactSet",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "module_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "page_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "wiki_revision_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "source_revisions",
+                "facts",
+                "facts_complete",
+                "reason",
+                "idempotency_key"
+              ],
+              "properties": {
+                "base_fact_set_revision_id": {
+                  "type": "string"
+                },
+                "facts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "source_revision_id",
+                      "locator",
+                      "source_quote",
+                      "source_quote_sha256",
+                      "required"
+                    ],
+                    "properties": {
+                      "conflict_group": {
+                        "type": "string"
+                      },
+                      "locator": {
+                        "type": "string"
+                      },
+                      "required": {
+                        "type": "boolean"
+                      },
+                      "source_quote": {
+                        "type": "string"
+                      },
+                      "source_quote_sha256": {
+                        "type": "string"
+                      },
+                      "source_revision_id": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "facts_complete": {
+                  "type": "boolean"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "origin_compile_id": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "source_revisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "revision_id",
+                      "content_sha256"
+                    ],
+                    "properties": {
+                      "content_sha256": {
+                        "type": "string"
+                      },
+                      "revision_id": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "fact_set_id",
+                    "fact_set_revision_id",
+                    "fact_set_revision",
+                    "base_fact_set_revision_id",
+                    "module_id",
+                    "page_id",
+                    "wiki_revision_id",
+                    "base_wiki_revision_id",
+                    "wiki_origin_kind",
+                    "wiki_content_sha256",
+                    "source_scope_revision",
+                    "source_revisions",
+                    "facts",
+                    "facts_complete",
+                    "declaration_source",
+                    "actor_id",
+                    "reason",
+                    "frozen_at",
+                    "fact_set_jcs_sha256"
+                  ],
+                  "properties": {
+                    "actor_id": {
+                      "type": "string"
+                    },
+                    "base_fact_set_revision_id": {
+                      "type": "string"
+                    },
+                    "base_wiki_revision_id": {
+                      "type": "string"
+                    },
+                    "declaration_source": {
+                      "type": "string"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "event_raw_sha256": {
+                      "type": "string"
+                    },
+                    "fact_set_id": {
+                      "type": "string"
+                    },
+                    "fact_set_jcs_sha256": {
+                      "type": "string"
+                    },
+                    "fact_set_revision": {
+                      "type": "string"
+                    },
+                    "fact_set_revision_id": {
+                      "type": "string"
+                    },
+                    "facts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "fact_id",
+                          "source_revision_id",
+                          "source_content_sha256",
+                          "locator",
+                          "source_byte_start",
+                          "source_byte_end",
+                          "source_quote",
+                          "source_quote_sha256",
+                          "required"
+                        ],
+                        "properties": {
+                          "conflict_group": {
+                            "type": "string"
+                          },
+                          "fact_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "source_byte_end": {
+                            "type": "string"
+                          },
+                          "source_byte_start": {
+                            "type": "string"
+                          },
+                          "source_content_sha256": {
+                            "type": "string"
+                          },
+                          "source_quote": {
+                            "type": "string"
+                          },
+                          "source_quote_sha256": {
+                            "type": "string"
+                          },
+                          "source_revision_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "facts_complete": {
+                      "type": "boolean"
+                    },
+                    "frozen_at": {
+                      "type": "string"
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "origin_compile_id": {
+                      "type": "string"
+                    },
+                    "page_id": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "source_revisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "revision_id",
+                          "content_sha256"
+                        ],
+                        "properties": {
+                          "content_sha256": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "source_scope_revision": {
+                      "type": "string"
+                    },
+                    "wiki_content_sha256": {
+                      "type": "string"
+                    },
+                    "wiki_origin_kind": {
+                      "type": "string"
+                    },
+                    "wiki_revision_id": {
+                      "type": "string"
                     }
                   }
                 },
