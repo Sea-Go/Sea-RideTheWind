@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// LikeDomainFactOutbox is append-only and is not consumed by the legacy hot
-// ranking relay. A separate H09.a delivery adapter must claim it later.
+// LikeDomainFactOutbox is append-only and remains separate from the legacy hot
+// ranking relay. The standalone fact-dispatch process claims its frozen rows.
 type LikeDomainFactOutbox struct {
 	EventID             string     `gorm:"column:event_id;primaryKey;type:varchar(128)"`
 	EventType           string     `gorm:"column:event_type;type:varchar(64);not null"`
