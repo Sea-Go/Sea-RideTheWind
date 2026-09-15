@@ -225,10 +225,26 @@ func (s *Store) GetWikiFactSetRevision(ctx context.Context,
 
 func (s *Store) loadWikiFactSetRevision(ctx context.Context, moduleID, pageID, revisionID string) (
 	types.WikiFactSetRecord, error) {
+	return s.loadWikiFactSetRevisionWithReader(ctx, s.DB, moduleID, pageID, revisionID,
+		s.GetWikiFactSetEvent)
+}
+
+func (s *Store) loadWikiFactSetRevisionInQuery(ctx context.Context, q queryer,
+	moduleID, pageID, revisionID string) (types.WikiFactSetRecord, error) {
+	return s.loadWikiFactSetRevisionWithReader(ctx, q, moduleID, pageID, revisionID,
+		func(ctx context.Context, eventID string) (types.WikiFactSetEventReceipt, error) {
+			return s.getWikiFactSetEventInQuery(ctx, q, eventID)
+		})
+}
+
+func (s *Store) loadWikiFactSetRevisionWithReader(ctx context.Context, q queryer,
+	moduleID, pageID, revisionID string,
+	readEvent func(context.Context, string) (types.WikiFactSetEventReceipt, error)) (
+	types.WikiFactSetRecord, error) {
 	var raw []byte
 	var setSHA, eventID, rowSetID, rowScope, rowWiki string
 	var rowRevision int64
-	err := s.DB.QueryRow(ctx, `SELECT r.data,r.fact_set_jcs_sha256,e.event_id,
+	err := q.QueryRow(ctx, `SELECT r.data,r.fact_set_jcs_sha256,e.event_id,
  r.fact_set_id,r.source_scope_revision,r.wiki_revision_id,r.fact_set_revision
  FROM knowledge_wiki_fact_set_revisions r
  JOIN knowledge_wiki_fact_set_events e ON e.revision_id=r.revision_id
@@ -250,7 +266,7 @@ func (s *Store) loadWikiFactSetRevision(ctx context.Context, moduleID, pageID, r
 		r.WikiRevisionID != rowWiki || r.FactSetRevision != strconv.FormatInt(rowRevision, 10) {
 		return types.WikiFactSetRecord{}, ErrArtifactUnavailable
 	}
-	event, err := s.GetWikiFactSetEvent(ctx, eventID)
+	event, err := readEvent(ctx, eventID)
 	if err != nil {
 		return types.WikiFactSetRecord{}, err
 	}
