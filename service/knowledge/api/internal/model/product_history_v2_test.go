@@ -8,11 +8,24 @@ import (
 	"strings"
 	"testing"
 
+	"sea-try-go/service/knowledge/api/internal/logic/product_v2"
 	"sea-try-go/service/knowledge/api/internal/model"
 	"sea-try-go/service/knowledge/api/internal/object"
+	"sea-try-go/service/knowledge/api/internal/svc"
 	"sea-try-go/service/knowledge/api/internal/testenv"
 	"sea-try-go/service/knowledge/api/internal/types"
+	"sea-try-go/service/user/user/rpc/pb"
+
+	"google.golang.org/grpc"
 )
+
+type v2HistoryTestUserReader struct{}
+
+func (v2HistoryTestUserReader) GetUser(_ context.Context, req *pb.GetUserReq,
+	_ ...grpc.CallOption) (*pb.GetUserResp, error) {
+	active := int64(0)
+	return &pb.GetUserResp{Found: true, User: &pb.UserInfo{Uid: req.Uid, Status: &active}}, nil
+}
 
 func canonicalHistoryRequest(t *testing.T, receipt types.SearchCitationReceipt,
 	citation types.AcceptSearchCitationsReq, answerID, tenant, uid string) types.CommitAcceptedAnswerReq {
@@ -87,8 +100,42 @@ func TestProductHistoryV2OldSlotCollisionAndCanonicalUID(t *testing.T) {
 	}
 }
 
+func TestProductHistoryV2RejectsTwoNonPlatformSlotsOnEmptyCanonicalPage(t *testing.T) {
+	store := testenv.Store(t)
+	fixture := makeCitationFixture(t, store)
+	citation := makeCitationRequest(t, fixture, "v2-only-old-slots-search")
+	receipt, err := store.AcceptSearchCitations(context.Background(), citation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := canonicalHistoryRequest(t, receipt, citation, "v2-only-archive", "archive", "17")
+	legacy := canonicalHistoryRequest(t, receipt, citation, "v2-only-legacy", "legacy", "17")
+	for _, req := range []types.CommitAcceptedAnswerReq{archive, legacy} {
+		answer, err := store.CommitAcceptedAnswer(context.Background(), req)
+		if err != nil || answer.AcceptedOrdinal != 1 {
+			t.Fatalf("old slot did not own its valid ordinal 1: %+v %v", answer, err)
+		}
+	}
+	canonical := types.AcceptedSubjectRef{AuthorityId: "rtw.identity", TenantId: "platform", SubjectId: "17"}
+	query := types.ListAcceptedAnswersReq{AuthorityId: canonical.AuthorityId, TenantId: canonical.TenantId,
+		SubjectId: canonical.SubjectId, SessionId: archive.SessionId, Limit: 1}
+	oldPage, err := store.ListAcceptedAnswers(context.Background(), query)
+	if err != nil || len(oldPage.Items) != 0 {
+		t.Fatalf("v1 canonical empty page changed: %+v %v", oldPage, err)
+	}
+	if _, err := store.GetAcceptedAnswer(context.Background(), canonical, archive.SessionId, archive.AnswerId); !errors.Is(err, model.ErrNotFound) {
+		t.Fatalf("v1 canonical detail did not remain 404: %v", err)
+	}
+	if _, err := store.ListVerifiedProductAcceptedAnswers(context.Background(), query); !errors.Is(err, model.ErrConflict) {
+		t.Fatalf("v2 empty canonical page hid two other-slot ordinal collisions: %v", err)
+	}
+	if _, err := store.GetVerifiedProductAcceptedAnswer(context.Background(), canonical, archive.SessionId, archive.AnswerId); !errors.Is(err, model.ErrConflict) {
+		t.Fatalf("v2 detail hid two other-slot ordinal collisions: %v", err)
+	}
+}
+
 func TestProductHistoryV2RejectsTamperedOldRow(t *testing.T) {
-	for _, fault := range []string{"turn_hash", "duplicate_subject_key", "duplicate_subject_alias", "extra_subject_realm", "quote_hash"} {
+	for _, fault := range []string{"turn_hash", "duplicate_subject_key", "duplicate_subject_alias", "extra_subject_realm", "quote_hash", "citation_search_id"} {
 		t.Run(fault, func(t *testing.T) {
 			store := testenv.Store(t)
 			fixture := makeCitationFixture(t, store)
@@ -132,9 +179,31 @@ func TestProductHistoryV2RejectsTamperedOldRow(t *testing.T) {
 				if err == nil {
 					_, err = store.DB.Exec(context.Background(), `UPDATE knowledge_answer_citations SET quote_hash=$2 WHERE answer_id=$1`, old.AnswerId, strings.Repeat("0", 64))
 				}
+			case "citation_search_id":
+				// The second search is accepted by the real citation authority,
+				// so this is a valid FK, not a manufactured missing reference.
+				other := makeCitationRequest(t, fixture, "v2-tamper-other-search")
+				_, err = store.AcceptSearchCitations(context.Background(), other)
+				if err == nil {
+					_, err = store.DB.Exec(context.Background(), `ALTER TABLE knowledge_answer_citations DISABLE TRIGGER knowledge_answer_citation_immutable`)
+				}
+				if err == nil {
+					_, err = store.DB.Exec(context.Background(), `UPDATE knowledge_answer_citations SET search_id=$2 WHERE answer_id=$1`, old.AnswerId, other.SearchId)
+				}
 			}
 			if err != nil {
 				t.Fatal(err)
+			}
+			if fault == "citation_search_id" {
+				var storedTurn, storedHash string
+				if err := store.DB.QueryRow(context.Background(), `SELECT turn_json,turn_hash FROM knowledge_accepted_answers WHERE answer_id=$1`,
+					old.AnswerId).Scan(&storedTurn, &storedHash); err != nil || storedTurn != old.TurnJson || storedHash != object.Hash([]byte(old.TurnJson)) {
+					t.Fatalf("citation FK fixture changed old answer/turn/hash: %v", err)
+				}
+				v1, err := store.GetAcceptedAnswer(context.Background(), old.Subject, old.SessionId, old.AnswerId)
+				if err != nil || v1.TurnJson != old.TurnJson {
+					t.Fatalf("v1 historical detail changed under citation FK fixture: %+v %v", v1, err)
+				}
 			}
 			if _, err := store.GetVerifiedProductAcceptedAnswer(context.Background(), old.Subject, old.SessionId, old.AnswerId); !errors.Is(err, model.ErrArtifactUnavailable) {
 				t.Fatalf("v2 detail accepted tampered %s: %v", fault, err)
@@ -143,6 +212,15 @@ func TestProductHistoryV2RejectsTamperedOldRow(t *testing.T) {
 				AuthorityId: old.Subject.AuthorityId, TenantId: old.Subject.TenantId,
 				SubjectId: old.Subject.SubjectId, SessionId: old.SessionId, Limit: 1}); !errors.Is(err, model.ErrArtifactUnavailable) {
 				t.Fatalf("v2 page accepted tampered %s: %v", fault, err)
+			}
+			if fault == "citation_search_id" {
+				claim := context.WithValue(context.Background(), "userId", json.Number("17"))
+				logic := product_v2.NewGetProductAnswerCitationStatesV2Logic(claim,
+					&svc.ServiceContext{Store: store, UserRpc: v2HistoryTestUserReader{}})
+				if _, err := logic.GetProductAnswerCitationStatesV2(&types.ProductAcceptedAnswerReq{
+					SessionId: old.SessionId, AnswerId: old.AnswerId}); !errors.Is(err, model.ErrArtifactUnavailable) {
+					t.Fatalf("v2 citations accepted tampered persisted SearchID: %v", err)
+				}
 			}
 		})
 	}

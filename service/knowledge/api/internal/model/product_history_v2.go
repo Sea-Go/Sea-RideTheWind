@@ -113,13 +113,10 @@ func validProductHistorySubject(subject types.AcceptedSubjectRef) bool {
 func rejectProductHistoryCollision(ctx context.Context, tx pgx.Tx, subject types.AcceptedSubjectRef, sessionID string) error {
 	var collided bool
 	err := tx.QueryRow(ctx, `SELECT EXISTS (
- SELECT 1 FROM knowledge_accepted_answers canonical
- JOIN knowledge_accepted_answers other
-   ON other.authority_id=canonical.authority_id AND other.subject_id=canonical.subject_id
-  AND other.session_id=canonical.session_id AND other.accepted_ordinal=canonical.accepted_ordinal
- WHERE canonical.authority_id=$1 AND canonical.tenant_id=$2 AND canonical.subject_id=$3
-   AND canonical.session_id=$4 AND other.tenant_id<>canonical.tenant_id)`,
-		subject.AuthorityId, subject.TenantId, subject.SubjectId, sessionID).Scan(&collided)
+ SELECT 1 FROM knowledge_accepted_answers
+ WHERE authority_id=$1 AND subject_id=$2 AND session_id=$3
+ GROUP BY accepted_ordinal HAVING count(*)>1)`,
+		subject.AuthorityId, subject.SubjectId, sessionID).Scan(&collided)
 	if err != nil {
 		return err
 	}
@@ -169,7 +166,7 @@ func verifyProductHistoryRow(ctx context.Context, tx pgx.Tx, a types.AcceptedAns
 		durableRef != verified.turn.Result.Search.Receipt.DurableRef {
 		return ErrArtifactUnavailable
 	}
-	rows, err := tx.Query(ctx, `SELECT citation_order,evidence_id,source_kind,content_id,revision_id,chunk_id,locator,quote_hash
+	rows, err := tx.Query(ctx, `SELECT citation_order,evidence_id,search_id,source_kind,content_id,revision_id,chunk_id,locator,quote_hash
  FROM knowledge_answer_citations WHERE answer_id=$1 ORDER BY citation_order ASC`, a.AnswerId)
 	if err != nil {
 		return err
@@ -177,13 +174,14 @@ func verifyProductHistoryRow(ctx context.Context, tx pgx.Tx, a types.AcceptedAns
 	count := 0
 	for rows.Next() {
 		var order int
-		var id, sourceKind, contentID, revisionID, chunkID, quoteHash string
+		var id, citationSearchID, sourceKind, contentID, revisionID, chunkID, quoteHash string
 		var locatorRaw []byte
-		if err = rows.Scan(&order, &id, &sourceKind, &contentID, &revisionID, &chunkID, &locatorRaw, &quoteHash); err != nil {
+		if err = rows.Scan(&order, &id, &citationSearchID, &sourceKind, &contentID, &revisionID, &chunkID, &locatorRaw, &quoteHash); err != nil {
 			rows.Close()
 			return err
 		}
-		if count >= len(verified.turn.Result.Citations) || order != count || id != verified.turn.Result.Citations[count] {
+		if count >= len(verified.turn.Result.Citations) || order != count || id != verified.turn.Result.Citations[count] ||
+			citationSearchID != a.SearchId {
 			rows.Close()
 			return ErrArtifactUnavailable
 		}
