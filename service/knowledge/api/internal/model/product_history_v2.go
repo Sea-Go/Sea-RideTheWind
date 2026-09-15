@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"sea-try-go/service/knowledge/api/internal/object"
+	"sea-try-go/service/knowledge/api/internal/telemetry"
 	"sea-try-go/service/knowledge/api/internal/types"
 	"sea-try-go/service/knowledge/internal/subjectrefturn"
 
@@ -22,6 +23,7 @@ func (s *Store) GetVerifiedProductAcceptedAnswer(ctx context.Context, subject ty
 			if !validProductHistorySubject(subject) || !validLogicalSessionID(sessionID) || !citationIdentity(answerID) {
 				return types.AcceptedAnswer{}, invalid("authenticated canonical subject, session and answer required")
 			}
+			telemetry.Add(ctx, map[string]any{"subject_id": subject.SubjectId})
 			tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 			if err != nil {
 				return types.AcceptedAnswer{}, err
@@ -52,6 +54,7 @@ func (s *Store) ListVerifiedProductAcceptedAnswers(ctx context.Context, req type
 				req.AfterOrdinal < 0 || req.Limit < 1 || req.Limit > 100 {
 				return page, invalid("authenticated canonical scope, cursor and limit required")
 			}
+			telemetry.Add(ctx, map[string]any{"subject_id": subject.SubjectId})
 			tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 			if err != nil {
 				return page, err
