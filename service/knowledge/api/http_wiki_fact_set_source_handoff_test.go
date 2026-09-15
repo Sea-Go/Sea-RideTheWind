@@ -21,38 +21,42 @@ import (
 )
 
 type wikiFactSetCrossSourceReport struct {
-	SchemaVersion         string   `json:"schema_version"`
-	FactSetRevisionID     string   `json:"fact_set_revision_id"`
-	SourceScopeRevision   string   `json:"source_scope_revision"`
-	CatalogTargetWikiID   string   `json:"catalog_target_wiki_revision_id"`
-	CatalogEventID        string   `json:"catalog_event_id"`
-	CatalogEventRawSHA    string   `json:"catalog_event_raw_sha256"`
-	CatalogEventJCSSHA    string   `json:"catalog_event_jcs_sha256"`
-	FactSetPayloadJCSSHA  string   `json:"fact_set_jcs_sha256"`
-	QualityEventIDs       []string `json:"quality_event_ids"`
-	CatalogQualityIDs     []string `json:"catalog_quality_event_ids"`
-	CatalogOffset         int64    `json:"catalog_offset"`
-	CatalogQualityOffsets []int64  `json:"catalog_quality_offsets"`
-	DCSourceEvents        int      `json:"dc_source_events"`
-	DCAckCutoff           int64    `json:"dc_ack_cutoff"`
-	DCAcknowledgedAtLeast int64    `json:"dc_acknowledged_at_least"`
-	DCPrefixIndexJCSSHA   string   `json:"dc_prefix_index_jcs_sha256"`
-	DCDeliveryBatchCount  int      `json:"dc_delivery_batch_count"`
-	DCCatalogInputHash    string   `json:"dc_catalog_input_hash"`
-	DCTargetQualityInputs []string `json:"dc_target_quality_input_hashes"`
-	DCFullPrefixVerified  bool     `json:"dc_full_prefix_verified"`
-	Catalogs              int      `json:"catalogs"`
-	Judgments             int      `json:"judgments"`
-	TechnicalSkips        int      `json:"technical_skips"`
-	ODSAckOffset          int64    `json:"ods_ack_offset"`
-	ManualWikiHead        string   `json:"manual_wiki_head"`
-	CatalogWikiHead       string   `json:"catalog_wiki_head"`
-	PublishedReleaseID    string   `json:"published_release_id"`
-	PointerRevision       int64    `json:"pointer_revision"`
-	FactsCompleteDeclared bool     `json:"facts_complete_declared"`
-	HumanCatalogVerified  bool     `json:"human_catalog_verified"`
-	D07Evaluable          bool     `json:"d07_evaluable"`
-	ProductionVerified    bool     `json:"production_verified"`
+	SchemaVersion             string   `json:"schema_version"`
+	FactSetRevisionID         string   `json:"fact_set_revision_id"`
+	SourceScopeRevision       string   `json:"source_scope_revision"`
+	CatalogTargetWikiID       string   `json:"catalog_target_wiki_revision_id"`
+	CatalogEventID            string   `json:"catalog_event_id"`
+	CatalogEventRawSHA        string   `json:"catalog_event_raw_sha256"`
+	CatalogEventJCSSHA        string   `json:"catalog_event_jcs_sha256"`
+	FactSetPayloadJCSSHA      string   `json:"fact_set_jcs_sha256"`
+	QualityEventIDs           []string `json:"quality_event_ids"`
+	CatalogQualityIDs         []string `json:"catalog_quality_event_ids"`
+	CatalogOffset             int64    `json:"catalog_offset"`
+	CatalogQualityOffsets     []int64  `json:"catalog_quality_offsets"`
+	DCSourceEvents            int      `json:"dc_source_events"`
+	DCAckCutoff               int64    `json:"dc_ack_cutoff"`
+	DCAcknowledgedAtLeast     int64    `json:"dc_acknowledged_at_least"`
+	DCPrefixIndexJCSSHA       string   `json:"dc_prefix_index_jcs_sha256"`
+	DCDeliveryBatchCount      int      `json:"dc_delivery_batch_count"`
+	DCCatalogInputHash        string   `json:"dc_catalog_input_hash"`
+	DCTargetQualityInputs     []string `json:"dc_target_quality_input_hashes"`
+	DCFullPrefixVerified      bool     `json:"dc_full_prefix_verified"`
+	SourceProofReaderVerified bool     `json:"sourceproof_reader_verified,omitempty"`
+	SourceProofResultSHA      string   `json:"sourceproof_result_sha256,omitempty"`
+	SourceProofODSPrefixSHA   string   `json:"sourceproof_ods_prefix_sha256,omitempty"`
+	SourceProofDCIndexSHA     string   `json:"sourceproof_dc_index_sha256,omitempty"`
+	Catalogs                  int      `json:"catalogs"`
+	Judgments                 int      `json:"judgments"`
+	TechnicalSkips            int      `json:"technical_skips"`
+	ODSAckOffset              int64    `json:"ods_ack_offset"`
+	ManualWikiHead            string   `json:"manual_wiki_head"`
+	CatalogWikiHead           string   `json:"catalog_wiki_head"`
+	PublishedReleaseID        string   `json:"published_release_id"`
+	PointerRevision           int64    `json:"pointer_revision"`
+	FactsCompleteDeclared     bool     `json:"facts_complete_declared"`
+	HumanCatalogVerified      bool     `json:"human_catalog_verified"`
+	D07Evaluable              bool     `json:"d07_evaluable"`
+	ProductionVerified        bool     `json:"production_verified"`
 }
 
 // The explicit Holder is only a source/effect proof: a declared FactSet plus
@@ -60,7 +64,7 @@ type wikiFactSetCrossSourceReport struct {
 // prefix and the same BTW quality consumer must store Catalog before ACK.
 // It never labels an admin declaration as objectively complete or D07 passed.
 func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
-	rtwURL, workerToken, moduleID, manualWikiID, publishedReleaseID string,
+	rtwURL, workerToken, adminToken, moduleID, manualWikiID, publishedReleaseID string,
 	catalog types.WikiFactSetRecord, required []types.WikiFactJudgmentRecord,
 	baseline types.WikiFactJudgmentRecord) {
 	t.Helper()
@@ -262,9 +266,45 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		t.Fatal(err)
 	}
 	writeRealFactSet0600(t, fixturePath, append(fixture, '\n'))
-	consumer := exec.CommandContext(ctx, "bash", "internal/warehouse/wikiqualitysource/acceptance.sh")
-	consumer.Dir = btwRoot
-	consumer.Env = append(os.Environ(), "SEA_RTW_REAL_WIKI_FACT_SET_FIXTURE="+fixturePath)
+	sourceProofRoot := os.Getenv("SEA_BTW_SOURCEPROOF_READER_ROOT")
+	sourceProofResultPath := filepath.Join(dir, "btw-real-wiki-sourceproof-result.json")
+	consumerScript := "internal/warehouse/wikiqualitysource/acceptance.sh"
+	consumerRoot := btwRoot
+	consumerEnv := append(os.Environ(), "SEA_RTW_REAL_WIKI_FACT_SET_FIXTURE="+fixturePath)
+	if sourceProofRoot != "" {
+		if adminToken == "" ||
+			filepath.Clean(sourceProofRoot) != filepath.Clean(btwRoot) {
+			t.Fatal("SourceProof requires this same Holder's actual AdminJWT and BTW tree")
+		}
+		sourceFixturePath := filepath.Join(dir, "btw-real-wiki-sourceproof-fixture.json")
+		sourceFixture, err := json.Marshal(struct {
+			RTWURL                 string   `json:"rtw_url"`
+			RTWToken               string   `json:"rtw_token"`
+			AdminToken             string   `json:"admin_token"`
+			DCURL                  string   `json:"dc_url"`
+			DCToken                string   `json:"dc_token"`
+			ExpectedEvents         int      `json:"expected_events"`
+			CatalogEventID         string   `json:"catalog_event_id"`
+			QualityEventIDs        []string `json:"quality_event_ids"`
+			CatalogQualityEventIDs []string `json:"catalog_quality_event_ids"`
+			ResultPath             string   `json:"result_path"`
+			FactSetRevisionID      string   `json:"fact_set_revision_id"`
+			SourceScopeRevision    string   `json:"source_scope_revision"`
+		}{rtwURL, workerToken, adminToken, platform.BaseURL, platform.Token,
+			delivered, catalog.EventId, allQualityIDs, targetQualityIDs,
+			sourceProofResultPath, catalog.FactSetRevisionId, catalog.SourceScopeRevision})
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeRealFactSet0600(t, sourceFixturePath, append(sourceFixture, '\n'))
+		consumerScript = "internal/evaluation/wiki_quality/sourceproof/real-source-acceptance.sh"
+		consumerRoot = sourceProofRoot
+		consumerEnv = append(consumerEnv,
+			"SEA_BTW_SOURCEPROOF_REAL_FIXTURE="+sourceFixturePath)
+	}
+	consumer := exec.CommandContext(ctx, "bash", consumerScript)
+	consumer.Dir = consumerRoot
+	consumer.Env = consumerEnv
 	output, consumerErr := consumer.CombinedOutput()
 	outputPath := filepath.Join(dir, "btw-real-wiki-fact-set-consumer.log")
 	writeRealFactSet0600(t, outputPath, output)
@@ -297,6 +337,12 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		!sameRealFactSetEventIDs(result.QualityEventIDs, allQualityIDs) ||
 		!sameRealFactSetEventIDs(result.CatalogQualityIDs, targetQualityIDs) {
 		t.Fatalf("BTW ODS/catalog/current quality/ACK differs from DC full prefix: %+v", result)
+	}
+	var sourceProofResult realWikiFactSetSourceProofResult
+	var sourceProofResultSHA string
+	if sourceProofRoot != "" {
+		sourceProofResult, sourceProofResultSHA = readRealFactSetSourceProofResult(t,
+			sourceProofResultPath, catalog, targetQualityIDs, delivered)
 	}
 	var cursor int64
 	if err := platform.Pool.QueryRow(ctx, `SELECT acknowledged_offset FROM eventing.consumer
@@ -332,6 +378,11 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		dcProof.AcknowledgedAtLeast < int64(delivered) ||
 		len(dcProof.OriginalEventInputs) != 4 {
 		t.Fatalf("DC read-only historical full prefix/immutable batch ACK differs from RTW original Events: %+v %v", dcProof, err)
+	}
+	if sourceProofRoot != "" &&
+		sourceProofResult.DCIndexSHA256 != dcProof.IndexJCSSHA {
+		t.Fatalf("BTW SourceProof and RTW independent DC HTTP full-prefix index disagree: SourceProof=%s RTW=%s",
+			sourceProofResult.DCIndexSHA256, dcProof.IndexJCSSHA)
 	}
 	afterCatalog, err := sets.GetWikiFactSetEvent(ctx, catalog.EventId)
 	if err != nil || afterCatalog.EventJson != catalogWire.EventJson ||
@@ -386,8 +437,12 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		if err := os.MkdirAll(evidenceDir, 0700); err != nil {
 			t.Fatal(err)
 		}
+		reportVersion := "sea.wiki.fact-set-cross-source.v2"
+		if sourceProofRoot != "" {
+			reportVersion = "sea.wiki.fact-set-cross-source.v3"
+		}
 		report, err := json.Marshal(wikiFactSetCrossSourceReport{
-			SchemaVersion:        "sea.wiki.fact-set-cross-source.v2",
+			SchemaVersion:        reportVersion,
 			FactSetRevisionID:    catalog.FactSetRevisionId,
 			SourceScopeRevision:  catalog.SourceScopeRevision,
 			CatalogTargetWikiID:  catalog.WikiRevisionId,
@@ -406,8 +461,12 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 			DCTargetQualityInputs: []string{
 				dcProof.OriginalEventInputs[required[0].EventId],
 				dcProof.OriginalEventInputs[required[1].EventId]},
-			DCFullPrefixVerified: dcProof.FullPrefixVerified,
-			Judgments:            judgments, TechnicalSkips: technical, ODSAckOffset: cursor,
+			DCFullPrefixVerified:      dcProof.FullPrefixVerified,
+			SourceProofReaderVerified: sourceProofRoot != "",
+			SourceProofResultSHA:      sourceProofResultSHA,
+			SourceProofODSPrefixSHA:   sourceProofResult.ODSPrefixSHA256,
+			SourceProofDCIndexSHA:     sourceProofResult.DCIndexSHA256,
+			Judgments:                 judgments, TechnicalSkips: technical, ODSAckOffset: cursor,
 			ManualWikiHead: afterManualHead, CatalogWikiHead: afterCatalogHead,
 			PublishedReleaseID:    afterRelease.ActiveReleaseId,
 			PointerRevision:       afterRelease.PointerRevision,
@@ -480,4 +539,61 @@ func readRealFactSetResult(path string) ([]byte, error) {
 		return nil, errors.New("FactSet consumer result exceeds one MiB")
 	}
 	return raw, nil
+}
+
+type realWikiFactSetSourceProofResult struct {
+	SchemaVersion        string   `json:"schema_version"`
+	CatalogEventID       string   `json:"catalog_event_id"`
+	FactSetRevisionID    string   `json:"fact_set_revision_id"`
+	SourceScopeRevision  string   `json:"source_scope_revision"`
+	WikiRevisionID       string   `json:"wiki_revision_id"`
+	CutoffOffset         int64    `json:"cutoff_offset"`
+	CommittedOffset      int64    `json:"committed_offset"`
+	AcknowledgedAtLeast  int64    `json:"acknowledged_at_least"`
+	RequiredSourceCount  int      `json:"required_source_count"`
+	TransportedJudgments int      `json:"transported_judgments"`
+	SelectedEventIDs     []string `json:"selected_event_ids"`
+	ODSPrefixSHA256      string   `json:"ods_prefix_sha256"`
+	ODSEvidenceSHA256    string   `json:"ods_evidence_sha256"`
+	DCIndexSHA256        string   `json:"dc_index_sha256"`
+	DCBatchReceiptCount  int      `json:"dc_batch_receipt_count"`
+	QualityState         string   `json:"quality_state"`
+	HumanCatalogVerified bool     `json:"human_catalog_verified"`
+	D07Evaluable         bool     `json:"d07_evaluable"`
+	ProductionVerified   bool     `json:"production_verified"`
+}
+
+func readRealFactSetSourceProofResult(t *testing.T, path string,
+	catalog types.WikiFactSetRecord, targetIDs []string,
+	expectedEvents int) (realWikiFactSetSourceProofResult, string) {
+	t.Helper()
+	var receipt realWikiFactSetSourceProofResult
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 {
+		t.Fatalf("BTW SourceProof did not freeze its separate private result: %v %v", info, err)
+	}
+	raw, err := readRealFactSetResult(path)
+	if err != nil || json.Unmarshal(raw, &receipt) != nil ||
+		receipt.SchemaVersion != "sea.wiki.fact-set-sourceproof-real.v1" ||
+		receipt.CatalogEventID != catalog.EventId ||
+		receipt.FactSetRevisionID != catalog.FactSetRevisionId ||
+		receipt.SourceScopeRevision != catalog.SourceScopeRevision ||
+		receipt.WikiRevisionID != catalog.WikiRevisionId ||
+		receipt.CutoffOffset != int64(expectedEvents) ||
+		receipt.CommittedOffset != int64(expectedEvents) ||
+		receipt.AcknowledgedAtLeast < int64(expectedEvents) ||
+		receipt.RequiredSourceCount != 2 || receipt.TransportedJudgments != 2 ||
+		len(receipt.SelectedEventIDs) != 3 ||
+		receipt.SelectedEventIDs[0] != catalog.EventId ||
+		!sameRealFactSetEventIDs(receipt.SelectedEventIDs[1:], targetIDs) ||
+		!realDCSHA(receipt.ODSPrefixSHA256) ||
+		!realDCSHA(receipt.ODSEvidenceSHA256) ||
+		!realDCSHA(receipt.DCIndexSHA256) ||
+		receipt.DCBatchReceiptCount < 1 ||
+		receipt.QualityState != "not_evaluable" ||
+		receipt.HumanCatalogVerified || receipt.D07Evaluable ||
+		receipt.ProductionVerified {
+		t.Fatalf("BTW SourceProof projected a different history or invented D07 qualification: %+v %v", receipt, err)
+	}
+	return receipt, object.Hash(raw)
 }
