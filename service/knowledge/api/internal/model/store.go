@@ -29,9 +29,11 @@ var (
 )
 
 type Store struct {
-	DB            *pgxpool.Pool
-	Objects       object.Store
-	Observability *telemetry.Runtime
+	DB                           *pgxpool.Pool
+	Objects                      object.Store
+	Observability                *telemetry.Runtime
+	continuousSubjectRefV2Writes bool
+	continuousSubjectRefV2Ready  bool
 }
 
 func New(db *pgxpool.Pool, objects object.Store, options ...Option) *Store {

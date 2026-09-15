@@ -45,6 +45,10 @@ type Config struct {
 	GroundingReviews struct {
 		Enabled bool `json:",default=false"`
 	}
+	SubjectRefV2Writes struct {
+		Enabled        bool   `json:",default=false"`
+		LocalTestNonce string `json:",optional"`
+	}
 	AdministratorIDs []string
 	WorkerToken      string
 	Postgres         struct {

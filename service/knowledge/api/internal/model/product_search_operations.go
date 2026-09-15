@@ -107,10 +107,24 @@ func (s *Store) ReserveProductSearch(ctx context.Context, subject types.Accepted
 	if err != nil {
 		return ProductSearchOperation{}, err
 	}
+	if s.continuousSubjectRefV2Writes {
+		if err = s.requireContinuousSubjectRefV2Ready(); err != nil {
+			return ProductSearchOperation{}, err
+		}
+		if err = v2WriteSubject(subject); err != nil {
+			return ProductSearchOperation{}, err
+		}
+	}
 	previous, err := s.GetProductSearchByKey(ctx, subject, session, key)
 	if err == nil {
 		if previous.RequestHash != hash || previous.Search != input {
 			return ProductSearchOperation{}, conflictCode("IDEMPOTENCY_CONFLICT", "product search key reused with different input")
+		}
+		if s.continuousSubjectRefV2Writes {
+			if err = s.ensureV2Operation(ctx, "knowledge_product_search_operations_subject_v2",
+				subject, session, key, "request_hash", hash, ""); err != nil {
+				return ProductSearchOperation{}, err
+			}
 		}
 		return previous, nil
 	}
@@ -129,12 +143,18 @@ func (s *Store) ReserveProductSearch(ctx context.Context, subject types.Accepted
 	if err != nil {
 		return ProductSearchOperation{}, err
 	}
-	_, err = s.DB.Exec(ctx, `INSERT INTO knowledge_product_search_operations
+	insertSQL := `INSERT INTO knowledge_product_search_operations
  (authority_id,tenant_id,subject_id,session_id,operation_key,request_hash,request_json,snapshot,
   search_id,answer_id,status)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending') ON CONFLICT DO NOTHING`,
-		subject.AuthorityId, subject.TenantId, subject.SubjectId, session, key, hash, inputRaw, snapshotRaw,
-		"search_"+uuid.NewString(), "answer_"+uuid.NewString())
+	 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending') ON CONFLICT DO NOTHING`
+	insertArgs := []any{subject.AuthorityId, subject.TenantId, subject.SubjectId, session, key, hash, inputRaw, snapshotRaw,
+		"search_" + uuid.NewString(), "answer_" + uuid.NewString()}
+	if s.continuousSubjectRefV2Writes {
+		err = s.ensureV2Operation(ctx, "knowledge_product_search_operations_subject_v2",
+			subject, session, key, "request_hash", hash, insertSQL, insertArgs...)
+	} else {
+		_, err = s.DB.Exec(ctx, insertSQL, insertArgs...)
+	}
 	if err != nil {
 		return ProductSearchOperation{}, err
 	}

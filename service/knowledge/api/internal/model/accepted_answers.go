@@ -154,6 +154,14 @@ func (s *Store) CommitAcceptedAnswer(ctx context.Context, req types.CommitAccept
 		if err != nil {
 			return types.AcceptedAnswer{}, err
 		}
+		if s.continuousSubjectRefV2Writes {
+			if err = s.requireContinuousSubjectRefV2Ready(); err != nil {
+				return types.AcceptedAnswer{}, err
+			}
+			if err = v2WriteSubject(req.Subject); err != nil {
+				return types.AcceptedAnswer{}, err
+			}
+		}
 		tx, err := s.DB.Begin(ctx)
 		if err != nil {
 			return types.AcceptedAnswer{}, err
@@ -170,12 +178,25 @@ func (s *Store) CommitAcceptedAnswer(ctx context.Context, req types.CommitAccept
  WHERE authority_id=$1 AND tenant_id=$2 AND subject_id=$3 AND session_id=$4 FOR UPDATE`, scope...).Scan(&last); err != nil {
 			return types.AcceptedAnswer{}, err
 		}
+		if s.continuousSubjectRefV2Writes {
+			if err = projectV2Session(ctx, tx, req.Subject, req.SessionId); err != nil {
+				return types.AcceptedAnswer{}, err
+			}
+		}
 		previous, previousHash, err := acceptedAnswerFromRow(tx.QueryRow(ctx,
 			`SELECT `+acceptedAnswerColumns+` FROM knowledge_accepted_answers WHERE answer_id=$1`, req.AnswerId))
 		if err == nil {
 			if previous.Subject != req.Subject || previous.SessionId != req.SessionId ||
 				previous.SearchId != req.SearchId || previousHash != in.turnHash || previous.TurnJson != req.TurnJson {
 				return types.AcceptedAnswer{}, conflictCode("IDEMPOTENCY_CONFLICT", "answer ID reused for a different turn")
+			}
+			if s.continuousSubjectRefV2Writes {
+				if err = projectV2Answer(ctx, tx, req.AnswerId, req.Subject, req.SessionId, previous.AcceptedOrdinal); err != nil {
+					return types.AcceptedAnswer{}, err
+				}
+				if err = tx.Commit(ctx); err != nil {
+					return types.AcceptedAnswer{}, err
+				}
 			}
 			telemetry.Replay(ctx)
 			return previous, nil
@@ -208,6 +229,11 @@ func (s *Store) CommitAcceptedAnswer(ctx context.Context, req types.CommitAccept
 		}
 		if tag.RowsAffected() == 0 {
 			return types.AcceptedAnswer{}, conflictCode("IDEMPOTENCY_CONFLICT", "answer ID reused for a different scope or turn")
+		}
+		if s.continuousSubjectRefV2Writes {
+			if err = projectV2Answer(ctx, tx, req.AnswerId, req.Subject, req.SessionId, ordinal); err != nil {
+				return types.AcceptedAnswer{}, err
+			}
 		}
 		for i, evidenceID := range in.turn.Result.Citations {
 			evidence := in.byID[evidenceID]
