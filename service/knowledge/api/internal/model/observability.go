@@ -16,6 +16,13 @@ type Option func(*Store)
 func WithObservability(runtime *telemetry.Runtime) Option {
 	return func(s *Store) { s.Observability = runtime }
 }
+
+// WithContinuousSubjectRefV2Writes is an explicit stage-three storage
+// candidate. The caller must apply the guarded four-table sidecar migration
+// first. The ordinary Store and schema migration never enable it.
+func WithContinuousSubjectRefV2Writes() Option {
+	return func(s *Store) { s.continuousSubjectRefV2Writes = true }
+}
 func operationID(scope, key string) string { return "command:" + object.Hash([]byte(scope+"/"+key)) }
 func activationKey(req types.ActivateReq) string {
 	if req.IdempotencyKey != "" {

@@ -39,6 +39,9 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	if _, err := c.UserRpc.BuildTarget(); err != nil {
 		return nil, fmt.Errorf("user RPC configuration: %w", err)
 	}
+	if c.SubjectRefV2Writes.Enabled && c.Mode == "pro" {
+		return nil, fmt.Errorf("SubjectRef v2 continuous-write candidate is limited to a marked local test database")
+	}
 	if c.SearchSummary.Endpoint != "" || c.SearchSummary.ScopeKey != "" {
 		u, err := url.Parse(c.SearchSummary.Endpoint)
 		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") ||
@@ -114,9 +117,18 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	if err != nil {
 		return fail(err)
 	}
-	store := model.New(pool, objects, model.WithObservability(observer))
+	storeOptions := []model.Option{model.WithObservability(observer)}
+	if c.SubjectRefV2Writes.Enabled {
+		storeOptions = append(storeOptions, model.WithContinuousSubjectRefV2Writes())
+	}
+	store := model.New(pool, objects, storeOptions...)
 	if c.Postgres.Migrate {
 		if err = store.Migrate(ctx); err != nil {
+			return fail(err)
+		}
+	}
+	if c.SubjectRefV2Writes.Enabled {
+		if err = store.CheckContinuousSubjectRefV2Writes(ctx, c.SubjectRefV2Writes.LocalTestNonce); err != nil {
 			return fail(err)
 		}
 	}

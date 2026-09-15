@@ -93,10 +93,24 @@ func (s *Store) ReserveToolParent(ctx context.Context, subject types.AcceptedSub
 	if !validAcceptedSubject(subject) || !validLogicalSessionID(session) || !validToolKey(key) || !citationIdentity(moduleID) {
 		return ToolParent{}, invalid("authenticated session, operation key and module required")
 	}
+	if s.continuousSubjectRefV2Writes {
+		if err := s.requireContinuousSubjectRefV2Ready(); err != nil {
+			return ToolParent{}, err
+		}
+		if err := v2WriteSubject(subject); err != nil {
+			return ToolParent{}, err
+		}
+	}
 	previous, err := s.GetToolParentByKey(ctx, subject, session, key)
 	if err == nil {
 		if previous.ModuleID != moduleID {
 			return ToolParent{}, conflictCode("IDEMPOTENCY_CONFLICT", "Tool parent key reused with another module")
+		}
+		if s.continuousSubjectRefV2Writes {
+			if err = s.ensureV2Operation(ctx, "knowledge_tool_parents_subject_v2",
+				subject, session, key, "module_id", moduleID, ""); err != nil {
+				return ToolParent{}, err
+			}
 		}
 		return previous, nil
 	}
@@ -114,13 +128,20 @@ func (s *Store) ReserveToolParent(ctx context.Context, subject types.AcceptedSub
 	digest := sha256.Sum256(raw)
 	snapshotRef := "snapshot_" + hex.EncodeToString(digest[:])
 	operationID := "toolop_" + uuid.NewString()
-	_, err = s.DB.Exec(ctx, `INSERT INTO knowledge_tool_parents
+	insertSQL := `INSERT INTO knowledge_tool_parents
  (authority_id,tenant_id,subject_id,session_id,operation_key,operation_id,module_id,snapshot,
   snapshot_ref,scope_ref,budget_ref,expires_at,search_remaining,read_remaining,quote_remaining)
  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,clock_timestamp()+interval '10 minutes',$12,$13,$14)
- ON CONFLICT DO NOTHING`, subject.AuthorityId, subject.TenantId, subject.SubjectId, session, key,
-		operationID, moduleID, raw, snapshotRef, "scope_"+uuid.NewString(), "budget_"+uuid.NewString(),
-		ToolMaxSearchCalls, ToolMaxReadCalls, ToolMaxQuoteRunes)
+ ON CONFLICT DO NOTHING`
+	insertArgs := []any{subject.AuthorityId, subject.TenantId, subject.SubjectId, session, key,
+		operationID, moduleID, raw, snapshotRef, "scope_" + uuid.NewString(), "budget_" + uuid.NewString(),
+		ToolMaxSearchCalls, ToolMaxReadCalls, ToolMaxQuoteRunes}
+	if s.continuousSubjectRefV2Writes {
+		err = s.ensureV2Operation(ctx, "knowledge_tool_parents_subject_v2",
+			subject, session, key, "module_id", moduleID, insertSQL, insertArgs...)
+	} else {
+		_, err = s.DB.Exec(ctx, insertSQL, insertArgs...)
+	}
 	if err != nil {
 		return ToolParent{}, err
 	}
