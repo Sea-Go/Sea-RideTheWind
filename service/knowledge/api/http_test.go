@@ -1193,6 +1193,69 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if ownAnswer != accepted {
 		t.Fatalf("product AnswerID lookup differs: %+v", ownAnswer)
 	}
+	readProductBytes := func(path, bearer string) []byte {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodGet, base+path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Authorization", "Bearer "+bearer)
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		raw, err := io.ReadAll(res.Body)
+		if err != nil || res.StatusCode != 200 {
+			t.Fatalf("read %s status=%d err=%v body=%s", path, res.StatusCode, err, raw)
+		}
+		return raw
+	}
+	v1AnswerWireBefore := readProductBytes(productPath+"/"+answerID, productToken)
+	v2ProductPath := "/v2/knowledge/answer-sessions/" + commitAnswer.SessionId + "/accepted-answers"
+	v2CitationPath := v2ProductPath + "/" + answerID + "/citations"
+	request("GET", v2ProductPath, "", nil, nil, 401)
+	request("GET", v2ProductPath, otherToken, nil, &types.AcceptedAnswersPageV2{}, 200)
+	var v2History types.AcceptedAnswersPageV2
+	request("GET", v2ProductPath+"?authority_id=forged&tenant_id=forged&subject_id="+
+		fmt.Sprintf("%d", otherUID), productToken, nil, &v2History, 200)
+	if len(v2History.Items) != 1 || v2History.Items[0].Subject != (types.AcceptedSubjectRefV2{
+		Issuer: "rtw.identity", SubjectId: fmt.Sprintf("%d", productUID)}) ||
+		v2History.Items[0].TurnJson != accepted.TurnJson || v2History.Items[0].AcceptedOrdinal != accepted.AcceptedOrdinal {
+		t.Fatalf("v2 historical projection differs from immutable v1 answer: %+v", v2History)
+	}
+	var v2Answer types.AcceptedAnswerV2
+	request("GET", v2ProductPath+"/"+answerID, productToken, nil, &v2Answer, 200)
+	if v2Answer != v2History.Items[0] || object.Hash([]byte(v2Answer.TurnJson)) != object.Hash([]byte(ownAnswer.TurnJson)) {
+		t.Fatalf("v2 detail changed old turn bytes or identity: %+v %+v", v2Answer, ownAnswer)
+	}
+	var v2DetailWire struct {
+		Data struct {
+			Subject map[string]json.RawMessage `json:"subject"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(readProductBytes(v2ProductPath+"/"+answerID, productToken), &v2DetailWire); err != nil ||
+		len(v2DetailWire.Data.Subject) != 2 || v2DetailWire.Data.Subject["issuer"] == nil ||
+		v2DetailWire.Data.Subject["subject_id"] == nil {
+		t.Fatalf("v2 product wire exposed legacy tenant/realm/authority: %+v err=%v", v2DetailWire, err)
+	}
+	if !bytes.Equal(v1AnswerWireBefore, readProductBytes(productPath+"/"+answerID, productToken)) {
+		t.Fatal("v2 read changed the old v1 GET response bytes")
+	}
+	var originalTurnHash, originalTurn string
+	if err := s.DB.QueryRow(context.Background(), `SELECT turn_hash,turn_json FROM knowledge_accepted_answers WHERE answer_id=$1`,
+		answerID).Scan(&originalTurnHash, &originalTurn); err != nil || originalTurnHash != object.Hash([]byte(originalTurn)) ||
+		originalTurn != v2Answer.TurnJson {
+		t.Fatalf("PG turn hash/bytes differ from v1 and v2: hash=%q err=%v", originalTurnHash, err)
+	}
+	request("GET", v2ProductPath+"/"+answerID, otherToken, nil, nil, 404)
+	request("GET", v2CitationPath, otherToken, nil, nil, 404)
+	var v2States types.ProductAnswerCitationStates
+	request("GET", v2CitationPath, productToken, nil, &v2States, 200)
+	if v2States.AnswerId != answerID || len(v2States.Citations) != 1 ||
+		v2States.Citations[0].QuoteHash != quoteHash || v2States.Citations[0].State != "available" {
+		t.Fatalf("v2 citation did not preserve fixed quote and current state: %+v", v2States)
+	}
 	var citedStates types.ProductAnswerCitationStates
 	request("GET", citationStatePath, productToken, nil, &citedStates, 200)
 	if citedStates.AnswerId != answerID || citedStates.SearchId != searchID ||
@@ -1210,6 +1273,38 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if len(otherHistory.Items) != 0 {
 		t.Fatalf("cross-subject history exposed: %+v", otherHistory)
 	}
+	// Both real User Center accounts now own a frozen v1 answer in the same
+	// logical session; the v2 projection must keep their UID scopes separate.
+	otherAnswerID := "http-other-answer"
+	otherSubject := types.AcceptedSubjectRef{AuthorityId: "rtw.identity", TenantId: "platform",
+		SubjectId: fmt.Sprintf("%d", otherUID)}
+	oldSubjectJSON, err := json.Marshal(acceptedSubject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherSubjectJSON, err := json.Marshal(otherSubject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherTurn := strings.Replace(commitAnswer.TurnJson, string(oldSubjectJSON), string(otherSubjectJSON), 1)
+	otherTurn = strings.Replace(otherTurn, `"AnswerID":"`+answerID+`"`, `"AnswerID":"`+otherAnswerID+`"`, 1)
+	otherTurn = strings.Replace(otherTurn, `"answer_id":"`+answerID+`"`, `"answer_id":"`+otherAnswerID+`"`, 1)
+	if otherTurn == commitAnswer.TurnJson {
+		t.Fatal("other UID turn did not update frozen Subject and AnswerID")
+	}
+	otherCommit := types.CommitAcceptedAnswerReq{AnswerId: otherAnswerID, SearchId: searchID,
+		Subject: otherSubject, SessionId: commitAnswer.SessionId, TurnJson: otherTurn}
+	var otherAccepted types.AcceptedAnswer
+	request("POST", "/internal/v1/knowledge/accepted-answers", c.WorkerToken, otherCommit, &otherAccepted, 200)
+	var otherV2History types.AcceptedAnswersPageV2
+	request("GET", v2ProductPath, otherToken, nil, &otherV2History, 200)
+	if len(otherV2History.Items) != 1 || otherV2History.Items[0].AnswerId != otherAnswerID ||
+		otherV2History.Items[0].Subject.SubjectId != fmt.Sprintf("%d", otherUID) ||
+		otherV2History.Items[0].TurnJson != otherAccepted.TurnJson {
+		t.Fatalf("other UID lost its own v1→v2 answer: %+v", otherV2History)
+	}
+	request("GET", v2ProductPath+"/"+otherAnswerID, productToken, nil, nil, 404)
+	request("GET", v2ProductPath+"/"+answerID, otherToken, nil, nil, 404)
 	request("GET", productPath+"?limit=101", productToken, nil, nil, 400)
 	request("GET", productPath+"?after_ordinal=-1", productToken, nil, nil, 400)
 	request("GET", "/v1/knowledge/answer-sessions/other-session/accepted-answers/"+answerID, productToken, nil, nil, 404)
@@ -1275,6 +1370,18 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if len(citedStates.Citations) != 1 || citedStates.Citations[0].State != "unavailable" {
 		t.Fatalf("product citation state ignored withdrawal: %+v", citedStates)
 	}
+	request("GET", v2CitationPath, productToken, nil, &v2States, 200)
+	if len(v2States.Citations) != 1 || v2States.Citations[0].State != "unavailable" ||
+		v2States.Citations[0].QuoteHash != quoteHash {
+		t.Fatalf("v2 citation replaced old quote/hash after withdrawal: %+v", v2States)
+	}
+	request("GET", v2ProductPath+"/"+answerID, productToken, nil, &v2Answer, 200)
+	if v2Answer.TurnJson != originalTurn || object.Hash([]byte(v2Answer.TurnJson)) != originalTurnHash {
+		t.Fatalf("v2 history changed immutable turn after withdrawal: %+v", v2Answer)
+	}
+	if !bytes.Equal(v1AnswerWireBefore, readProductBytes(productPath+"/"+answerID, productToken)) {
+		t.Fatal("withdrawal or v2 projection changed old v1 GET response bytes")
+	}
 	if realUser {
 		var secondCitationState types.ProductAnswerCitationStates
 		request("GET", productPath+"/"+second.AnswerId+"/citations", productToken, nil, &secondCitationState, 200)
@@ -1300,9 +1407,16 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		request("GET", productPath, productToken, nil, nil, 403)
 		request("GET", productPath+"/"+answerID, productToken, nil, nil, 403)
 		request("GET", citationStatePath, productToken, nil, nil, 403)
+		request("GET", v2ProductPath, productToken, nil, nil, 403)
+		request("GET", v2ProductPath+"/"+answerID, productToken, nil, nil, 403)
+		request("GET", v2CitationPath, productToken, nil, nil, 403)
 		request("GET", productPath, otherToken, nil, &otherHistory, 200)
-		if len(otherHistory.Items) != 0 {
+		if len(otherHistory.Items) != 1 || otherHistory.Items[0] != otherAccepted {
 			t.Fatalf("active other subject changed after disabling owner: %+v", otherHistory)
+		}
+		request("GET", v2ProductPath, otherToken, nil, &otherV2History, 200)
+		if len(otherV2History.Items) != 1 || otherV2History.Items[0].AnswerId != otherAnswerID {
+			t.Fatalf("active other v2 subject changed after disabling owner: %+v", otherV2History)
 		}
 		realUsers.delete(t, productUID)
 		request("GET", parentPath, productToken, nil, nil, 403)
