@@ -31,6 +31,30 @@ CREATE TABLE IF NOT EXISTS knowledge_outbox (
 );
 ALTER TABLE knowledge_outbox ADD COLUMN IF NOT EXISTS correlation jsonb NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS knowledge_outbox_pending ON knowledge_outbox(created_at,event_id) WHERE delivered_at IS NULL;
+-- A module source-version witness can only compare a frozen whole Event JCS
+-- with DC's accepted input. JSONB never recovers the original raw Event bytes.
+-- All existing rows are retained; this guard freezes their current business
+-- envelope and permits only the one-way technical delivered_at receipt.
+CREATE OR REPLACE FUNCTION reject_knowledge_outbox_business_change() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP='DELETE' THEN
+  RAISE EXCEPTION 'knowledge Outbox Event cannot be deleted';
+ END IF;
+ IF NEW.event_id IS DISTINCT FROM OLD.event_id
+    OR NEW.event_type IS DISTINCT FROM OLD.event_type
+    OR NEW.aggregate_id IS DISTINCT FROM OLD.aggregate_id
+    OR NEW.payload IS DISTINCT FROM OLD.payload
+    OR NEW.correlation IS DISTINCT FROM OLD.correlation
+    OR NEW.created_at IS DISTINCT FROM OLD.created_at
+    OR (OLD.delivered_at IS NOT NULL AND NEW.delivered_at IS DISTINCT FROM OLD.delivered_at) THEN
+  RAISE EXCEPTION 'knowledge Outbox business Event cannot change';
+ END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS knowledge_outbox_business_immutable ON knowledge_outbox;
+CREATE TRIGGER knowledge_outbox_business_immutable BEFORE UPDATE OR DELETE ON knowledge_outbox
+FOR EACH ROW EXECUTE FUNCTION reject_knowledge_outbox_business_change();
 -- Wiki Compile source envelopes are frozen once committed. Technical delivery
 -- may set delivered_at, but it cannot edit the business EventID, body or
 -- correlation to change a DC Job's canonical input under the same key.
