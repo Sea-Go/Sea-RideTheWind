@@ -34,6 +34,13 @@ type wikiFactSetCrossSourceReport struct {
 	CatalogOffset         int64    `json:"catalog_offset"`
 	CatalogQualityOffsets []int64  `json:"catalog_quality_offsets"`
 	DCSourceEvents        int      `json:"dc_source_events"`
+	DCAckCutoff           int64    `json:"dc_ack_cutoff"`
+	DCAcknowledgedAtLeast int64    `json:"dc_acknowledged_at_least"`
+	DCPrefixIndexJCSSHA   string   `json:"dc_prefix_index_jcs_sha256"`
+	DCDeliveryBatchCount  int      `json:"dc_delivery_batch_count"`
+	DCCatalogInputHash    string   `json:"dc_catalog_input_hash"`
+	DCTargetQualityInputs []string `json:"dc_target_quality_input_hashes"`
+	DCFullPrefixVerified  bool     `json:"dc_full_prefix_verified"`
 	Catalogs              int      `json:"catalogs"`
 	Judgments             int      `json:"judgments"`
 	TechnicalSkips        int      `json:"technical_skips"`
@@ -297,6 +304,35 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		Scan(&cursor); err != nil || cursor != int64(delivered) {
 		t.Fatalf("same BTW quality consumer skipped Catalog or did not ACK full prefix: %d %v", cursor, err)
 	}
+	// Read the actual DC service-token evidence after BTW ACK. PG counts alone
+	// cannot prove the consumer's historical batch receipts and full Event wire.
+	pins := make(map[string]realDCPin, 4)
+	pins[catalog.EventId], err = pinRealDCRTWEvent(catalogWire.EventJson,
+		catalog.EventRawSha256, catalog.EventJcsSha256,
+		"knowledge.wiki.fact-set.frozen.v1", catalogOffset)
+	if err != nil {
+		t.Fatalf("RTW Catalog original bytes/JCS cannot be pinned to DC: %v", err)
+	}
+	qualityOffsetsByID := map[string]int64{baseline.EventId: baselineOffset}
+	for i, judgment := range required {
+		qualityOffsetsByID[judgment.EventId] = qualityOffsets[i]
+	}
+	for _, judgment := range allQuality {
+		pins[judgment.EventId], err = pinRealDCRTWEvent(
+			originalQuality[judgment.EventId], judgment.EventRawSha256,
+			judgment.EventJcsSha256, "knowledge.wiki.quality.judged.v1",
+			qualityOffsetsByID[judgment.EventId])
+		if err != nil {
+			t.Fatalf("RTW single quality original bytes/JCS cannot be pinned to DC: %v", err)
+		}
+	}
+	dcProof, err := readRealDCAcknowledgedWikiFactSetPrefix(ctx,
+		platform.BaseURL, platform.Token, int64(delivered), pins)
+	if err != nil || !dcProof.FullPrefixVerified ||
+		dcProof.AcknowledgedAtLeast < int64(delivered) ||
+		len(dcProof.OriginalEventInputs) != 4 {
+		t.Fatalf("DC read-only historical full prefix/immutable batch ACK differs from RTW original Events: %+v %v", dcProof, err)
+	}
 	afterCatalog, err := sets.GetWikiFactSetEvent(ctx, catalog.EventId)
 	if err != nil || afterCatalog.EventJson != catalogWire.EventJson ||
 		afterCatalog.EventRawSha256 != catalogWire.EventRawSha256 ||
@@ -351,7 +387,7 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 			t.Fatal(err)
 		}
 		report, err := json.Marshal(wikiFactSetCrossSourceReport{
-			SchemaVersion:        "sea.wiki.fact-set-cross-source.v1",
+			SchemaVersion:        "sea.wiki.fact-set-cross-source.v2",
 			FactSetRevisionID:    catalog.FactSetRevisionId,
 			SourceScopeRevision:  catalog.SourceScopeRevision,
 			CatalogTargetWikiID:  catalog.WikiRevisionId,
@@ -362,7 +398,16 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 			QualityEventIDs:      allQualityIDs, CatalogQualityIDs: targetQualityIDs,
 			CatalogOffset: catalogOffset, CatalogQualityOffsets: qualityOffsets,
 			DCSourceEvents: accepted, Catalogs: catalogs,
-			Judgments: judgments, TechnicalSkips: technical, ODSAckOffset: cursor,
+			DCAckCutoff:           dcProof.Cutoff,
+			DCAcknowledgedAtLeast: dcProof.AcknowledgedAtLeast,
+			DCPrefixIndexJCSSHA:   dcProof.IndexJCSSHA,
+			DCDeliveryBatchCount:  dcProof.BatchReceipts,
+			DCCatalogInputHash:    dcProof.OriginalEventInputs[catalog.EventId],
+			DCTargetQualityInputs: []string{
+				dcProof.OriginalEventInputs[required[0].EventId],
+				dcProof.OriginalEventInputs[required[1].EventId]},
+			DCFullPrefixVerified: dcProof.FullPrefixVerified,
+			Judgments:            judgments, TechnicalSkips: technical, ODSAckOffset: cursor,
 			ManualWikiHead: afterManualHead, CatalogWikiHead: afterCatalogHead,
 			PublishedReleaseID:    afterRelease.ActiveReleaseId,
 			PointerRevision:       afterRelease.PointerRevision,
@@ -374,8 +419,8 @@ func runRealWikiFactSetHandoff(t *testing.T, dir string, store *model.Store,
 		writeRealFactSet0600(t, filepath.Join(evidenceDir, "wiki-fact-set-cross-source.json"),
 			append(report, '\n'))
 	}
-	t.Logf("RTW/DC/BTW same wiki quality consumer: events=%d Catalog=1 target_required=2 total_quality=3 technical=%d ACK=%d",
-		accepted, technical, cursor)
+	t.Logf("RTW/DC/BTW same wiki quality consumer: events=%d Catalog=1 target_required=2 total_quality=3 technical=%d ACK=%d DC_historical_batches=%d",
+		accepted, technical, cursor, dcProof.BatchReceipts)
 }
 
 func sameRealFactSetEventIDs(got, expected []string) bool {
