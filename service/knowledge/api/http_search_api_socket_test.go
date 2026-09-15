@@ -65,13 +65,36 @@ func (p *formalSearchAPI) AssertServed(t *testing.T) {
 }
 
 // startRealBTWSearchAPIProcess owns an independently compiled cmd/api process.
-// It consumes the previously built BGE-M3 local-exact index file only after
-// RTW has accepted READY and manually published its three immutable refs.
+// It consumes the previously built BGE-M3 three-Ref file only after RTW has
+// accepted READY and manually published. Hybrid mode loads the same Dense/
+// Multi refs through Lite and learned Sparse through frozen IP postings.
 func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerToken,
-	dcRuntimePath string, built realIndexResult, expectedQuote string) *formalSearchAPI {
+	dcRuntimePath string, built realIndexResult, expectedQuote string,
+	nativeRuntimePaths ...string) *formalSearchAPI {
 	t.Helper()
+	if len(nativeRuntimePaths) > 1 {
+		t.Fatal("formal search API accepts at most one explicit native runtime")
+	}
+	nativeRuntimePath := ""
+	if len(nativeRuntimePaths) == 1 {
+		nativeRuntimePath = nativeRuntimePaths[0]
+	}
 	if len(built.APIIndexSettings) == 0 || len(built.Indexes) != 3 || expectedQuote == "" {
 		t.Fatal("formal cmd/api requires actual three-lane index settings and expected quote")
+	}
+	mode, nativeAddress, nativeSettingsPath := "local-exact", "", ""
+	if nativeRuntimePath != "" {
+		runtime, nativeErr := readRealNativeLiteRuntime(nativeRuntimePath)
+		if nativeErr != nil || built.NativeProjection == nil ||
+			built.NativeProjection.Status != "test_projection_before_RTW_READY" ||
+			built.NativeProjection.PhysicalQualified ||
+			built.NativeProjection.Endpoint != runtime.Endpoint ||
+			built.NativeProjection.EnginePackageSHA256 != runtime.EnginePackageSHA256 ||
+			built.NativeProjection.RuntimeSHA256 != runtime.RawSHA256 ||
+			!validRealNativeSettings(built.NativeProjection.Settings) {
+			t.Fatal("formal native cmd/api lacks the same task-owned Lite projection receipt")
+		}
+		mode, nativeAddress = "native-hybrid", runtime.Endpoint
 	}
 	// Each independently running API owns its executable, configuration and
 	// JSONL file. A shared O_TRUNC path lets live file descriptors overwrite
@@ -91,6 +114,12 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 	indexFile := filepath.Join(instanceDir, "btw-search-api-index.json")
 	if err = os.WriteFile(indexFile, built.APIIndexSettings, 0600); err != nil {
 		t.Fatal(err)
+	}
+	if mode == "native-hybrid" {
+		nativeSettingsPath = filepath.Join(instanceDir, "btw-search-api-native.json")
+		if err = os.WriteFile(nativeSettingsPath, built.NativeProjection.Settings, 0600); err != nil {
+			t.Fatal(err)
+		}
 	}
 	policyFile := filepath.Join(instanceDir, "btw-search-api-policy.json")
 	policy := `{"version":"real-bge-three-lane-fast-low-v1","fast_low":{"max_batches":1,"max_subqueries":1,"top_k_per_lane":2,"max_evidence":1,"wall_time":"25s"}}`
@@ -241,7 +270,7 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 	cmd := exec.Command(binary)
 	cmd.Dir = btwRoot
 	cmd.Env = append(os.Environ(),
-		"BTW_SEARCH_MODE=local-exact", "BTW_SEARCH_API_ADDR="+apiAddr,
+		"BTW_SEARCH_MODE="+mode, "BTW_SEARCH_API_ADDR="+apiAddr,
 		"BTW_SEARCH_METRICS_ADDR="+metricsAddr, "BTW_SEARCH_SCOPE_KEY="+productFixtureScopeKey,
 		"BTW_SEARCH_TOOLS_SCOPE_KEY="+toolFixtureScopeKey,
 		"BTW_RTW_URL="+rtwBase, "BTW_RTW_TOKEN="+workerToken,
@@ -254,6 +283,10 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 		"BTW_OTLP_TRACES_URL="+otlp.URL+"/v1/traces",
 		"BTW_SERVICE_VERSION="+strings.TrimSpace(string(version)),
 		"BTW_ENVIRONMENT=test", "BTW_INSTANCE_ID=formal-cmd-api-cross")
+	if mode == "native-hybrid" {
+		cmd.Env = append(cmd.Env, "BTW_SEARCH_MILVUS_ADDRESS="+nativeAddress,
+			"BTW_SEARCH_MILVUS_API_KEY=", "BTW_SEARCH_NATIVE_FILE="+nativeSettingsPath)
+	}
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	if err := cmd.Start(); err != nil {
 		logFile.Close()

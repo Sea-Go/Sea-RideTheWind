@@ -32,6 +32,7 @@ const productFixtureScopeKey = "test-only-search-scope-key-32-bytes-minimum"
 // contains only disposable local credentials and is never copied into Git.
 type realIndexSetup struct {
 	DCRuntime       string            `json:"dc_runtime"`
+	NativeRuntime   string            `json:"native_runtime,omitempty"`
 	ArtifactDir     string            `json:"artifact_dir"`
 	ChunkManifest   model.ArtifactRef `json:"chunk_manifest"`
 	BuildID         string            `json:"build_id"`
@@ -47,12 +48,26 @@ type realIndexResult struct {
 	Indexes          map[string]model.ArtifactRef `json:"indexes"`
 	ChunkCount       int                          `json:"chunk_count"`
 	APIIndexSettings json.RawMessage              `json:"api_index_settings"`
+	NativeProjection *realNativeProjection        `json:"native_projection,omitempty"`
 }
 
-// The builder child produces actual local-exact BGE-M3 artifacts and exits.
+// This is an isolated Hybrid receipt: Lite owns Dense/Multi, the original
+// learned-IP Sparse postings keep their exact Ref. RTW's IndexManifest v1
+// does not sign physical settings, so it cannot qualify production READY.
+type realNativeProjection struct {
+	Status              string          `json:"status"`
+	Endpoint            string          `json:"endpoint"`
+	RuntimeSHA256       string          `json:"runtime_sha256"`
+	EnginePackageSHA256 string          `json:"engine_package_sha256"`
+	Settings            json.RawMessage `json:"settings"`
+	PhysicalQualified   bool            `json:"physical_qualified"`
+}
+
+// The builder child produces actual local-exact BGE-M3 artifacts and exits;
+// the explicit Hybrid fixture also projects Dense/Multi before RTW READY.
 // Search later runs only in the independently launched formal cmd/api binary.
 func buildRealBTWIndexesOnly(t *testing.T, dir, btwRoot, rtwBase, workerToken, moduleID string,
-	setup *realIndexSetup) {
+	setup *realIndexSetup) string {
 	t.Helper()
 	fixturePath := filepath.Join(dir, "btw-formal-index-fixture.json")
 	readyPath := filepath.Join(dir, "btw-formal-index-unused-ready")
@@ -69,18 +84,33 @@ func buildRealBTWIndexesOnly(t *testing.T, dir, btwRoot, rtwBase, workerToken, m
 	compile := exec.Command("go", "test", "-c", "-mod=readonly", "-race", "-o", binary,
 		"./internal/transport/http/search")
 	compile.Dir = btwRoot
-	if output, err := compile.CombinedOutput(); err != nil {
-		t.Fatalf("compile BTW real-index builder: %v\n%s", err, output)
+	compileOutput, compileErr := compile.CombinedOutput()
+	if setup.NativeRuntime != "" {
+		persistNativeTestBytes(t, "native-builder-compile.log", compileOutput)
+	}
+	if compileErr != nil {
+		if setup.NativeRuntime == "" {
+			t.Fatalf("compile BTW real-index builder: %v\n%s", compileErr, compileOutput)
+		}
+		t.Fatalf("compile BTW real-index builder: %v; private log retained", compileErr)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, binary, "-test.run=^TestRTWRealProductSearchServer$", "-test.v")
 	cmd.Dir = btwRoot
 	cmd.Env = append(os.Environ(), "SEA_RTW_PRODUCT_SERVER_FIXTURE="+fixturePath)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("BTW real three-lane index builder failed: %v\n%s", err,
-			strings.ReplaceAll(string(output), workerToken, "[REDACTED]"))
+	buildOutput, buildErr := cmd.CombinedOutput()
+	if setup.NativeRuntime != "" {
+		persistNativeTestBytes(t, "native-builder-child.log", buildOutput)
 	}
+	if buildErr != nil {
+		if setup.NativeRuntime == "" {
+			t.Fatalf("BTW real three-lane index builder failed: %v\n%s", buildErr,
+				strings.ReplaceAll(string(buildOutput), workerToken, "[REDACTED]"))
+		}
+		t.Fatalf("BTW real three-lane index builder failed: %v; private log retained", buildErr)
+	}
+	return binary
 }
 
 func realBGEProfiles(t *testing.T, runtimePath string) []types.RetrievalProfile {
