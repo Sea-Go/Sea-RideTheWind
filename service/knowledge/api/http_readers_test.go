@@ -71,14 +71,25 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 	}
 	request("GET", modulePath+"/revisions?limit=1&cursor="+url.QueryEscape(revisions.NextCursor), token, nil, &revisions, 200)
 	qualityHolder := os.Getenv("SEA_BTW_WIKI_QUALITY_CONSUMER_ROOT") != ""
-	if len(revisions.Items) != 1 || qualityHolder && revisions.NextCursor == "" ||
-		!qualityHolder && revisions.NextCursor != "" {
+	factSetHolder := os.Getenv("SEA_BTW_WIKI_FACT_SET_CONSUMER_ROOT") != ""
+	if len(revisions.Items) != 1 || (qualityHolder || factSetHolder) && revisions.NextCursor == "" ||
+		!(qualityHolder || factSetHolder) && revisions.NextCursor != "" {
 		t.Fatal("second page incorrect", revisions)
 	}
 	if qualityHolder {
 		request("GET", modulePath+"/revisions?limit=1&cursor="+url.QueryEscape(revisions.NextCursor), token, nil, &revisions, 200)
 		if len(revisions.Items) != 1 || revisions.NextCursor != "" || revisions.Items[0].Content != "" {
 			t.Fatal("explicit quality Holder third Wiki revision page incorrect", revisions)
+		}
+	}
+	if factSetHolder {
+		request("GET", modulePath+"/revisions?limit=1&cursor="+url.QueryEscape(revisions.NextCursor), token, nil, &revisions, 200)
+		if len(revisions.Items) != 1 || revisions.NextCursor == "" || revisions.Items[0].Content != "" {
+			t.Fatal("explicit FactSet Holder third Source/Wiki revision page incorrect", revisions)
+		}
+		request("GET", modulePath+"/revisions?limit=1&cursor="+url.QueryEscape(revisions.NextCursor), token, nil, &revisions, 200)
+		if len(revisions.Items) != 1 || revisions.NextCursor != "" || revisions.Items[0].Content != "" {
+			t.Fatal("explicit FactSet Holder fourth Source/Wiki revision page incorrect", revisions)
 		}
 	}
 	var releases types.ListReleasesResp
@@ -97,8 +108,8 @@ func verifyProductReaders(t *testing.T, s *model.Store, request httpRequest, tok
 	for _, c := range compiles.Items {
 		pendingSeen = pendingSeen || c.CompileId == pending.CompileId
 	}
-	if !pendingSeen || qualityHolder && len(compiles.Items) != 2 ||
-		!qualityHolder && len(compiles.Items) != 1 {
+	if !pendingSeen || (qualityHolder || factSetHolder) && len(compiles.Items) != 2 ||
+		!(qualityHolder || factSetHolder) && len(compiles.Items) != 1 {
 		t.Fatal(compiles)
 	}
 	// Details support polling after a command and expose a real terminal state.
