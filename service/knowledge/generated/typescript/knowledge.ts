@@ -356,6 +356,30 @@ export function getToolSearch(params: components.ToolSearchPathParams, session_i
 
 /**
  * @description
+ * @param params
+ */
+export function listProductAcceptedAnswersV2(params: components.ProductAcceptedAnswersReqParams, session_id: string) {
+	return webapi.get<components.AcceptedAnswersPageV2Envelope>(`/v2/knowledge/answer-sessions/${session_id}/accepted-answers`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getProductAcceptedAnswerV2(params: components.ProductAcceptedAnswerReqParams, session_id: string, answer_id: string) {
+	return webapi.get<components.AcceptedAnswerV2Envelope>(`/v2/knowledge/answer-sessions/${session_id}/accepted-answers/${answer_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getProductAnswerCitationStatesV2(params: components.ProductAcceptedAnswerReqParams, session_id: string, answer_id: string) {
+	return webapi.get<components.ProductAnswerCitationStatesEnvelope>(`/v2/knowledge/answer-sessions/${session_id}/accepted-answers/${answer_id}/citations`, params)
+}
+
+/**
+ * @description
  * @param req
  */
 export function commitAcceptedAnswer(req: components.CommitAcceptedAnswerReq) {
