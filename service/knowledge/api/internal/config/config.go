@@ -53,6 +53,9 @@ type Config struct {
 	WikiQualityJudgments struct {
 		Enabled bool `json:",default=false"`
 	}
+	WikiFactSets struct {
+		Enabled bool `json:",default=false"`
+	}
 	GroundingReviews struct {
 		Enabled bool `json:",default=false"`
 	}

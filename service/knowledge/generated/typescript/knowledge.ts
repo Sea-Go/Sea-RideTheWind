@@ -214,6 +214,22 @@ export function createSource(params: components.CreateSourceReqParams, req: comp
  * @description
  * @param params
  */
+export function getWikiFactSetRevision(params: components.WikiFactSetRevisionPathParams, module_id: string, page_id: string, fact_set_revision_id: string) {
+	return webapi.get<components.WikiFactSetEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/fact-set-revisions/${fact_set_revision_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getWikiFactSetScope(params: components.WikiFactSetScopePathParams, module_id: string, page_id: string, source_scope_revision: string) {
+	return webapi.get<components.WikiFactSetEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/fact-sets/${source_scope_revision}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
 export function getWikiPageHead(params: components.WikiPageHeadPathParams, module_id: string, page_id: string) {
 	return webapi.get<components.WikiPageHeadEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/head`, params)
 }
@@ -225,6 +241,15 @@ export function getWikiPageHead(params: components.WikiPageHeadPathParams, modul
  */
 export function createWiki(params: components.CreateWikiReqParams, req: components.CreateWikiReq, module_id: string, page_id: string) {
 	return webapi.post<components.RevisionEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/revisions`, params, req)
+}
+
+/**
+ * @description
+ * @param params
+ * @param req
+ */
+export function freezeWikiFactSet(params: components.FreezeWikiFactSetReqParams, req: components.FreezeWikiFactSetReq, module_id: string, page_id: string, wiki_revision_id: string) {
+	return webapi.post<components.WikiFactSetEnvelope>(`/v1/knowledge/modules/${module_id}/wiki-pages/${page_id}/revisions/${wiki_revision_id}/fact-sets`, params, req)
 }
 
 /**
@@ -557,6 +582,14 @@ export function getSearchJudgmentEvent(params: components.SearchJudgmentEventPat
  */
 export function readSearchSource(req: components.ReadSearchSourceReq) {
 	return webapi.post<components.CitationChunkEnvelope>(`/internal/v1/knowledge/search-sources/read`, req)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getWikiFactSetEvent(params: components.WikiFactSetEventPathParams, event_id: string) {
+	return webapi.get<components.WikiFactSetEventEnvelope>(`/internal/v1/knowledge/wiki-fact-sets/events/${event_id}`, params)
 }
 
 /**

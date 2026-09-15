@@ -305,6 +305,45 @@ export interface CreateWikiReq {
 export interface CreateWikiReqParams {
 }
 
+export interface FactSetFact {
+	fact_id: string
+	source_revision_id: string
+	source_content_sha256: string
+	locator: string
+	source_byte_start: string
+	source_byte_end: string
+	source_quote: string
+	source_quote_sha256: string
+	required: boolean
+	conflict_group?: string
+}
+
+export interface FactSetInputFact {
+	source_revision_id: string
+	locator: string
+	source_quote: string
+	source_quote_sha256: string
+	required: boolean
+	conflict_group?: string
+}
+
+export interface FactSetSourceRevision {
+	revision_id: string
+	content_sha256: string
+}
+
+export interface FreezeWikiFactSetReq {
+	origin_compile_id?: string
+	source_revisions: Array<FactSetSourceRevision>
+	facts: Array<FactSetInputFact>
+	facts_complete: boolean
+	reason: string
+	base_fact_set_revision_id?: string
+	idempotency_key: string
+}
+export interface FreezeWikiFactSetReqParams {
+}
+
 export interface GetAcceptedAnswerReq {
 }
 export interface GetAcceptedAnswerReqParams {
@@ -1013,6 +1052,68 @@ export interface WikiFactJudgmentRecord {
 	event_id?: string
 	event_raw_sha256?: string
 	event_jcs_sha256?: string
+}
+
+export interface WikiFactSetEnvelope {
+	code: number
+	msg: string
+	data: WikiFactSetRecord
+}
+
+export interface WikiFactSetEventEnvelope {
+	code: number
+	msg: string
+	data: WikiFactSetEventReceipt
+}
+
+export interface WikiFactSetEventPath {
+}
+export interface WikiFactSetEventPathParams {
+}
+
+export interface WikiFactSetEventReceipt {
+	event_id: string
+	event_json: string
+	event_raw_sha256: string
+	event_jcs_sha256: string
+	fact_set_jcs_sha256: string
+}
+
+export interface WikiFactSetRecord {
+	schema_version: string
+	fact_set_id: string
+	fact_set_revision_id: string
+	fact_set_revision: string
+	base_fact_set_revision_id: string
+	module_id: string
+	page_id: string
+	wiki_revision_id: string
+	base_wiki_revision_id: string
+	wiki_origin_kind: string
+	origin_compile_id?: string
+	wiki_content_sha256: string
+	source_scope_revision: string
+	source_revisions: Array<FactSetSourceRevision>
+	facts: Array<FactSetFact>
+	facts_complete: boolean
+	declaration_source: string
+	actor_id: string
+	reason: string
+	frozen_at: string
+	fact_set_jcs_sha256: string
+	event_id?: string
+	event_raw_sha256?: string
+	event_jcs_sha256?: string
+}
+
+export interface WikiFactSetRevisionPath {
+}
+export interface WikiFactSetRevisionPathParams {
+}
+
+export interface WikiFactSetScopePath {
+}
+export interface WikiFactSetScopePathParams {
 }
 
 export interface WikiPageHeadEnvelope {
