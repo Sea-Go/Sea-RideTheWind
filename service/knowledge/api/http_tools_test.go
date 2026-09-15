@@ -26,6 +26,38 @@ import (
 
 const toolFixtureScopeKey = "test-only-tools-scope-key-32-bytes-minimum"
 
+type toolFixtureScope struct {
+	Audience               string                   `json:"aud"`
+	Subject                types.AcceptedSubjectRef `json:"subject_ref"`
+	SessionID              string                   `json:"session_id"`
+	OperationID            string                   `json:"operation_id"`
+	BudgetRef              string                   `json:"budget_ref"`
+	SearchID               string                   `json:"search_id"`
+	SnapshotRef            string                   `json:"snapshot_ref"`
+	Snapshot               types.SearchSnapshot     `json:"snapshot"`
+	AllowPartial           bool                     `json:"allow_partial"`
+	AllowLowerIntelligence bool                     `json:"allow_lower_intelligence"`
+	RequestHash            string                   `json:"request_hash"`
+	IssuedAtUnix           int64                    `json:"issued_at_unix"`
+	ExpiresAtUnix          int64                    `json:"expires_at_unix"`
+}
+
+type toolFixtureScopeV2 struct {
+	Audience               string                     `json:"aud"`
+	Subject                types.AcceptedSubjectRefV2 `json:"subject_ref"`
+	SessionID              string                     `json:"session_id"`
+	OperationID            string                     `json:"operation_id"`
+	BudgetRef              string                     `json:"budget_ref"`
+	SearchID               string                     `json:"search_id"`
+	SnapshotRef            string                     `json:"snapshot_ref"`
+	Snapshot               types.SearchSnapshot       `json:"snapshot"`
+	AllowPartial           bool                       `json:"allow_partial"`
+	AllowLowerIntelligence bool                       `json:"allow_lower_intelligence"`
+	RequestHash            string                     `json:"request_hash"`
+	IssuedAtUnix           int64                      `json:"issued_at_unix"`
+	ExpiresAtUnix          int64                      `json:"expires_at_unix"`
+}
+
 type toolSearchFixture struct {
 	server     *httptest.Server
 	stage      atomic.Int64 // 1: forged evidence; 0: empty fixture; 2: transparent real BTW relay.
@@ -66,31 +98,53 @@ func newToolSearchFixture(t *testing.T) *toolSearchFixture {
 			http.Error(w, "bad signature", 400)
 			return
 		}
-		var scope struct {
-			Audience               string                   `json:"aud"`
-			Subject                types.AcceptedSubjectRef `json:"subject_ref"`
-			SessionID              string                   `json:"session_id"`
-			OperationID            string                   `json:"operation_id"`
-			BudgetRef              string                   `json:"budget_ref"`
-			SearchID               string                   `json:"search_id"`
-			SnapshotRef            string                   `json:"snapshot_ref"`
-			Snapshot               types.SearchSnapshot     `json:"snapshot"`
-			AllowPartial           bool                     `json:"allow_partial"`
-			AllowLowerIntelligence bool                     `json:"allow_lower_intelligence"`
-			RequestHash            string                   `json:"request_hash"`
-			IssuedAtUnix           int64                    `json:"issued_at_unix"`
-			ExpiresAtUnix          int64                    `json:"expires_at_unix"`
+		var scope toolFixtureScope
+		var aud struct {
+			Audience string `json:"aud"`
 		}
-		decoder := json.NewDecoder(bytes.NewReader(payload))
-		decoder.DisallowUnknownFields()
-		if decoder.Decode(&scope) != nil {
-			t.Error("malformed Tool scope")
+		if json.Unmarshal(payload, &aud) != nil {
+			t.Error("malformed Tool audience")
 			http.Error(w, "bad scope", 400)
 			return
 		}
-		canonical, _ := json.Marshal(scope)
+		var canonical []byte
+		if aud.Audience == "btw.search.tools.v2" {
+			var wire toolFixtureScopeV2
+			decoder := json.NewDecoder(bytes.NewReader(payload))
+			decoder.DisallowUnknownFields()
+			if decoder.Decode(&wire) != nil || decoder.Decode(new(any)) != io.EOF {
+				t.Error("malformed v2 Tool scope")
+				http.Error(w, "bad scope", 400)
+				return
+			}
+			canonical, _ = json.Marshal(wire)
+			if wire.Subject.Issuer != "rtw.identity" || wire.Subject.SubjectId == "" {
+				t.Error("wrong v2 Tool issuer or UID")
+				http.Error(w, "bad scope", 400)
+				return
+			}
+			scope = toolFixtureScope{Audience: wire.Audience,
+				Subject:   types.AcceptedSubjectRef{AuthorityId: wire.Subject.Issuer, TenantId: "platform", SubjectId: wire.Subject.SubjectId},
+				SessionID: wire.SessionID, OperationID: wire.OperationID, BudgetRef: wire.BudgetRef,
+				SearchID: wire.SearchID, SnapshotRef: wire.SnapshotRef, Snapshot: wire.Snapshot,
+				AllowPartial: wire.AllowPartial, AllowLowerIntelligence: wire.AllowLowerIntelligence,
+				RequestHash: wire.RequestHash, IssuedAtUnix: wire.IssuedAtUnix, ExpiresAtUnix: wire.ExpiresAtUnix}
+		} else {
+			decoder := json.NewDecoder(bytes.NewReader(payload))
+			decoder.DisallowUnknownFields()
+			if decoder.Decode(&scope) != nil || decoder.Decode(new(any)) != io.EOF {
+				t.Error("malformed v1 Tool scope")
+				http.Error(w, "bad scope", 400)
+				return
+			}
+			canonical, _ = json.Marshal(scope)
+		}
 		now := time.Now().Unix()
-		if !bytes.Equal(canonical, payload) || scope.Audience != "btw.search.tools.v1" ||
+		expectedAudience := "btw.search.tools.v1"
+		if os.Getenv("KNOWLEDGE_V2_PRODUCER_SCOPE") == "1" {
+			expectedAudience = "btw.search.tools.v2"
+		}
+		if !bytes.Equal(canonical, payload) || scope.Audience != expectedAudience ||
 			scope.Subject.AuthorityId != "rtw.identity" || scope.Subject.TenantId != "platform" ||
 			scope.Subject.SubjectId == "" || scope.SessionID != "tool-parent-session" ||
 			scope.OperationID == "" || scope.BudgetRef == "" || scope.SearchID == "" ||
@@ -118,7 +172,7 @@ func newToolSearchFixture(t *testing.T) *toolSearchFixture {
 				QuoteRunes int `json:"quote_runes"`
 			} `json:"limits"`
 		}
-		decoder = json.NewDecoder(bytes.NewReader(raw))
+		decoder := json.NewDecoder(bytes.NewReader(raw))
 		decoder.DisallowUnknownFields()
 		if decoder.Decode(&body) != nil {
 			t.Error("malformed Tool body")

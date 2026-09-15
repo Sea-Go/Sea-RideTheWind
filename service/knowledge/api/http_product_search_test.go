@@ -150,6 +150,20 @@ type productFixtureScope struct {
 	ExpiresAtUnix          int64                    `json:"expires_at_unix"`
 }
 
+type productFixtureScopeV2 struct {
+	Audience               string                     `json:"aud"`
+	Subject                types.AcceptedSubjectRefV2 `json:"subject_ref"`
+	SessionID              string                     `json:"session_id"`
+	SearchID               string                     `json:"search_id"`
+	AnswerID               string                     `json:"answer_id"`
+	Snapshot               types.SearchSnapshot       `json:"snapshot"`
+	AllowPartial           bool                       `json:"allow_partial"`
+	AllowLowerIntelligence bool                       `json:"allow_lower_intelligence"`
+	RequestHash            string                     `json:"request_hash"`
+	IssuedAtUnix           int64                      `json:"issued_at_unix"`
+	ExpiresAtUnix          int64                      `json:"expires_at_unix"`
+}
+
 type productSearchFixture struct {
 	server     *httptest.Server
 	stage      atomic.Int64 // 0: forged 200; 1: committed but lost reply; 2: committed 200; 3: blocked failure; 4: transparent real BTW relay
@@ -200,7 +214,12 @@ func newProductSearchFixture(t *testing.T, rtwBase *string, workerToken string) 
 		}
 		canonical, _ := json.Marshal(search)
 		hash := sha256.Sum256(canonical)
+		expectedAudience := "btw.search.summary.v1"
+		if os.Getenv("KNOWLEDGE_V2_PRODUCER_SCOPE") == "1" {
+			expectedAudience = "btw.search.summary.v2"
+		}
 		if !bytes.Equal(raw, canonical) || scope.RequestHash != hex.EncodeToString(hash[:]) ||
+			scope.Audience != expectedAudience ||
 			scope.Snapshot.ModuleId != search.ModuleID || scope.Subject.AuthorityId != "rtw.identity" ||
 			scope.Subject.TenantId != "platform" || scope.Subject.SubjectId == "" ||
 			scope.SessionID != "search-facade-session" || scope.AllowPartial || scope.AllowLowerIntelligence {
@@ -310,15 +329,45 @@ func decodeProductFixtureScope(t *testing.T, header string) (productFixtureScope
 		t.Error("invalid RTW scope signature")
 		return scope, false
 	}
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	decoder.DisallowUnknownFields()
-	if err = decoder.Decode(&scope); err != nil {
-		t.Error("malformed RTW scope payload")
+	var audience struct {
+		Audience string `json:"aud"`
+	}
+	if err = json.Unmarshal(payload, &audience); err != nil {
+		t.Error("malformed RTW scope audience")
 		return scope, false
 	}
-	canonical, _ := json.Marshal(scope)
+	var canonical []byte
+	if audience.Audience == "btw.search.summary.v2" {
+		var wire productFixtureScopeV2
+		decoder := json.NewDecoder(bytes.NewReader(payload))
+		decoder.DisallowUnknownFields()
+		if err = decoder.Decode(&wire); err != nil || decoder.Decode(new(any)) != io.EOF {
+			t.Error("malformed RTW v2 scope payload")
+			return scope, false
+		}
+		canonical, _ = json.Marshal(wire)
+		if wire.Subject.Issuer != "rtw.identity" || wire.Subject.SubjectId == "" {
+			t.Error("RTW v2 scope has wrong issuer or UID")
+			return scope, false
+		}
+		scope = productFixtureScope{Audience: wire.Audience,
+			Subject:   types.AcceptedSubjectRef{AuthorityId: wire.Subject.Issuer, TenantId: "platform", SubjectId: wire.Subject.SubjectId},
+			SessionID: wire.SessionID, SearchID: wire.SearchID, AnswerID: wire.AnswerID,
+			Snapshot: wire.Snapshot, AllowPartial: wire.AllowPartial,
+			AllowLowerIntelligence: wire.AllowLowerIntelligence, RequestHash: wire.RequestHash,
+			IssuedAtUnix: wire.IssuedAtUnix, ExpiresAtUnix: wire.ExpiresAtUnix}
+	} else {
+		decoder := json.NewDecoder(bytes.NewReader(payload))
+		decoder.DisallowUnknownFields()
+		if err = decoder.Decode(&scope); err != nil || decoder.Decode(new(any)) != io.EOF {
+			t.Error("malformed RTW v1 scope payload")
+			return scope, false
+		}
+		canonical, _ = json.Marshal(scope)
+	}
 	now := time.Now().Unix()
-	if !bytes.Equal(payload, canonical) || scope.Audience != "btw.search.summary.v1" ||
+	if !bytes.Equal(payload, canonical) ||
+		(scope.Audience != "btw.search.summary.v1" && scope.Audience != "btw.search.summary.v2") ||
 		scope.IssuedAtUnix > now+30 || scope.IssuedAtUnix < now-300 ||
 		scope.ExpiresAtUnix <= now || scope.ExpiresAtUnix-scope.IssuedAtUnix > 300 {
 		t.Error("noncanonical, stale or wrong-audience scope")

@@ -24,6 +24,7 @@ import (
 	"sea-try-go/service/knowledge/api/internal/model"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/zeromicro/go-zero/core/conf"
 
 	"google.golang.org/grpc"
@@ -88,6 +89,20 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	publishNewRelease := os.Getenv("SEA_BGE_WORKER_PUBLISH_SEARCH") == "1"
 	contract := loadGeneratedHTTPContract(t)
 	s := testenv.Store(t)
+	if os.Getenv("KNOWLEDGE_V2_PRODUCER_SCOPE") == "1" {
+		if !realUser || os.Getenv("KNOWLEDGE_SUBJECTREF_V2_TEST_NONCE") == "" {
+			t.Fatal("v2 producer scope requires real UserCenter and a marked disposable PG")
+		}
+		for _, name := range []string{"migrate-subjectref-v2-storage.sql", "migrate-subjectref-v2-search-scopes.sql"} {
+			raw, readErr := os.ReadFile(filepath.Join("..", "scripts", name))
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if _, execErr := s.DB.Exec(context.Background(), string(raw), pgx.QueryExecModeSimpleProtocol); execErr != nil {
+				t.Fatalf("local owner candidate %s: %v", name, execErr)
+			}
+		}
+	}
 	dir := t.TempDir()
 	objects, err := object.NewLocal(filepath.Join(dir, "objects"))
 	if err != nil {
@@ -150,12 +165,20 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	searchFixture := newProductSearchFixture(t, &base, c.WorkerToken)
 	c.SearchSummary.Endpoint = searchFixture.server.URL + "/v1/search/summary"
 	c.SearchSummary.ScopeKey = productFixtureScopeKey
+	if os.Getenv("KNOWLEDGE_V2_PRODUCER_SCOPE") == "1" {
+		c.SearchSummary.ScopeVersion = "v2"
+		c.SubjectRefV2Writes.Enabled = true
+		c.SubjectRefV2Writes.LocalTestNonce = os.Getenv("KNOWLEDGE_SUBJECTREF_V2_TEST_NONCE")
+	}
 	if os.Getenv("SEA_BTW_SUMMARY_DC_RUNTIME_FILE") != "" {
 		c.SearchSummary.FastTimeoutMillis = 60000 // measured local Ollama may need more than the fixed fixture
 	}
 	toolFixture := newToolSearchFixture(t)
 	c.SearchTools.Endpoint = toolFixture.server.URL + "/v1/search/tools/search"
 	c.SearchTools.ScopeKey = toolFixtureScopeKey
+	if os.Getenv("KNOWLEDGE_V2_PRODUCER_SCOPE") == "1" {
+		c.SearchTools.ScopeVersion = "v2"
+	}
 	c.SearchJudgments.Enabled = true
 	c.GroundingReviews.Enabled = true
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
