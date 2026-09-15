@@ -317,7 +317,8 @@ func scanTurns(ctx context.Context, tx pgx.Tx, r *report) error {
 	const trigger = `SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
  WHERE t.tgrelid='knowledge_accepted_answers'::regclass AND t.tgname='knowledge_accepted_answer_immutable'
  AND NOT t.tgisinternal AND t.tgenabled IN ('O','A') AND p.proname='knowledge_immutable_payload'
- AND (t.tgtype & 2)<>0 AND (t.tgtype & 8)<>0 AND (t.tgtype & 16)<>0)`
+ AND (t.tgtype & 1)<>0 AND (t.tgtype & 2)<>0 AND (t.tgtype & 8)<>0 AND (t.tgtype & 16)<>0
+ AND t.tgqual IS NULL)`
 	if err := tx.QueryRow(ctx, trigger).Scan(&immutable); err != nil {
 		return err
 	}
@@ -341,6 +342,12 @@ func scanTurns(ctx context.Context, tx pgx.Tx, r *report) error {
 		if hash != hex.EncodeToString(h[:]) {
 			r.add("knowledge_accepted_answers", "turn_hash_mismatch", ref, 0)
 		}
+		ambiguous, ambiguityErr := ambiguousFrozenTurnKeys([]byte(raw))
+		if ambiguityErr != nil {
+			r.add("knowledge_accepted_answers", "turn_key_scan_failed", ref, 0)
+		} else if ambiguous {
+			r.add("knowledge_accepted_answers", "ambiguous_turn_identity", ref, 0)
+		}
 		var turn struct {
 			Request struct {
 				AnswerID  string `json:"AnswerID"`
@@ -352,12 +359,30 @@ func scanTurns(ctx context.Context, tx pgx.Tx, r *report) error {
 					SubjectID   string `json:"subject_id"`
 				} `json:"Subject"`
 			} `json:"Request"`
+			Result struct {
+				AnswerID string `json:"answer_id"`
+				Search   struct {
+					Pack json.RawMessage `json:"evidence_pack"`
+				} `json:"search"`
+			} `json:"result"`
 		}
-		if err := json.Unmarshal([]byte(raw), &turn); err != nil ||
-			turn.Request.AnswerID != id || turn.Request.SearchID != search || turn.Request.SessionID != session ||
+		if err := json.Unmarshal([]byte(raw), &turn); err != nil {
+			r.add("knowledge_accepted_answers", "turn_identity_mismatch", ref, 0)
+			continue
+		}
+		if turn.Request.AnswerID != id || turn.Request.SearchID != search || turn.Request.SessionID != session ||
 			turn.Request.Subject.AuthorityID != a || turn.Request.Subject.TenantID != t ||
 			turn.Request.Subject.SubjectID != s {
 			r.add("knowledge_accepted_answers", "turn_identity_mismatch", ref, 0)
+		}
+		if turn.Result.AnswerID != id {
+			r.add("knowledge_accepted_answers", "turn_result_answer_mismatch", ref, 0)
+		}
+		var pack struct {
+			SearchID string `json:"search_id"`
+		}
+		if err := json.Unmarshal(turn.Result.Search.Pack, &pack); err != nil || pack.SearchID != search {
+			r.add("knowledge_accepted_answers", "turn_pack_search_mismatch", ref, 0)
 		}
 	}
 	return rows.Err()
