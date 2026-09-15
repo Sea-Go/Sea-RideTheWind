@@ -86,6 +86,33 @@ func TestFavoriteSubjectRefV2NewFactsAndRetractInheritFrozenSchema(t *testing.T)
 	}
 }
 
+func TestFavoriteSubjectRefV2PreservesHighRTWUIDInJCS(t *testing.T) {
+	const uid int64 = 9007199254740993 // above JCS's exact JSON-number range
+	item := FavoriteItem{FavoriteId: 9007199254740995, FolderId: 9007199254740997,
+		UserId: uid, TargetType: "article", TargetId: "high-uid-article"}
+	row, err := favoriteOutboxV2(item, 1, "assert", time.Date(2026, 9, 15, 8, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var event FavoriteWireEvent
+	if strictFavoriteJSON([]byte(row.Payload), &event) != nil || !validFavoriteDelivery(row, event) {
+		t.Fatal("high UID v2 EventSpec invalid")
+	}
+	var body authorityPayload
+	if strictFavoriteJSON(event.Payload, &body) != nil {
+		t.Fatal("high UID v2 payload invalid")
+	}
+	projected, ok := favoriteSubjectV1(2, body.Subject)
+	if !ok || projected.SubjectID != "9007199254740993" ||
+		!strings.Contains(string(body.Subject), `"subject_id":"9007199254740993"`) ||
+		strings.Contains(string(body.Subject), `"tenant_id"`) {
+		t.Fatalf("RTW positive int64 UID lost exact v2 representation: %s", body.Subject)
+	}
+	if hash, err := favoriteJCSHash([]byte(row.Payload)); err != nil || !favoriteReceiptHash.MatchString(hash) {
+		t.Fatalf("high UID JCS hash failed: %s %v", hash, err)
+	}
+}
+
 func TestFavoriteSubjectRefV2AuthorityAndBadFrozenVersions(t *testing.T) {
 	store := favoriteFactStore(t)
 	v2 := NewFavoriteModel(store.conn, WithSubjectRefV2Facts())
