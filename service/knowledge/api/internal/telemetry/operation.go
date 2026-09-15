@@ -39,6 +39,7 @@ var operations = map[string]bool{
 	"knowledge.outbox.poll":             true,
 	"knowledge.search.snapshot.current": true, "knowledge.search.source.read": true, "knowledge.search.citations.accept": true, "knowledge.search.citations.get": true,
 	"knowledge.answer.accept": true, "knowledge.answer.get": true, "knowledge.answer.list": true,
+	"knowledge.answer.v2.get": true, "knowledge.answer.v2.list": true,
 	"knowledge.product.search": true, "knowledge.product.search.get": true,
 	"knowledge.reviewer.key.register": true, "knowledge.reviewer.key.revoke": true, "knowledge.reviewer.key.get": true,
 	"knowledge.answer.grounding.review.submit": true, "knowledge.answer.grounding.review.get": true,
@@ -46,7 +47,8 @@ var operations = map[string]bool{
 
 var readOnlyOperations = map[string]bool{
 	"knowledge.search.snapshot.current": true, "knowledge.search.source.read": true, "knowledge.search.citations.get": true,
-	"knowledge.answer.get": true, "knowledge.answer.list": true, "knowledge.outbox.poll": true,
+	"knowledge.answer.get": true, "knowledge.answer.list": true,
+	"knowledge.answer.v2.get": true, "knowledge.answer.v2.list": true, "knowledge.outbox.poll": true,
 	"knowledge.product.search.get": true,
 	"knowledge.reviewer.key.get":   true, "knowledge.answer.grounding.review.get": true,
 }

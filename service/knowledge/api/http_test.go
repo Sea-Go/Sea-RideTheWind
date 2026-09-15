@@ -1751,6 +1751,15 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatalf("missing real metric %s", name)
 		}
 	}
+	for _, operation := range []string{"knowledge.answer.v2.get", "knowledge.answer.v2.list"} {
+		line := `sea_knowledge_operations_total{error_code="NONE",operation="` + operation + `",outcome="succeeded"}`
+		if !bytes.Contains(metricBody, []byte(line)) {
+			t.Fatalf("v2 read missing its bounded operation metric %s", operation)
+		}
+		if bytes.Contains(metricBody, []byte(`sea_knowledge_commits_total{operation="`+operation+`"}`)) {
+			t.Fatalf("v2 historical GET counted as a write: %s", operation)
+		}
+	}
 	if evidence := os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR"); evidence != "" {
 		if err := os.MkdirAll(evidence, 0700); err != nil {
 			t.Fatal(err)
@@ -1844,6 +1853,17 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 				t.Fatalf("citation stage logged source quote: %#v", record)
 			}
 		}
+		if strings.HasPrefix(event, "knowledge.answer.v2.") {
+			if record["trace_id"] == nil || record["span_id"] == nil ||
+				record["request_id"] == nil || record["operation_id"] == nil {
+				t.Fatalf("v2 historical stage lost request/operation/trace: %#v", record)
+			}
+			if strings.HasSuffix(event, ".succeeded") || strings.HasSuffix(event, ".rejected") || strings.HasSuffix(event, ".failed") {
+				if record["outcome"] == nil || record["duration_ms"] == nil {
+					t.Fatalf("v2 historical terminal stage lost outcome/duration: %#v", record)
+				}
+			}
+		}
 		if event == "http.request.completed" && record["route"] == "unmatched" && record["method"] == "POST" && record["status"] == float64(404) {
 			seenUnmatchedPost = true
 		}
@@ -1851,7 +1871,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if !seenUnmatchedPost {
 		t.Fatal("unmatched POST lost its bounded actual HTTP method")
 	}
-	for _, event := range []string{"knowledge.service.starting", "knowledge.service.started", "knowledge.module.create.succeeded", "knowledge.release.activate.rejected", "knowledge.search.snapshot.current.succeeded", "knowledge.search.source.read.succeeded", "knowledge.search.citations.accept.succeeded", "knowledge.search.citations.accept.replayed", "knowledge.search.citations.get.succeeded", "http.request.completed"} {
+	for _, event := range []string{"knowledge.service.starting", "knowledge.service.started", "knowledge.module.create.succeeded", "knowledge.release.activate.rejected", "knowledge.search.snapshot.current.succeeded", "knowledge.search.source.read.succeeded", "knowledge.search.citations.accept.succeeded", "knowledge.search.citations.accept.replayed", "knowledge.search.citations.get.succeeded", "knowledge.answer.v2.get.succeeded", "knowledge.answer.v2.list.succeeded", "http.request.completed"} {
 		if !seen[event] {
 			t.Fatalf("missing runtime event %s in %d records", event, len(records))
 		}
