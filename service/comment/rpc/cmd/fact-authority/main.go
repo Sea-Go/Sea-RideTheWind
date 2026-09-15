@@ -21,13 +21,24 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil)).With("service", "rtw-comment-fact-authority")
-	slog.SetDefault(logger)
-	if err := run(logger); err != nil {
+	started := time.Now()
+	meta := communityfact.ProcessMetadata{Service: "rtw-comment-fact-authority", Environment: os.Getenv("RTW_ENVIRONMENT"),
+		Version: os.Getenv("RTW_SERVICE_VERSION"), InstanceID: os.Getenv("RTW_INSTANCE_ID"), Component: "community"}
+	logger := communityfact.NewProcessLogger(os.Stderr, meta)
+	tracing := communityfact.InstallLocalTracing()
+	defer tracing.Shutdown(context.Background())
+	err := meta.Validate()
+	if err == nil {
+		err = run(logger)
+	}
+	if err != nil {
 		logger.Error("comment fact authority stopped", "event", "comment.fact_authority.stopped",
-			"outcome", "failed", "error_code", "AUTHORITY_UNAVAILABLE", "error_type", "process")
+			"outcome", "failed", "duration_ms", float64(time.Since(started).Microseconds())/1000,
+			"error_code", "AUTHORITY_UNAVAILABLE", "error_type", "process")
 		os.Exit(1)
 	}
+	logger.Info("comment fact authority stopped", "event", "comment.fact_authority.stopped",
+		"outcome", "succeeded", "duration_ms", float64(time.Since(started).Microseconds())/1000)
 }
 
 func run(logger *slog.Logger) error {
@@ -51,7 +62,7 @@ func run(logger *slog.Logger) error {
 	if err := sqlDB.PingContext(ctx); err != nil {
 		return err
 	}
-	handler, err := communityfact.NewAuthorityHandler("rtw.comment-rpc", token, model.NewCommentModel(db).AuthoritativeFact)
+	handler, err := communityfact.NewAuthorityHandler("rtw.comment-rpc", token, model.NewCommentModel(db).AuthoritativeFact, logger)
 	if err != nil {
 		return err
 	}
@@ -64,7 +75,7 @@ func run(logger *slog.Logger) error {
 	finished := make(chan error, 1)
 	go func() { finished <- server.Serve(listener) }()
 	logger.InfoContext(ctx, "comment fact authority started", "event", "comment.fact_authority.started",
-		"outcome", "succeeded", "address", listener.Addr().String())
+		"address", listener.Addr().String())
 	select {
 	case err := <-finished:
 		if errors.Is(err, http.ErrServerClosed) {

@@ -23,13 +23,24 @@ import (
 func main() {
 	once := flag.Bool("once", false, "dispatch at most one pending comment fact")
 	flag.Parse()
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil)).With("service", "rtw-comment-fact-dispatch")
-	slog.SetDefault(logger)
-	if err := run(*once, logger); err != nil {
+	started := time.Now()
+	meta := communityfact.ProcessMetadata{Service: "rtw-comment-fact-dispatch", Environment: os.Getenv("RTW_ENVIRONMENT"),
+		Version: os.Getenv("RTW_SERVICE_VERSION"), InstanceID: os.Getenv("RTW_INSTANCE_ID"), Component: "community"}
+	logger := communityfact.NewProcessLogger(os.Stderr, meta)
+	tracing := communityfact.InstallLocalTracing()
+	defer tracing.Shutdown(context.Background())
+	err := meta.Validate()
+	if err == nil {
+		err = run(*once, logger)
+	}
+	if err != nil {
 		logger.Error("comment fact dispatcher stopped", "event", "comment.fact_delivery.stopped",
-			"outcome", "failed", "error_code", "DELIVERY_FAILED", "error_type", "process")
+			"outcome", "failed", "duration_ms", float64(time.Since(started).Microseconds())/1000,
+			"error_code", "DELIVERY_FAILED", "error_type", "process")
 		os.Exit(1)
 	}
+	logger.Info("comment fact dispatcher stopped", "event", "comment.fact_delivery.stopped",
+		"outcome", "succeeded", "duration_ms", float64(time.Since(started).Microseconds())/1000)
 }
 
 func run(once bool, logger *slog.Logger) error {
