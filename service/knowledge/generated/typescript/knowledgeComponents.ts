@@ -348,6 +348,25 @@ export interface GroundingReviewReceiptEnvelope {
 	data: GroundingReviewReceipt
 }
 
+export interface JudgeWikiFactReq {
+	origin_compile_id?: string
+	source_revision_id: string
+	source_content_sha256: string
+	locator: string
+	source_quote: string
+	source_quote_sha256: string
+	wiki_claim_text?: string
+	wiki_claim_sha256?: string
+	assessment: string
+	grade?: string
+	rubric_version: string
+	reason: string
+	base_judge_revision_id?: string
+	idempotency_key: string
+}
+export interface JudgeWikiFactReqParams {
+}
+
 export interface ListAcceptedAnswersReq {
 }
 export interface ListAcceptedAnswersReqParams {
@@ -419,6 +438,24 @@ export interface ListRevisionsRespEnvelope {
 	code: number
 	msg: string
 	data: ListRevisionsResp
+}
+
+export interface ListWikiFactJudgmentsEnvelope {
+	code: number
+	msg: string
+	data: ListWikiFactJudgmentsResp
+}
+
+export interface ListWikiFactJudgmentsReq {
+}
+export interface ListWikiFactJudgmentsReqParams {
+	limit?: number
+	cursor?: string
+}
+
+export interface ListWikiFactJudgmentsResp {
+	items: Array<WikiFactJudgmentRecord>
+	next_cursor?: string
 }
 
 export interface Module {
@@ -928,6 +965,94 @@ export interface ToolSearchResult {
 export interface ToolUsage {
 	read_calls: number
 	quote_runes: number
+}
+
+export interface WikiFactJudgmentEnvelope {
+	code: number
+	msg: string
+	data: WikiFactJudgmentRecord
+}
+
+export interface WikiFactJudgmentPath {
+}
+export interface WikiFactJudgmentPathParams {
+}
+
+export interface WikiFactJudgmentRecord {
+	schema_version: string
+	judgment_id: string
+	fact_id: string
+	judge_revision_id: string
+	judge_revision: string
+	base_judge_revision_id: string
+	module_id: string
+	page_id: string
+	wiki_revision_id: string
+	base_wiki_revision_id: string
+	wiki_origin_kind: string
+	origin_compile_id?: string
+	wiki_content_sha256: string
+	source_revision_id: string
+	source_content_sha256: string
+	locator: string
+	source_byte_start: string
+	source_byte_end: string
+	source_quote: string
+	source_quote_sha256: string
+	wiki_claim_text?: string
+	wiki_claim_sha256?: string
+	citation_present: boolean
+	assessment: string
+	grade?: string
+	rubric_version: string
+	reason: string
+	actor_id: string
+	judged_at: string
+	source_withdrawn: boolean
+	wiki_withdrawn: boolean
+	event_id?: string
+	event_raw_sha256?: string
+	event_jcs_sha256?: string
+}
+
+export interface WikiPageHeadEnvelope {
+	code: number
+	msg: string
+	data: WikiPageHeadSnapshot
+}
+
+export interface WikiPageHeadPath {
+}
+export interface WikiPageHeadPathParams {
+}
+
+export interface WikiPageHeadSnapshot {
+	module_id: string
+	page_id: string
+	revision_id: string
+	base_revision_id: string
+	content_sha256: string
+	title: string
+	created_by: string
+	withdrawn: boolean
+}
+
+export interface WikiQualityEventEnvelope {
+	code: number
+	msg: string
+	data: WikiQualityEventReceipt
+}
+
+export interface WikiQualityEventPath {
+}
+export interface WikiQualityEventPathParams {
+}
+
+export interface WikiQualityEventReceipt {
+	event_id: string
+	event_json: string
+	event_raw_sha256: string
+	event_jcs_sha256: string
 }
 
 export interface WithdrawReq {

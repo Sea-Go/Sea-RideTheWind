@@ -149,6 +149,9 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	if c.WikiCompileJobs.Enabled {
 		storeOptions = append(storeOptions, model.WithWikiCompileJobs())
 	}
+	if c.WikiQualityJudgments.Enabled {
+		storeOptions = append(storeOptions, model.WithWikiQualityJudgments())
+	}
 	store := model.New(pool, objects, storeOptions...)
 	if c.Postgres.Migrate {
 		if err = store.Migrate(ctx); err != nil {
@@ -175,6 +178,11 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 	}
 	if c.SearchJudgments.Enabled {
 		if err = store.CheckSearchJudgmentSchema(ctx); err != nil {
+			return fail(err)
+		}
+	}
+	if c.WikiQualityJudgments.Enabled {
+		if err = store.CheckWikiQualitySchema(ctx); err != nil {
 			return fail(err)
 		}
 	}
