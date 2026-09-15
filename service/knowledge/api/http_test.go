@@ -1040,7 +1040,15 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		callsBeforeCited := searchFixture.calls.Load()
 		var cited types.ProductSearchResult
 		citedStarted := time.Now()
-		request("POST", searchPath, productToken, citedBody, &cited, 200)
+		webSearch := false
+		if realUser {
+			cited, webSearch = waitWebProductSearch(t, realUsers, base, m.Id,
+				"search-facade-session", citedBody["query"].(string),
+				citedBody["idempotency_key"].(string))
+		}
+		if !webSearch {
+			request("POST", searchPath, productToken, citedBody, &cited, 200)
+		}
 		citedLatency := time.Since(citedStarted)
 		answerValid := cited.Answer == "The published source states: "+quote
 		if formalAPI != nil && formalAPI.liveGateway {
