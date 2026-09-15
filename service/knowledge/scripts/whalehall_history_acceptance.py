@@ -25,9 +25,12 @@ def wait_ready(path: Path, process: subprocess.Popen, timeout: float) -> None:
     raise RuntimeError("RTW shared history source timed out before ready")
 
 
-def run_bun(whalehall: Path, ready: Path, log: Path) -> dict:
+def run_bun(whalehall: Path, ready: Path, log: Path, read_version: str,
+            expected_other_account_items: int) -> dict:
     env = os.environ.copy()
     env["RTW_CLOUD_HISTORY_READY"] = str(ready)
+    env["RTW_CLOUD_HISTORY_READ_VERSION"] = read_version
+    env["RTW_CLOUD_HISTORY_EXPECTED_OTHER_ACCOUNT_ITEMS"] = str(expected_other_account_items)
     result = subprocess.run(["bun", "tests/rtw-cloud-history-handoff.ts"], cwd=whalehall,
                             env=env, capture_output=True, timeout=75)
     log.write_bytes(result.stdout + result.stderr)
@@ -45,7 +48,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--whalehall-root", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--read-version", choices=("v1", "v2"), default="v1")
+    parser.add_argument("--expected-other-account-items", type=int, default=0)
     args = parser.parse_args()
+    if not 0 <= args.expected_other_account_items <= 20:
+        raise RuntimeError("expected other account item count must be in 0..20")
     whalehall, output = Path(args.whalehall_root).resolve(), Path(args.output).resolve()
     if not (whalehall / "tests" / "rtw-cloud-history-handoff.ts").is_file():
         raise RuntimeError("WhaleHall handoff test unavailable")
@@ -62,18 +69,28 @@ def main() -> None:
                                   cwd=ROOT, env=env, stdout=sink, stderr=subprocess.STDOUT)
         try:
             wait_ready(paths["available.json"], source, 180)
-            available = run_bun(whalehall, paths["available.json"], output / "whalehall-available.log")
+            available = run_bun(whalehall, paths["available.json"], output / "whalehall-available.log",
+                                args.read_version, args.expected_other_account_items)
             paths["available.release"].touch(exist_ok=False)
             wait_ready(paths["withdrawn.json"], source, 180)
-            withdrawn = run_bun(whalehall, paths["withdrawn.json"], output / "whalehall-withdrawn.log")
+            withdrawn = run_bun(whalehall, paths["withdrawn.json"], output / "whalehall-withdrawn.log",
+                                args.read_version, args.expected_other_account_items)
             paths["withdrawn.release"].touch(exist_ok=False)
             if source.wait(timeout=120) != 0:
                 raise RuntimeError(f"RTW shared source failed after release; inspect {source_log}")
             if available.get("stage") != "available" or withdrawn.get("stage") != "withdrawn" or \
-                    available.get("otherAccountItems") != 0 or withdrawn.get("otherAccountItems") != 0:
+                    any(stage.get("otherAccountItems") != args.expected_other_account_items or
+                        stage.get("otherAccountTargetItems", 0) != 0 or
+                        stage.get("quoteFieldExposed") is not False or
+                        stage.get("readVersion", "v1") != args.read_version or
+                        (args.expected_other_account_items > 0 and
+                         "otherAccountTargetItems" not in stage)
+                        for stage in (available, withdrawn)):
                 raise RuntimeError("RTW/WhaleHall stage or identity contract differs")
             report = {"status": "passed", "source": "isolated_real_RTW_UserCenter_Knowledge_HTTP",
                       "client": "WhaleHall_Bun_RTWCloudHistoryClient", "stages": [available, withdrawn],
+                      "read_version": args.read_version,
+                      "expected_other_account_items": args.expected_other_account_items,
                       "renderer_window_visual": "not_verified", "production_account_binding": "not_connected"}
             (output / "report.json").write_text(json.dumps(report, sort_keys=True, indent=2) + "\n")
             print(f"Final report: {output / 'report.json'}")
