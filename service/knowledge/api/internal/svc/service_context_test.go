@@ -1,10 +1,21 @@
 package svc
 
 import (
+	"context"
+	"errors"
+	"net"
+	"os"
 	"strings"
 	"testing"
 
 	"sea-try-go/service/knowledge/api/internal/config"
+	"sea-try-go/service/knowledge/api/internal/model"
+	"sea-try-go/service/knowledge/api/internal/object"
+	"sea-try-go/service/user/user/rpc/pb"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/grpc"
 )
 
 func TestProductIdentityRequiresUserIssuerAndRPC(t *testing.T) {
@@ -19,4 +30,81 @@ func TestProductIdentityRequiresUserIssuerAndRPC(t *testing.T) {
 	if _, err := NewServiceContext(c, nil); err == nil || !strings.Contains(err.Error(), "user RPC configuration") {
 		t.Fatalf("missing user RPC accepted: %v", err)
 	}
+}
+
+func TestContinuousSubjectRefV2CandidateCannotStartInProMode(t *testing.T) {
+	var c config.Config
+	c.Auth.AccessSecret = "admin-test-secret"
+	c.UserAuth.AccessSecret = "user-test-secret"
+	c.WorkerToken = "worker-test-token"
+	c.AdministratorIDs = []string{"1"}
+	c.UserRpc.Endpoints = []string{"127.0.0.1:12345"}
+	c.Mode = "pro"
+	c.SubjectRefV2Writes.Enabled = true
+	if _, err := NewServiceContext(c, nil); err == nil ||
+		!strings.Contains(err.Error(), "limited to a marked local test database") {
+		t.Fatalf("production mode reached candidate database setup: %v", err)
+	}
+}
+
+func TestContinuousSubjectRefV2CandidateServiceAssemblyRequiresOwnerGate(t *testing.T) {
+	dsn, nonce := os.Getenv("KNOWLEDGE_TEST_DSN"), os.Getenv("KNOWLEDGE_SUBJECTREF_V2_TEST_NONCE")
+	if dsn == "" || nonce == "" {
+		t.Skip("isolated PG16 runner provisions a DB-owner marker before candidate assembly")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	objects, err := object.NewLocal(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := model.New(pool, objects)
+	if err = store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile("../../../scripts/migrate-subjectref-v2-storage.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = pool.Exec(ctx, string(raw), pgx.QueryExecModeSimpleProtocol); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := grpc.NewServer()
+	pb.RegisterUserServiceServer(server, pb.UnimplementedUserServiceServer{})
+	done := make(chan struct{})
+	go func() { defer close(done); _ = server.Serve(listener) }()
+	defer func() { server.Stop(); _ = listener.Close(); <-done }()
+	var c config.Config
+	c.Auth.AccessSecret = "admin-test-secret"
+	c.UserAuth.AccessSecret = "user-test-secret"
+	c.WorkerToken = "worker-test-token"
+	c.AdministratorIDs = []string{"1"}
+	c.UserRpc.Endpoints = []string{listener.Addr().String()}
+	c.Mode = "dev"
+	c.Postgres.DSN = dsn
+	c.Postgres.MaxConnections = 8
+	c.Objects.Backend = "local"
+	c.Objects.LocalDirectory = t.TempDir()
+	c.SubjectRefV2Writes.Enabled = true
+	c.SubjectRefV2Writes.LocalTestNonce = strings.Repeat("0", 64)
+	if assembled, err := NewServiceContext(c, nil); !errors.Is(err, model.ErrUnavailable) || assembled != nil {
+		if assembled != nil {
+			assembled.Close()
+		}
+		t.Fatalf("wrong DB-owner marker assembled v2 writes: %v", err)
+	}
+	c.SubjectRefV2Writes.LocalTestNonce = nonce
+	assembled, err := NewServiceContext(c, nil)
+	if err != nil {
+		t.Fatalf("valid owner-marked DB rejected full service assembly: %v", err)
+	}
+	assembled.Close()
 }
