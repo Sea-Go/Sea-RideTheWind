@@ -289,6 +289,35 @@ type (
 		TenantId    string `json:"tenant_id"`
 		SubjectId   string `json:"subject_id"`
 	}
+	// Product read projection only. The immutable v1 turn_json retains its old subject.
+	AcceptedSubjectRefV2 {
+		Issuer    string `json:"issuer"`
+		SubjectId string `json:"subject_id"`
+	}
+	AcceptedAnswerV2 {
+		AnswerId        string               `json:"answer_id"`
+		SearchId        string               `json:"search_id"`
+		Subject         AcceptedSubjectRefV2 `json:"subject"`
+		SessionId       string               `json:"session_id"`
+		Status          string               `json:"status"`
+		AcceptedOrdinal int64                `json:"accepted_ordinal"`
+		AcceptedAt      string               `json:"accepted_at"`
+		TurnJson        string               `json:"turn_json"`
+	}
+	AcceptedAnswerV2Envelope {
+		Code int              `json:"code"`
+		Msg  string           `json:"msg"`
+		Data AcceptedAnswerV2 `json:"data"`
+	}
+	AcceptedAnswersPageV2 {
+		Items       []AcceptedAnswerV2 `json:"items"`
+		NextOrdinal int64              `json:"next_ordinal,optional,omitempty"`
+	}
+	AcceptedAnswersPageV2Envelope {
+		Code int                   `json:"code"`
+		Msg  string                `json:"msg"`
+		Data AcceptedAnswersPageV2 `json:"data"`
+	}
 	CommitAcceptedAnswerReq {
 		AnswerId  string             `json:"answer_id"`
 		SearchId  string             `json:"search_id"`
@@ -928,6 +957,24 @@ service knowledge-api {
 	get /answer-sessions/:session_id/accepted-answers/:answer_id (ProductAcceptedAnswerReq) returns (AcceptedAnswerEnvelope)
 
 	@handler GetProductAnswerCitationStates
+	get /answer-sessions/:session_id/accepted-answers/:answer_id/citations (ProductAcceptedAnswerReq) returns (ProductAnswerCitationStatesEnvelope)
+}
+
+// v2 is a read-only product projection over the unchanged v1 historical rows.
+// The authenticated subject is still resolved by RTW User Center, never by a caller field.
+@server (
+	prefix: /v2/knowledge
+	group:  product_v2
+	jwt:    UserAuth
+)
+service knowledge-api {
+	@handler ListProductAcceptedAnswersV2
+	get /answer-sessions/:session_id/accepted-answers (ProductAcceptedAnswersReq) returns (AcceptedAnswersPageV2Envelope)
+
+	@handler GetProductAcceptedAnswerV2
+	get /answer-sessions/:session_id/accepted-answers/:answer_id (ProductAcceptedAnswerReq) returns (AcceptedAnswerV2Envelope)
+
+	@handler GetProductAnswerCitationStatesV2
 	get /answer-sessions/:session_id/accepted-answers/:answer_id/citations (ProductAcceptedAnswerReq) returns (ProductAnswerCitationStatesEnvelope)
 }
 

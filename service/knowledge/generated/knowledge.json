@@ -7610,6 +7610,369 @@
           }
         }
       }
+    },
+    "/v2/knowledge/answer-sessions/{session_id}/accepted-answers": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ListProductAcceptedAnswersV2",
+        "operationId": "productV2ListProductAcceptedAnswersV2",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "name": "after_ordinal",
+            "in": "query",
+            "allowEmptyValue": true
+          },
+          {
+            "type": "integer",
+            "default": 50,
+            "name": "limit",
+            "in": "query",
+            "allowEmptyValue": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "answer_id",
+                          "search_id",
+                          "subject",
+                          "session_id",
+                          "status",
+                          "accepted_ordinal",
+                          "accepted_at",
+                          "turn_json"
+                        ],
+                        "properties": {
+                          "accepted_at": {
+                            "type": "string"
+                          },
+                          "accepted_ordinal": {
+                            "type": "integer"
+                          },
+                          "answer_id": {
+                            "type": "string"
+                          },
+                          "search_id": {
+                            "type": "string"
+                          },
+                          "session_id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "subject": {
+                            "type": "object",
+                            "required": [
+                              "issuer",
+                              "subject_id"
+                            ],
+                            "properties": {
+                              "issuer": {
+                                "type": "string"
+                              },
+                              "subject_id": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "turn_json": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "next_ordinal": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/knowledge/answer-sessions/{session_id}/accepted-answers/{answer_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetProductAcceptedAnswerV2",
+        "operationId": "productV2GetProductAcceptedAnswerV2",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "answer_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "answer_id",
+                    "search_id",
+                    "subject",
+                    "session_id",
+                    "status",
+                    "accepted_ordinal",
+                    "accepted_at",
+                    "turn_json"
+                  ],
+                  "properties": {
+                    "accepted_at": {
+                      "type": "string"
+                    },
+                    "accepted_ordinal": {
+                      "type": "integer"
+                    },
+                    "answer_id": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "object",
+                      "required": [
+                        "issuer",
+                        "subject_id"
+                      ],
+                      "properties": {
+                        "issuer": {
+                          "type": "string"
+                        },
+                        "subject_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "turn_json": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/knowledge/answer-sessions/{session_id}/accepted-answers/{answer_id}/citations": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetProductAnswerCitationStatesV2",
+        "operationId": "productV2GetProductAnswerCitationStatesV2",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "session_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "answer_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "answer_id",
+                    "search_id",
+                    "status",
+                    "module_id",
+                    "release_id",
+                    "publication_revision",
+                    "citations"
+                  ],
+                  "properties": {
+                    "answer_id": {
+                      "type": "string"
+                    },
+                    "citations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "evidence_id",
+                          "source_kind",
+                          "content_id",
+                          "revision_id",
+                          "chunk_id",
+                          "original",
+                          "locator",
+                          "quote_hash",
+                          "state"
+                        ],
+                        "properties": {
+                          "chunk_id": {
+                            "type": "string"
+                          },
+                          "content_id": {
+                            "type": "string"
+                          },
+                          "evidence_id": {
+                            "type": "string"
+                          },
+                          "locator": {
+                            "type": "object",
+                            "required": [
+                              "locator",
+                              "original_byte_start",
+                              "original_byte_end",
+                              "normalized_rune_start",
+                              "normalized_rune_end"
+                            ],
+                            "properties": {
+                              "locator": {
+                                "type": "string"
+                              },
+                              "normalized_rune_end": {
+                                "type": "integer"
+                              },
+                              "normalized_rune_start": {
+                                "type": "integer"
+                              },
+                              "original_byte_end": {
+                                "type": "integer"
+                              },
+                              "original_byte_start": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "original": {
+                            "type": "object",
+                            "required": [
+                              "key",
+                              "sha256"
+                            ],
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "quote_hash": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          },
+                          "source_kind": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "module_id": {
+                      "type": "string"
+                    },
+                    "publication_revision": {
+                      "type": "string"
+                    },
+                    "release_id": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "x-description": "This is a goctl generated swagger file.",

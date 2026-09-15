@@ -54,6 +54,23 @@ type AcceptedAnswerEnvelope struct {
 	Data AcceptedAnswer `json:"data"`
 }
 
+type AcceptedAnswerV2 struct {
+	AnswerId        string               `json:"answer_id"`
+	SearchId        string               `json:"search_id"`
+	Subject         AcceptedSubjectRefV2 `json:"subject"`
+	SessionId       string               `json:"session_id"`
+	Status          string               `json:"status"`
+	AcceptedOrdinal int64                `json:"accepted_ordinal"`
+	AcceptedAt      string               `json:"accepted_at"`
+	TurnJson        string               `json:"turn_json"`
+}
+
+type AcceptedAnswerV2Envelope struct {
+	Code int              `json:"code"`
+	Msg  string           `json:"msg"`
+	Data AcceptedAnswerV2 `json:"data"`
+}
+
 type AcceptedAnswersPage struct {
 	Items       []AcceptedAnswer `json:"items"`
 	NextOrdinal int64            `json:"next_ordinal,optional,omitempty"`
@@ -65,10 +82,26 @@ type AcceptedAnswersPageEnvelope struct {
 	Data AcceptedAnswersPage `json:"data"`
 }
 
+type AcceptedAnswersPageV2 struct {
+	Items       []AcceptedAnswerV2 `json:"items"`
+	NextOrdinal int64              `json:"next_ordinal,optional,omitempty"`
+}
+
+type AcceptedAnswersPageV2Envelope struct {
+	Code int                   `json:"code"`
+	Msg  string                `json:"msg"`
+	Data AcceptedAnswersPageV2 `json:"data"`
+}
+
 type AcceptedSubjectRef struct {
 	AuthorityId string `json:"authority_id"`
 	TenantId    string `json:"tenant_id"`
 	SubjectId   string `json:"subject_id"`
+}
+
+type AcceptedSubjectRefV2 struct {
+	Issuer    string `json:"issuer"`
+	SubjectId string `json:"subject_id"`
 }
 
 type ActivateReq struct {
