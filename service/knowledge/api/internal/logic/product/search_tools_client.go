@@ -16,6 +16,7 @@ import (
 	"sea-try-go/service/knowledge/api/internal/model"
 	"sea-try-go/service/knowledge/api/internal/svc"
 	"sea-try-go/service/knowledge/api/internal/types"
+	"sea-try-go/service/user/user/identity"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -51,6 +52,64 @@ type toolsSearchScope struct {
 	RequestHash            string                   `json:"request_hash"`
 	IssuedAtUnix           int64                    `json:"issued_at_unix"`
 	ExpiresAtUnix          int64                    `json:"expires_at_unix"`
+}
+
+type toolsSearchScopeV2 struct {
+	Audience               string                `json:"aud"`
+	Subject                identity.SubjectRefV2 `json:"subject_ref"`
+	SessionID              string                `json:"session_id"`
+	OperationID            string                `json:"operation_id"`
+	BudgetRef              string                `json:"budget_ref"`
+	SearchID               string                `json:"search_id"`
+	SnapshotRef            string                `json:"snapshot_ref"`
+	Snapshot               types.SearchSnapshot  `json:"snapshot"`
+	AllowPartial           bool                  `json:"allow_partial"`
+	AllowLowerIntelligence bool                  `json:"allow_lower_intelligence"`
+	RequestHash            string                `json:"request_hash"`
+	IssuedAtUnix           int64                 `json:"issued_at_unix"`
+	ExpiresAtUnix          int64                 `json:"expires_at_unix"`
+}
+
+func signToolsSearchV2(parent model.ToolParent, child model.ToolSearch, subject identity.SubjectRefV2,
+	key string, allowPartial, allowLower bool, now time.Time) (toolsSearchBody, string, error) {
+	var body toolsSearchBody
+	if len(key) < 32 || child.OperationID != parent.OperationID || child.SearchID == "" ||
+		!now.Before(parent.ExpiresAt) || !identity.ValidSubjectRefV2(subject) ||
+		parent.Subject.AuthorityId != subject.Issuer ||
+		parent.Subject.TenantId != identity.PlatformTenantID || parent.Subject.SubjectId != subject.SubjectID {
+		return body, "", errToolsUpstream
+	}
+	inputHash, err := child.Input.Hash()
+	if err != nil || inputHash != child.RequestHash || parent.Snapshot.ModuleId != parent.ModuleID ||
+		child.ReservedReads != child.Input.ReadCalls || child.ReservedRunes != child.Input.QuoteRunes {
+		return body, "", errToolsUpstream
+	}
+	body = toolsSearchBody{ModuleID: parent.ModuleID, Query: child.Input.Query,
+		Depth: child.Input.Depth, Intelligence: child.Input.Intelligence, SearchID: child.SearchID}
+	body.Limits.ReadCalls = child.ReservedReads
+	body.Limits.QuoteRunes = child.ReservedRunes
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return body, "", err
+	}
+	hash := sha256.Sum256(raw)
+	expires := now.Add(120 * time.Second)
+	if parent.ExpiresAt.Before(expires) {
+		expires = parent.ExpiresAt
+	}
+	scope := toolsSearchScopeV2{Audience: "btw.search.tools.v2", Subject: subject,
+		SessionID: parent.SessionID, OperationID: parent.OperationID, BudgetRef: parent.BudgetRef,
+		SearchID: child.SearchID, SnapshotRef: parent.SnapshotRef, Snapshot: parent.Snapshot,
+		AllowPartial: allowPartial, AllowLowerIntelligence: allowLower,
+		RequestHash: hex.EncodeToString(hash[:]), IssuedAtUnix: now.Unix(), ExpiresAtUnix: expires.Unix()}
+	payload, err := json.Marshal(scope)
+	if err != nil {
+		return body, "", err
+	}
+	mac := hmac.New(sha256.New, []byte(key))
+	_, _ = mac.Write(payload)
+	return body, base64.RawURLEncoding.EncodeToString(payload) + "." +
+		base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
 func signToolsSearch(parent model.ToolParent, child model.ToolSearch, key string,
@@ -95,8 +154,26 @@ func callBTWToolsSearch(ctx context.Context, service *svc.ServiceContext,
 		return empty, errToolsUpstream
 	}
 	now := time.Now()
-	body, signed, err := signToolsSearch(parent, child, service.Config.SearchTools.ScopeKey,
-		service.Config.SearchTools.AllowPartial, service.Config.SearchTools.AllowLowerIntelligence, now)
+	version, err := service.Store.ToolParentScopeVersion(ctx, parent.Subject, parent.SessionID, parent.OperationID)
+	if err != nil {
+		return empty, err
+	}
+	var body toolsSearchBody
+	var signed string
+	if version == "v2" {
+		if err = service.Store.RequireSearchScopeVersions(); err != nil {
+			return empty, err
+		}
+		var subject identity.SubjectRefV2
+		subject, err = issuedSearchSubjectV2(ctx, service, parent.Subject)
+		if err == nil {
+			body, signed, err = signToolsSearchV2(parent, child, subject, service.Config.SearchTools.ScopeKey,
+				service.Config.SearchTools.AllowPartial, service.Config.SearchTools.AllowLowerIntelligence, now)
+		}
+	} else {
+		body, signed, err = signToolsSearch(parent, child, service.Config.SearchTools.ScopeKey,
+			service.Config.SearchTools.AllowPartial, service.Config.SearchTools.AllowLowerIntelligence, now)
+	}
 	if err != nil {
 		return empty, err
 	}
