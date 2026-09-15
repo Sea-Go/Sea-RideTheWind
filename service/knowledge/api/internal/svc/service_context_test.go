@@ -47,6 +47,35 @@ func TestContinuousSubjectRefV2CandidateCannotStartInProMode(t *testing.T) {
 	}
 }
 
+func TestWikiCompileJobCandidateStopsBeforeProductionOrRemoteEffects(t *testing.T) {
+	var c config.Config
+	c.Auth.AccessSecret = "admin-test-secret"
+	c.UserAuth.AccessSecret = "user-test-secret"
+	c.WorkerToken = "worker-test-token"
+	c.AdministratorIDs = []string{"1"}
+	c.UserRpc.Endpoints = []string{"127.0.0.1:12345"}
+	c.WikiCompileJobs.Enabled = true
+	c.WikiCompileJobs.Endpoint = "http://127.0.0.1:18181/v1/jobs"
+	c.WikiCompileJobs.Token = "test-dc-job-service-token"
+	c.WikiCompileJobs.IntervalMillis = 1000
+	c.Mode = "pro"
+	if _, err := NewServiceContext(c, nil); err == nil ||
+		!strings.Contains(err.Error(), "candidate requires dev/test") {
+		t.Fatalf("Wiki job switch reached a production database or DC: %v", err)
+	}
+	c.Mode = "dev"
+	c.WikiCompileJobs.Endpoint = "https://jobs.example.test/v1/jobs"
+	if _, err := NewServiceContext(c, nil); err == nil ||
+		!strings.Contains(err.Error(), "explicit loopback") {
+		t.Fatalf("Wiki job switch accepted a remote endpoint: %v", err)
+	}
+	c.WikiCompileJobs.Endpoint = "http://127.0.0.1:18181/v1/events"
+	if _, err := NewServiceContext(c, nil); err == nil ||
+		!strings.Contains(err.Error(), "explicit loopback") {
+		t.Fatalf("Wiki job switch used H04 Eventing as a DC Job endpoint: %v", err)
+	}
+}
+
 func TestV2SearchScopeCannotStartWithoutStageThreeOwnerGate(t *testing.T) {
 	var c config.Config
 	c.Auth.AccessSecret = "admin-test-secret"
