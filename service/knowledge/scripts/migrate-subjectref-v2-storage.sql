@@ -112,19 +112,23 @@ BEGIN
    AND conname='knowledge_subject_v2_check_reference_identity_ck';
  FOR spec IN SELECT * FROM (VALUES
   ('knowledge_answer_sessions_subject_v2',
-   'issuer:text:1,tenant_id:text:1,subject_id:text:1,session_id:text:1'),
+   'issuer:text:1:0:0:0,tenant_id:text:1:0:0:0,subject_id:text:1:0:0:0,session_id:text:1:0:0:0'),
   ('knowledge_accepted_answers_subject_v2',
-   'answer_id:text:1,issuer:text:1,tenant_id:text:1,subject_id:text:1,session_id:text:1,accepted_ordinal:bigint:1'),
+   'answer_id:text:1:0:0:0,issuer:text:1:0:0:0,tenant_id:text:1:0:0:0,subject_id:text:1:0:0:0,session_id:text:1:0:0:0,accepted_ordinal:bigint:1:0:0:0'),
   ('knowledge_product_search_operations_subject_v2',
-   'issuer:text:1,tenant_id:text:1,subject_id:text:1,session_id:text:1,operation_key:text:1'),
+   'issuer:text:1:0:0:0,tenant_id:text:1:0:0:0,subject_id:text:1:0:0:0,session_id:text:1:0:0:0,operation_key:text:1:0:0:0'),
   ('knowledge_tool_parents_subject_v2',
-   'issuer:text:1,tenant_id:text:1,subject_id:text:1,session_id:text:1,operation_key:text:1')
+   'issuer:text:1:0:0:0,tenant_id:text:1:0:0:0,subject_id:text:1:0:0:0,session_id:text:1:0:0:0,operation_key:text:1:0:0:0')
  ) AS x(relation_name,column_shape) LOOP
   IF (SELECT relkind FROM pg_class WHERE oid=to_regclass(spec.relation_name)) <> 'r' THEN
    RAISE EXCEPTION 'v2 sidecar relation shape changed: %',spec.relation_name;
   END IF;
   SELECT string_agg(a.attname||':'||format_type(a.atttypid,a.atttypmod)||':'||
-   CASE WHEN a.attnotnull THEN '1' ELSE '0' END,',' ORDER BY a.attnum)
+   CASE WHEN a.attnotnull THEN '1' ELSE '0' END||':'||
+   CASE WHEN EXISTS (SELECT 1 FROM pg_attrdef d WHERE d.adrelid=a.attrelid AND d.adnum=a.attnum)
+    THEN '1' ELSE '0' END||':'||
+   CASE WHEN a.attgenerated='' THEN '0' ELSE '1' END||':'||
+   CASE WHEN a.attidentity='' THEN '0' ELSE '1' END,',' ORDER BY a.attnum)
    INTO actual FROM pg_attribute a WHERE a.attrelid=to_regclass(spec.relation_name)
    AND a.attnum>0 AND NOT a.attisdropped;
   IF actual IS DISTINCT FROM spec.column_shape THEN
