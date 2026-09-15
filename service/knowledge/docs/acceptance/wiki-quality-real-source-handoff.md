@@ -1,0 +1,7 @@
+# Wiki 事实评阅真实来源交接
+
+本测试叶子在显式设置 `SEA_BTW_WIKI_QUALITY_CONSUMER_ROOT` 与 `SEA_DC_EVENT_PLATFORM_ROOT` 时运行。RTW 同一次隔离 PG16/管理员 HTTP 事务产生两个 `knowledge.wiki.quality.judged.v1` 事件：同一个 Source Fact 分别判给人工 Wiki 修订和 RTW 已接纳的 AI Wiki 修订。源 Outbox 把同一 `ridethewind.knowledge` producer 的事件送到真实 DC Eventing；外部 BTW 消费者独立用 RTW 私有 HTTP 读回原 Event 字节和 JCS SHA，在自己的 PG ODS 落库后 ACK 连续 offset。缺 BTW root 时保持原 HTTP 测试读面；给了 BTW root 却缺 DC root 则立即失败。共享 DC root 不会启动其他搜索来源 Holder。
+
+测试固定两条质量 Event 与至少一条非质量事件，核 DC `eventing.event` 的 count/min/max offset、质量 EventID、BTW 已提交与已 ACK offset、DC consumer cursor、RTW Event transport 前后的原字节/两 SHA，以及两页 Wiki 编辑头和已发布 Release 指针不变。一次性 RTW Worker/DC Eventing 令牌仅写进父测试目录的 `0600` fixture，不回显到日志或交接文档。脱敏 `observability/wiki-quality-cross-source.json` 保留版本、两个 revision/fact/event SHA、数仓计数与 `fact_set_complete=false`、`production_verified=false`；BTW consumer 日志仍在私有 `0600` 测试目录。
+
+本机叶子固定验收使用 RTW Wiki 质量源 `6865022`、DC Eventing `0e6f0fe` 与 BTW Wiki quality ODS `3ae4a0f`。最终真同父 `TestRealHTTPKnowledgeWorkflow` race 顶层通过：11 条连续事件、2 条质量判定、9 条技术跳过、ODS ACK 到 11，日志 SHA256 `1d1d46a36f63353af8ffa9ae4b3d4d78e08fc6d40541c6090bcd47e98c64b1c8`，脱敏报告 SHA256 `a0d4133de77c2ba8f795e61978e955600352bfe5536e7d4585ebd79b2faba10e`，PG 停机 `pg_ctl status=3`。源原始 EventSpec/JCS Golden 仍以 `testdata/wiki-quality-event-v1.json` 为准；单个 fact 的判断没有证明应覆盖事实全集，不能据此计算页面 D07 质量率。`actor_id` 是既有 RTW 管理员 JWT 与名单允许的 `userId` 字面值，不是经实时 UserCenter 核验的规范 UID。生产批准、真人 FactSet 与实时管理员资格不在这一轮验收范围。
