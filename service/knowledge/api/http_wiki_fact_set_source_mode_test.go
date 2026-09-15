@@ -12,8 +12,10 @@ import (
 func wikiFactSetHolderMode() (bool, error) {
 	btwRoot := os.Getenv("SEA_BTW_WIKI_FACT_SET_CONSUMER_ROOT")
 	readerRoot := os.Getenv("SEA_BTW_SOURCEPROOF_READER_ROOT")
+	dwdRoot := os.Getenv("SEA_BTW_WIKI_DWD_SOURCE_ROOT")
+	dwdRuntime := os.Getenv("SEA_BTW_WIKI_DWD_RUNTIME_ROOT")
 	if btwRoot == "" {
-		if readerRoot != "" {
+		if readerRoot != "" || dwdRoot != "" || dwdRuntime != "" {
 			return false, errors.New("FactSet SourceProof reader requires the original FactSet Holder")
 		}
 		return false, nil
@@ -25,6 +27,37 @@ func wikiFactSetHolderMode() (bool, error) {
 	if readerRoot != "" && (!filepath.IsAbs(readerRoot) ||
 		filepath.Clean(readerRoot) != filepath.Clean(btwRoot)) {
 		return false, errors.New("FactSet SourceProof reader must use the same fixed BTW source tree")
+	}
+	if dwdRoot == "" && dwdRuntime != "" {
+		return false, errors.New("Wiki DWD runtime cannot select a source Holder")
+	}
+	if dwdRoot != "" {
+		if readerRoot == "" || !filepath.IsAbs(dwdRoot) ||
+			filepath.Clean(dwdRoot) != filepath.Clean(readerRoot) ||
+			!filepath.IsAbs(dwdRuntime) ||
+			!filepath.IsAbs(os.Getenv("KNOWLEDGE_OBS_EVIDENCE_DIR")) {
+			return false, errors.New("Wiki DWD Holder requires the same SourceProof tree, fixed runtime and persistent evidence")
+		}
+		for _, path := range []string{
+			filepath.Join(dwdRoot, "warehouse/wiki_quality/acceptance.py"),
+			filepath.Join(dwdRoot, "internal/warehouse/wikiqualitydwd/export.go"),
+		} {
+			info, err := os.Lstat(path)
+			if err != nil || !info.Mode().IsRegular() {
+				return false, errors.New("Wiki DWD evidence loader is missing from the fixed source and runtime")
+			}
+		}
+		// The locked venv Python is itself a symlink to a verified executable.
+		for _, path := range []string{
+			filepath.Join(dwdRuntime, "clickhouse"),
+			filepath.Join(dwdRuntime, ".venv/bin/python"),
+			filepath.Join(dwdRuntime, ".venv/bin/dbt"),
+		} {
+			info, err := os.Stat(path)
+			if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
+				return false, errors.New("Wiki DWD runtime is not an available executable")
+			}
+		}
 	}
 	if readerRoot != "" {
 		script := filepath.Join(readerRoot,
@@ -68,6 +101,8 @@ func TestWikiFactSetHolderSelectorRejectsIncompleteOrSharedModes(t *testing.T) {
 			t.Setenv("SEA_BTW_SEARCHSOURCE_CONSUMER_ROOT", tc.search)
 			t.Setenv("KNOWLEDGE_FACT_SET_REAL_HTTP", tc.single)
 			t.Setenv("SEA_BTW_SOURCEPROOF_READER_ROOT", tc.reader)
+			t.Setenv("SEA_BTW_WIKI_DWD_SOURCE_ROOT", "")
+			t.Setenv("SEA_BTW_WIKI_DWD_RUNTIME_ROOT", "")
 			selected, err := wikiFactSetHolderMode()
 			if selected != tc.selected || (err != nil) != tc.invalid {
 				t.Fatalf("early Holder selector misrouted shared DC/quality/qrel: selected=%v err=%v", selected, err)
@@ -77,6 +112,8 @@ func TestWikiFactSetHolderSelectorRejectsIncompleteOrSharedModes(t *testing.T) {
 }
 
 func TestWikiFactSetHolderSourceProofReaderNeedsFixedScriptBeforePG(t *testing.T) {
+	t.Setenv("SEA_BTW_WIKI_DWD_SOURCE_ROOT", "")
+	t.Setenv("SEA_BTW_WIKI_DWD_RUNTIME_ROOT", "")
 	root := t.TempDir()
 	script := filepath.Join(root,
 		"internal/evaluation/wiki_quality/sourceproof/real-source-acceptance.sh")
@@ -99,5 +136,45 @@ func TestWikiFactSetHolderSourceProofReaderNeedsFixedScriptBeforePG(t *testing.T
 	selected, err = wikiFactSetHolderMode()
 	if !selected || err != nil {
 		t.Fatalf("fixed ordinary BTW Reader script was rejected: %v %v", selected, err)
+	}
+}
+
+func TestWikiFactSetDWDHolderNeedsOneFixedReaderRuntimeAndPersistentEvidence(t *testing.T) {
+	root, runtime := t.TempDir(), t.TempDir()
+	for _, path := range []string{
+		filepath.Join(root, "internal/evaluation/wiki_quality/sourceproof/real-source-acceptance.sh"),
+		filepath.Join(root, "warehouse/wiki_quality/acceptance.py"),
+		filepath.Join(root, "internal/warehouse/wikiqualitydwd/export.go"),
+		filepath.Join(runtime, "clickhouse"),
+		filepath.Join(runtime, ".venv/bin/python"),
+		filepath.Join(runtime, ".venv/bin/dbt"),
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("test-only source or runtime fixture"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("SEA_BTW_WIKI_FACT_SET_CONSUMER_ROOT", root)
+	t.Setenv("SEA_BTW_SOURCEPROOF_READER_ROOT", root)
+	t.Setenv("SEA_DC_EVENT_PLATFORM_ROOT", t.TempDir())
+	t.Setenv("SEA_BTW_WIKI_QUALITY_CONSUMER_ROOT", "")
+	t.Setenv("SEA_BTW_SEARCHSOURCE_CONSUMER_ROOT", "")
+	t.Setenv("KNOWLEDGE_FACT_SET_REAL_HTTP", "")
+	t.Setenv("SEA_BTW_WIKI_DWD_SOURCE_ROOT", t.TempDir())
+	t.Setenv("SEA_BTW_WIKI_DWD_RUNTIME_ROOT", runtime)
+	t.Setenv("KNOWLEDGE_OBS_EVIDENCE_DIR", t.TempDir())
+	if selected, err := wikiFactSetHolderMode(); selected || err == nil {
+		t.Fatalf("DWD Holder accepted a different BTW producer tree: %v %v", selected, err)
+	}
+	t.Setenv("SEA_BTW_WIKI_DWD_SOURCE_ROOT", root)
+	t.Setenv("KNOWLEDGE_OBS_EVIDENCE_DIR", "")
+	if selected, err := wikiFactSetHolderMode(); selected || err == nil {
+		t.Fatalf("DWD Holder accepted ephemeral original evidence: %v %v", selected, err)
+	}
+	t.Setenv("KNOWLEDGE_OBS_EVIDENCE_DIR", t.TempDir())
+	if selected, err := wikiFactSetHolderMode(); !selected || err != nil {
+		t.Fatalf("complete DWD selector rejected before disposable PG: %v %v", selected, err)
 	}
 }
