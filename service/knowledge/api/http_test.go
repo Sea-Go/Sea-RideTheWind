@@ -23,6 +23,7 @@ import (
 	"sea-try-go/service/knowledge/api/internal/config"
 	"sea-try-go/service/knowledge/api/internal/model"
 
+	jsoncanonicalizer "github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/zeromicro/go-zero/core/conf"
@@ -180,6 +181,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		c.SearchTools.ScopeVersion = "v2"
 	}
 	c.SearchJudgments.Enabled = true
+	c.WikiQualityJudgments.Enabled = true
 	c.GroundingReviews.Enabled = true
 	dsn, err := url.Parse(os.Getenv("KNOWLEDGE_TEST_DSN"))
 	if err != nil {
@@ -343,6 +345,76 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	request("POST", "/v1/knowledge/modules/"+m.Id+"/sources", token, types.CreateSourceReq{Title: "Book A", Content: "Book A\n\nEvidence", MediaType: "text/markdown", Provenance: "synthetic", IdempotencyKey: "http-source"}, &a, 200)
 	var w types.Revision
 	request("POST", "/v1/knowledge/modules/"+m.Id+"/wiki-pages/page-a/revisions", token, types.CreateWikiReq{Title: "Interpretation", Content: "My interpretation", SourceRefs: []types.SourceRef{{RevisionId: a.RevisionId, Locator: "paragraph:2"}}, IdempotencyKey: "http-wiki"}, &w, 200)
+	qualityPath := "/v1/knowledge/modules/" + m.Id + "/wiki-pages/page-a/revisions/" + w.RevisionId + "/quality-judgments"
+	qualityInput := map[string]any{"source_revision_id": a.RevisionId,
+		"source_content_sha256": a.ContentHash, "locator": "paragraph:2",
+		"source_quote": "Evidence", "source_quote_sha256": object.Hash([]byte("Evidence")),
+		"assessment": "missing", "grade": "0", "rubric_version": "sea.wiki.fact-coverage.v1",
+		"reason":          "the original Evidence fact is absent from this manual Wiki revision",
+		"idempotency_key": "http-human-wiki-quality-first"}
+	var beforeQualityRPC int64
+	if userRPC != nil {
+		beforeQualityRPC = userRPC.calls.Load()
+	}
+	request("POST", qualityPath, "", qualityInput, nil, 401)
+	request("POST", qualityPath, nonAdminToken, qualityInput, nil, 403)
+	badQuality := map[string]any{}
+	for key, value := range qualityInput {
+		badQuality[key] = value
+	}
+	badQuality["source_content_sha256"] = strings.Repeat("0", 64)
+	request("POST", qualityPath, token, badQuality, nil, 400)
+	duplicateQuality, err := json.Marshal(qualityInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	duplicateQuality = bytes.Replace(duplicateQuality, []byte(`"assessment":"missing"`),
+		[]byte(`"assessment":"missing","assessment":"covered"`), 1)
+	request("POST", qualityPath, token, json.RawMessage(duplicateQuality), nil, 400)
+	var quality types.WikiFactJudgmentRecord
+	request("POST", qualityPath, token, qualityInput, &quality, 200)
+	if quality.WikiOriginKind != "manual_revision" || quality.OriginCompileId != "" ||
+		quality.Grade != "0" || quality.Assessment != "missing" ||
+		quality.WikiRevisionId != w.RevisionId || quality.SourceRevisionId != a.RevisionId ||
+		quality.SourceByteStart != "8" || quality.SourceByteEnd != "16" ||
+		quality.EventId == "" || quality.EventRawSha256 == "" || quality.EventJcsSha256 == "" {
+		t.Fatalf("admin Wiki fact label did not anchor the original RTW source bytes: %+v", quality)
+	}
+	if userRPC != nil && userRPC.calls.Load() != beforeQualityRPC {
+		t.Fatal("admin Auth JWT+IDs label unexpectedly claimed live UserCenter RPC qualification")
+	}
+	var repeated types.WikiFactJudgmentRecord
+	request("POST", qualityPath, token, qualityInput, &repeated, 200)
+	if !reflect.DeepEqual(repeated, quality) {
+		t.Fatalf("same human idempotency key did not return the original Event: %+v %+v", repeated, quality)
+	}
+	var fromAdmin types.WikiFactJudgmentRecord
+	request("GET", qualityPath+"/"+quality.FactId, token, nil, &fromAdmin, 200)
+	if fromAdmin.JudgeRevisionId != quality.JudgeRevisionId || fromAdmin.EventId != quality.EventId {
+		t.Fatalf("admin fact GET lost independent judge head: %+v", fromAdmin)
+	}
+	var qualityPage types.ListWikiFactJudgmentsResp
+	request("GET", qualityPath+"?limit=20", token, nil, &qualityPage, 200)
+	if len(qualityPage.Items) != 1 || qualityPage.Items[0].FactId != quality.FactId {
+		t.Fatalf("admin fact list omitted this manual revision's label: %+v", qualityPage)
+	}
+	var editingHead types.WikiPageHeadSnapshot
+	request("GET", "/v1/knowledge/modules/"+m.Id+"/wiki-pages/page-a/head", "", nil, nil, 401)
+	request("GET", "/v1/knowledge/modules/"+m.Id+"/wiki-pages/page-a/head", nonAdminToken, nil, nil, 403)
+	request("GET", "/v1/knowledge/modules/"+m.Id+"/wiki-pages/page-a/head", token, nil, &editingHead, 200)
+	if editingHead.RevisionId != w.RevisionId || editingHead.ContentSha256 != w.ContentHash {
+		t.Fatalf("fact judgment moved the Wiki editing head: %+v", editingHead)
+	}
+	var qualityEvent types.WikiQualityEventReceipt
+	qualityEventPath := "/internal/v1/knowledge/wiki-quality/events/" + quality.EventId
+	request("GET", qualityEventPath, "", nil, nil, 401)
+	request("GET", qualityEventPath, c.WorkerToken, nil, &qualityEvent, 200)
+	qualityJCS, err := jsoncanonicalizer.Transform([]byte(qualityEvent.EventJson))
+	if err != nil || qualityEvent.EventId != quality.EventId ||
+		object.Hash([]byte(qualityEvent.EventJson)) != quality.EventRawSha256 ||
+		object.Hash(qualityJCS) != quality.EventJcsSha256 {
+		t.Fatalf("private Worker original Event/JCS hashes differ from admin source: %+v %v", qualityEvent, err)
+	}
 	realBGE := os.Getenv("SEA_DC_BGE_RUNTIME")
 	retrievalProfiles := testenv.Profiles()
 	if realBGE != "" {
