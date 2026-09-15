@@ -600,6 +600,75 @@ type (
 		Msg  string                     `json:"msg"`
 		Data SearchJudgmentEventReceipt `json:"data"`
 	}
+	RegisterReviewerKeyReq {
+		KeyId               string `json:"key_id"`
+		DataKind            string `json:"data_kind"`
+		PublicKeyEd25519Hex string `json:"public_key_ed25519_hex"`
+		IdempotencyKey      string `json:"idempotency_key"`
+	}
+	RevokeReviewerKeyReq {
+		KeyId          string `path:"key_id"`
+		Reason         string `json:"reason"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	ReviewerKeyPath {
+		KeyId string `path:"key_id"`
+	}
+	ReviewerKeyRecord {
+		SchemaVersion       string `json:"schema_version"`
+		KeyId               string `json:"key_id"`
+		ReviewerAuthority   string `json:"reviewer_authority"`
+		ReviewerId          string `json:"reviewer_id"`
+		DataKind            string `json:"data_kind"`
+		PublicKeyEd25519Hex string `json:"public_key_ed25519_hex"`
+		RegisteredAt        string `json:"registered_at"`
+		RevokedAt           string `json:"revoked_at"`
+		Status              string `json:"status"`
+		RegistryRevision    int64  `json:"registry_revision"`
+		RegistrationEventId string `json:"registration_event_id"`
+		RevocationEventId   string `json:"revocation_event_id"`
+	}
+	ReviewerKeyRecordEnvelope {
+		Code int               `json:"code"`
+		Msg  string            `json:"msg"`
+		Data ReviewerKeyRecord `json:"data"`
+	}
+	SubmitGroundingReviewReq {
+		CaseJson       string `json:"case_json"`
+		ReviewJson     string `json:"review_json"`
+		KeyId          string `json:"key_id"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	GroundingReviewCasePath {
+		CaseSha256 string `path:"case_sha256"`
+	}
+	GroundingReviewReceipt {
+		SchemaVersion            string `json:"schema_version"`
+		CaseSha256               string `json:"case_sha256"`
+		CaseJson                 string `json:"case_json"`
+		ReviewJson               string `json:"review_json"`
+		ReviewSha256             string `json:"review_sha256"`
+		KeyId                    string `json:"key_id"`
+		ReviewerAuthority        string `json:"reviewer_authority"`
+		ReviewerId               string `json:"reviewer_id"`
+		DataKind                 string `json:"data_kind"`
+		RegistryRevisionAtCommit int64  `json:"registry_revision_at_commit"`
+		AnswerId                 string `json:"answer_id"`
+		SearchId                 string `json:"search_id"`
+		AcceptedAnswerSha256     string `json:"accepted_answer_sha256"`
+		TurnSha256               string `json:"turn_sha256"`
+		CitationPackRef          string `json:"citation_pack_ref"`
+		CitationPackSha256       string `json:"citation_pack_sha256"`
+		TraceAuthorityStatus     string `json:"trace_authority_status"`
+		ReviewedAt               string `json:"reviewed_at"`
+		EventId                  string `json:"event_id"`
+		EventSha256              string `json:"event_sha256"`
+	}
+	GroundingReviewReceiptEnvelope {
+		Code int                    `json:"code"`
+		Msg  string                 `json:"msg"`
+		Data GroundingReviewReceipt `json:"data"`
+	}
 )
 
 type (
@@ -812,6 +881,15 @@ service knowledge-api {
 
 	@handler WithdrawSearchJudgment
 	post /modules/:module_id/search-judgments/withdrawals (WithdrawSearchJudgmentReq) returns (SearchJudgmentReceiptEnvelope)
+
+	@handler RegisterReviewerKey
+	post /reviewer-keys (RegisterReviewerKeyReq) returns (ReviewerKeyRecordEnvelope)
+
+	@handler RevokeReviewerKey
+	post /reviewer-keys/:key_id/revoke (RevokeReviewerKeyReq) returns (ReviewerKeyRecordEnvelope)
+
+	@handler SubmitGroundingReview
+	post /answer-grounding/reviews (SubmitGroundingReviewReq) returns (GroundingReviewReceiptEnvelope)
 }
 
 // Product history accepts only a logical session and pagination from the caller.
@@ -867,6 +945,12 @@ service knowledge-api {
 
 	@handler GetSearchJudgmentEvent
 	get /search-judgments/events/:event_id (SearchJudgmentEventPath) returns (SearchJudgmentEventReceiptEnvelope)
+
+	@handler GetReviewerKey
+	get /reviewer-keys/:key_id (ReviewerKeyPath) returns (ReviewerKeyRecordEnvelope)
+
+	@handler GetGroundingReview
+	get /answer-grounding/reviews/:case_sha256 (GroundingReviewCasePath) returns (GroundingReviewReceiptEnvelope)
 
 	@handler AcceptSearchCitations
 	post /search-citations (AcceptSearchCitationsReq) returns (SearchCitationReceiptEnvelope)

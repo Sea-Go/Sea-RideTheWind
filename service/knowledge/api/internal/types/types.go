@@ -269,6 +269,39 @@ type GetAcceptedAnswerReq struct {
 	SessionId   string `form:"session_id"`
 }
 
+type GroundingReviewCasePath struct {
+	CaseSha256 string `path:"case_sha256"`
+}
+
+type GroundingReviewReceipt struct {
+	SchemaVersion            string `json:"schema_version"`
+	CaseSha256               string `json:"case_sha256"`
+	CaseJson                 string `json:"case_json"`
+	ReviewJson               string `json:"review_json"`
+	ReviewSha256             string `json:"review_sha256"`
+	KeyId                    string `json:"key_id"`
+	ReviewerAuthority        string `json:"reviewer_authority"`
+	ReviewerId               string `json:"reviewer_id"`
+	DataKind                 string `json:"data_kind"`
+	RegistryRevisionAtCommit int64  `json:"registry_revision_at_commit"`
+	AnswerId                 string `json:"answer_id"`
+	SearchId                 string `json:"search_id"`
+	AcceptedAnswerSha256     string `json:"accepted_answer_sha256"`
+	TurnSha256               string `json:"turn_sha256"`
+	CitationPackRef          string `json:"citation_pack_ref"`
+	CitationPackSha256       string `json:"citation_pack_sha256"`
+	TraceAuthorityStatus     string `json:"trace_authority_status"`
+	ReviewedAt               string `json:"reviewed_at"`
+	EventId                  string `json:"event_id"`
+	EventSha256              string `json:"event_sha256"`
+}
+
+type GroundingReviewReceiptEnvelope struct {
+	Code int                    `json:"code"`
+	Msg  string                 `json:"msg"`
+	Data GroundingReviewReceipt `json:"data"`
+}
+
 type ListAcceptedAnswersReq struct {
 	AuthorityId  string `form:"authority_id"`
 	TenantId     string `form:"tenant_id"`
@@ -502,6 +535,13 @@ type RecordSearchJudgmentReq struct {
 	IdempotencyKey    string `json:"idempotency_key"`
 }
 
+type RegisterReviewerKeyReq struct {
+	KeyId               string `json:"key_id"`
+	DataKind            string `json:"data_kind"`
+	PublicKeyEd25519Hex string `json:"public_key_ed25519_hex"`
+	IdempotencyKey      string `json:"idempotency_key"`
+}
+
 type Release struct {
 	ReleaseId         string             `json:"release_id"`
 	ModuleId          string             `json:"module_id"`
@@ -551,6 +591,31 @@ type RetrievalProfile struct {
 	Aggregation string `json:"aggregation,optional"`
 }
 
+type ReviewerKeyPath struct {
+	KeyId string `path:"key_id"`
+}
+
+type ReviewerKeyRecord struct {
+	SchemaVersion       string `json:"schema_version"`
+	KeyId               string `json:"key_id"`
+	ReviewerAuthority   string `json:"reviewer_authority"`
+	ReviewerId          string `json:"reviewer_id"`
+	DataKind            string `json:"data_kind"`
+	PublicKeyEd25519Hex string `json:"public_key_ed25519_hex"`
+	RegisteredAt        string `json:"registered_at"`
+	RevokedAt           string `json:"revoked_at"`
+	Status              string `json:"status"`
+	RegistryRevision    int64  `json:"registry_revision"`
+	RegistrationEventId string `json:"registration_event_id"`
+	RevocationEventId   string `json:"revocation_event_id"`
+}
+
+type ReviewerKeyRecordEnvelope struct {
+	Code int               `json:"code"`
+	Msg  string            `json:"msg"`
+	Data ReviewerKeyRecord `json:"data"`
+}
+
 type Revision struct {
 	RevisionId     string      `json:"revision_id"`
 	ModuleId       string      `json:"module_id"`
@@ -577,6 +642,12 @@ type RevisionEnvelope struct {
 
 type RevisionPath struct {
 	RevisionId string `path:"revision_id"`
+}
+
+type RevokeReviewerKeyReq struct {
+	KeyId          string `path:"key_id"`
+	Reason         string `json:"reason"`
+	IdempotencyKey string `json:"idempotency_key"`
 }
 
 type SearchCitationPath struct {
@@ -674,6 +745,13 @@ type SearchSnapshotEnvelope struct {
 type SourceRef struct {
 	RevisionId string `json:"revision_id"`
 	Locator    string `json:"locator"`
+}
+
+type SubmitGroundingReviewReq struct {
+	CaseJson       string `json:"case_json"`
+	ReviewJson     string `json:"review_json"`
+	KeyId          string `json:"key_id"`
+	IdempotencyKey string `json:"idempotency_key"`
 }
 
 type ToolBudget struct {

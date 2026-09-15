@@ -52,6 +52,14 @@ export function getPublishedRevision(params: components.PublishedRevisionPathPar
 
 /**
  * @description
+ * @param req
+ */
+export function submitGroundingReview(req: components.SubmitGroundingReviewReq) {
+	return webapi.post<components.GroundingReviewReceiptEnvelope>(`/v1/knowledge/answer-grounding/reviews`, req)
+}
+
+/**
+ * @description
  * @param params
  * @param req
  */
@@ -231,6 +239,23 @@ export function createBuild(params: components.CreateBuildReqParams, req: compon
 
 /**
  * @description
+ * @param req
+ */
+export function registerReviewerKey(req: components.RegisterReviewerKeyReq) {
+	return webapi.post<components.ReviewerKeyRecordEnvelope>(`/v1/knowledge/reviewer-keys`, req)
+}
+
+/**
+ * @description
+ * @param params
+ * @param req
+ */
+export function revokeReviewerKey(params: components.RevokeReviewerKeyReqParams, req: components.RevokeReviewerKeyReq, key_id: string) {
+	return webapi.post<components.ReviewerKeyRecordEnvelope>(`/v1/knowledge/reviewer-keys/${key_id}/revoke`, params, req)
+}
+
+/**
+ * @description
  * @param params
  */
 export function listDraftModules(params: components.ListModulesReqParams) {
@@ -357,6 +382,14 @@ export function getAcceptedAnswer(params: components.GetAcceptedAnswerReqParams,
  * @description
  * @param params
  */
+export function getGroundingReview(params: components.GroundingReviewCasePathParams, case_sha256: string) {
+	return webapi.get<components.GroundingReviewReceiptEnvelope>(`/internal/v1/knowledge/answer-grounding/reviews/${case_sha256}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
 export function getBuild(params: components.BuildPathParams, build_id: string) {
 	return webapi.get<components.BuildEnvelope>(`/internal/v1/knowledge/builds/${build_id}`, params)
 }
@@ -419,6 +452,14 @@ export function getCurrentSearchSnapshot(params: components.ModulePathParams, mo
  */
 export function getRelease(params: components.ReleasePathParams, release_id: string) {
 	return webapi.get<components.ReleaseEnvelope>(`/internal/v1/knowledge/releases/${release_id}`, params)
+}
+
+/**
+ * @description
+ * @param params
+ */
+export function getReviewerKey(params: components.ReviewerKeyPathParams, key_id: string) {
+	return webapi.get<components.ReviewerKeyRecordEnvelope>(`/internal/v1/knowledge/reviewer-keys/${key_id}`, params)
 }
 
 /**
