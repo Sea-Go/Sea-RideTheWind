@@ -200,6 +200,15 @@ func emitWithReceipt(ctx context.Context, tx pgx.Tx, eventType, aggregate string
 	if err := tx.QueryRow(ctx, "UPDATE knowledge_modules SET event_sequence=event_sequence+1 WHERE id=$1 RETURNING event_sequence", aggregate).Scan(&sequence); err != nil {
 		return Event{}, nil, err
 	}
+	return emitWithVersion(ctx, tx, eventType, aggregate, sequence, payload)
+}
+
+// emitWithVersion writes the same Knowledge envelope for non-module authority
+// aggregates whose sequence is serialized by their own registry row.
+func emitWithVersion(ctx context.Context, tx pgx.Tx, eventType, aggregate string, sequence int64, payload any) (Event, []byte, error) {
+	if sequence < 1 {
+		return Event{}, nil, invalid("positive aggregate version required")
+	}
 	var operationID string
 	if err := tx.QueryRow(ctx, "SELECT current_setting('knowledge.operation_id',true)").Scan(&operationID); err != nil {
 		return Event{}, nil, err

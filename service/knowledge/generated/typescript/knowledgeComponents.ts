@@ -281,6 +281,40 @@ export interface GetAcceptedAnswerReqParams {
 	session_id: string
 }
 
+export interface GroundingReviewCasePath {
+}
+export interface GroundingReviewCasePathParams {
+}
+
+export interface GroundingReviewReceipt {
+	schema_version: string
+	case_sha256: string
+	case_json: string
+	review_json: string
+	review_sha256: string
+	key_id: string
+	reviewer_authority: string
+	reviewer_id: string
+	data_kind: string
+	registry_revision_at_commit: number
+	answer_id: string
+	search_id: string
+	accepted_answer_sha256: string
+	turn_sha256: string
+	citation_pack_ref: string
+	citation_pack_sha256: string
+	trace_authority_status: string
+	reviewed_at: string
+	event_id: string
+	event_sha256: string
+}
+
+export interface GroundingReviewReceiptEnvelope {
+	code: number
+	msg: string
+	data: GroundingReviewReceipt
+}
+
 export interface ListAcceptedAnswersReq {
 }
 export interface ListAcceptedAnswersReqParams {
@@ -522,6 +556,13 @@ export interface RecordSearchJudgmentReq {
 export interface RecordSearchJudgmentReqParams {
 }
 
+export interface RegisterReviewerKeyReq {
+	key_id: string
+	data_kind: string
+	public_key_ed25519_hex: string
+	idempotency_key: string
+}
+
 export interface Release {
 	release_id: string
 	module_id: string
@@ -572,6 +613,32 @@ export interface RetrievalProfile {
 	aggregation?: string
 }
 
+export interface ReviewerKeyPath {
+}
+export interface ReviewerKeyPathParams {
+}
+
+export interface ReviewerKeyRecord {
+	schema_version: string
+	key_id: string
+	reviewer_authority: string
+	reviewer_id: string
+	data_kind: string
+	public_key_ed25519_hex: string
+	registered_at: string
+	revoked_at: string
+	status: string
+	registry_revision: number
+	registration_event_id: string
+	revocation_event_id: string
+}
+
+export interface ReviewerKeyRecordEnvelope {
+	code: number
+	msg: string
+	data: ReviewerKeyRecord
+}
+
 export interface Revision {
 	revision_id: string
 	module_id: string
@@ -599,6 +666,13 @@ export interface RevisionEnvelope {
 export interface RevisionPath {
 }
 export interface RevisionPathParams {
+}
+
+export interface RevokeReviewerKeyReq {
+	reason: string
+	idempotency_key: string
+}
+export interface RevokeReviewerKeyReqParams {
 }
 
 export interface SearchCitationPath {
@@ -698,6 +772,13 @@ export interface SearchSnapshotEnvelope {
 export interface SourceRef {
 	revision_id: string
 	locator: string
+}
+
+export interface SubmitGroundingReviewReq {
+	case_json: string
+	review_json: string
+	key_id: string
+	idempotency_key: string
 }
 
 export interface ToolBudget {

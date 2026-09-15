@@ -399,6 +399,129 @@
         }
       }
     },
+    "/internal/v1/knowledge/answer-grounding/reviews/{case_sha256}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetGroundingReview",
+        "operationId": "workerGetGroundingReview",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "case_sha256",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "case_sha256",
+                    "case_json",
+                    "review_json",
+                    "review_sha256",
+                    "key_id",
+                    "reviewer_authority",
+                    "reviewer_id",
+                    "data_kind",
+                    "registry_revision_at_commit",
+                    "answer_id",
+                    "search_id",
+                    "accepted_answer_sha256",
+                    "turn_sha256",
+                    "citation_pack_ref",
+                    "citation_pack_sha256",
+                    "trace_authority_status",
+                    "reviewed_at",
+                    "event_id",
+                    "event_sha256"
+                  ],
+                  "properties": {
+                    "accepted_answer_sha256": {
+                      "type": "string"
+                    },
+                    "answer_id": {
+                      "type": "string"
+                    },
+                    "case_json": {
+                      "type": "string"
+                    },
+                    "case_sha256": {
+                      "type": "string"
+                    },
+                    "citation_pack_ref": {
+                      "type": "string"
+                    },
+                    "citation_pack_sha256": {
+                      "type": "string"
+                    },
+                    "data_kind": {
+                      "type": "string"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_sha256": {
+                      "type": "string"
+                    },
+                    "key_id": {
+                      "type": "string"
+                    },
+                    "registry_revision_at_commit": {
+                      "type": "integer"
+                    },
+                    "review_json": {
+                      "type": "string"
+                    },
+                    "review_sha256": {
+                      "type": "string"
+                    },
+                    "reviewed_at": {
+                      "type": "string"
+                    },
+                    "reviewer_authority": {
+                      "type": "string"
+                    },
+                    "reviewer_id": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "trace_authority_status": {
+                      "type": "string"
+                    },
+                    "turn_sha256": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/knowledge/builds/{build_id}": {
       "get": {
         "produces": [
@@ -1415,6 +1538,97 @@
         }
       }
     },
+    "/internal/v1/knowledge/reviewer-keys/{key_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetReviewerKey",
+        "operationId": "workerGetReviewerKey",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "key_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "key_id",
+                    "reviewer_authority",
+                    "reviewer_id",
+                    "data_kind",
+                    "public_key_ed25519_hex",
+                    "registered_at",
+                    "revoked_at",
+                    "status",
+                    "registry_revision",
+                    "registration_event_id",
+                    "revocation_event_id"
+                  ],
+                  "properties": {
+                    "data_kind": {
+                      "type": "string"
+                    },
+                    "key_id": {
+                      "type": "string"
+                    },
+                    "public_key_ed25519_hex": {
+                      "type": "string"
+                    },
+                    "registered_at": {
+                      "type": "string"
+                    },
+                    "registration_event_id": {
+                      "type": "string"
+                    },
+                    "registry_revision": {
+                      "type": "integer"
+                    },
+                    "reviewer_authority": {
+                      "type": "string"
+                    },
+                    "reviewer_id": {
+                      "type": "string"
+                    },
+                    "revocation_event_id": {
+                      "type": "string"
+                    },
+                    "revoked_at": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/knowledge/revisions/{revision_id}": {
       "get": {
         "produces": [
@@ -1965,6 +2179,154 @@
                       "type": "string"
                     },
                     "text_hash": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/answer-grounding/reviews": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "SubmitGroundingReview",
+        "operationId": "knowledgeSubmitGroundingReview",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "case_json",
+                "review_json",
+                "key_id",
+                "idempotency_key"
+              ],
+              "properties": {
+                "case_json": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "key_id": {
+                  "type": "string"
+                },
+                "review_json": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "case_sha256",
+                    "case_json",
+                    "review_json",
+                    "review_sha256",
+                    "key_id",
+                    "reviewer_authority",
+                    "reviewer_id",
+                    "data_kind",
+                    "registry_revision_at_commit",
+                    "answer_id",
+                    "search_id",
+                    "accepted_answer_sha256",
+                    "turn_sha256",
+                    "citation_pack_ref",
+                    "citation_pack_sha256",
+                    "trace_authority_status",
+                    "reviewed_at",
+                    "event_id",
+                    "event_sha256"
+                  ],
+                  "properties": {
+                    "accepted_answer_sha256": {
+                      "type": "string"
+                    },
+                    "answer_id": {
+                      "type": "string"
+                    },
+                    "case_json": {
+                      "type": "string"
+                    },
+                    "case_sha256": {
+                      "type": "string"
+                    },
+                    "citation_pack_ref": {
+                      "type": "string"
+                    },
+                    "citation_pack_sha256": {
+                      "type": "string"
+                    },
+                    "data_kind": {
+                      "type": "string"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "event_sha256": {
+                      "type": "string"
+                    },
+                    "key_id": {
+                      "type": "string"
+                    },
+                    "registry_revision_at_commit": {
+                      "type": "integer"
+                    },
+                    "review_json": {
+                      "type": "string"
+                    },
+                    "review_sha256": {
+                      "type": "string"
+                    },
+                    "reviewed_at": {
+                      "type": "string"
+                    },
+                    "reviewer_authority": {
+                      "type": "string"
+                    },
+                    "reviewer_id": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "search_id": {
+                      "type": "string"
+                    },
+                    "trace_authority_status": {
+                      "type": "string"
+                    },
+                    "turn_sha256": {
                       "type": "string"
                     }
                   }
@@ -6787,6 +7149,236 @@
                       "type": "string"
                     },
                     "state": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/reviewer-keys": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "RegisterReviewerKey",
+        "operationId": "knowledgeRegisterReviewerKey",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "key_id",
+                "data_kind",
+                "public_key_ed25519_hex",
+                "idempotency_key"
+              ],
+              "properties": {
+                "data_kind": {
+                  "type": "string"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "key_id": {
+                  "type": "string"
+                },
+                "public_key_ed25519_hex": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "key_id",
+                    "reviewer_authority",
+                    "reviewer_id",
+                    "data_kind",
+                    "public_key_ed25519_hex",
+                    "registered_at",
+                    "revoked_at",
+                    "status",
+                    "registry_revision",
+                    "registration_event_id",
+                    "revocation_event_id"
+                  ],
+                  "properties": {
+                    "data_kind": {
+                      "type": "string"
+                    },
+                    "key_id": {
+                      "type": "string"
+                    },
+                    "public_key_ed25519_hex": {
+                      "type": "string"
+                    },
+                    "registered_at": {
+                      "type": "string"
+                    },
+                    "registration_event_id": {
+                      "type": "string"
+                    },
+                    "registry_revision": {
+                      "type": "integer"
+                    },
+                    "reviewer_authority": {
+                      "type": "string"
+                    },
+                    "reviewer_id": {
+                      "type": "string"
+                    },
+                    "revocation_event_id": {
+                      "type": "string"
+                    },
+                    "revoked_at": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/reviewer-keys/{key_id}/revoke": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "RevokeReviewerKey",
+        "operationId": "knowledgeRevokeReviewerKey",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "key_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "reason",
+                "idempotency_key"
+              ],
+              "properties": {
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "key_id",
+                    "reviewer_authority",
+                    "reviewer_id",
+                    "data_kind",
+                    "public_key_ed25519_hex",
+                    "registered_at",
+                    "revoked_at",
+                    "status",
+                    "registry_revision",
+                    "registration_event_id",
+                    "revocation_event_id"
+                  ],
+                  "properties": {
+                    "data_kind": {
+                      "type": "string"
+                    },
+                    "key_id": {
+                      "type": "string"
+                    },
+                    "public_key_ed25519_hex": {
+                      "type": "string"
+                    },
+                    "registered_at": {
+                      "type": "string"
+                    },
+                    "registration_event_id": {
+                      "type": "string"
+                    },
+                    "registry_revision": {
+                      "type": "integer"
+                    },
+                    "reviewer_authority": {
+                      "type": "string"
+                    },
+                    "reviewer_id": {
+                      "type": "string"
+                    },
+                    "revocation_event_id": {
+                      "type": "string"
+                    },
+                    "revoked_at": {
+                      "type": "string"
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "status": {
                       "type": "string"
                     }
                   }

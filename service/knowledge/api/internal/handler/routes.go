@@ -57,6 +57,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			[]rest.Route{
 				{
 					Method:  http.MethodPost,
+					Path:    "/answer-grounding/reviews",
+					Handler: knowledge.SubmitGroundingReviewHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
 					Path:    "/builds/:build_id/cancel",
 					Handler: knowledge.CancelBuildHandler(serverCtx),
 				},
@@ -161,6 +166,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Handler: knowledge.CreateBuildHandler(serverCtx),
 				},
 				{
+					Method:  http.MethodPost,
+					Path:    "/reviewer-keys",
+					Handler: knowledge.RegisterReviewerKeyHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/reviewer-keys/:key_id/revoke",
+					Handler: knowledge.RevokeReviewerKeyHandler(serverCtx),
+				},
+				{
 					Method:  http.MethodGet,
 					Path:    "/workbench/modules",
 					Handler: knowledge.ListDraftModulesHandler(serverCtx),
@@ -254,6 +269,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				},
 				{
 					Method:  http.MethodGet,
+					Path:    "/answer-grounding/reviews/:case_sha256",
+					Handler: worker.GetGroundingReviewHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
 					Path:    "/builds/:build_id",
 					Handler: worker.GetBuildHandler(serverCtx),
 				},
@@ -291,6 +311,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodGet,
 					Path:    "/releases/:release_id",
 					Handler: worker.GetReleaseHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/reviewer-keys/:key_id",
+					Handler: worker.GetReviewerKeyHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodGet,

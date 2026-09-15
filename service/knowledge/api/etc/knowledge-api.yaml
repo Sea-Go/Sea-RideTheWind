@@ -41,6 +41,9 @@ SearchTools:
 # Enable only after migrate-search-judgments.sql and an approved human rubric.
 SearchJudgments:
   Enabled: false
+# Apply migrate-grounding-reviews.sql before enabling reviewer authority.
+GroundingReviews:
+  Enabled: false
 AdministratorIDs:
   - ${KNOWLEDGE_ADMIN_ID}
 WorkerToken: ${KNOWLEDGE_WORKER_TOKEN}

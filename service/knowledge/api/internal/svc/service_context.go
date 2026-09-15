@@ -125,6 +125,11 @@ func NewServiceContext(c config.Config, observer *telemetry.Runtime) (*ServiceCo
 			return fail(err)
 		}
 	}
+	if c.GroundingReviews.Enabled {
+		if err = store.CheckGroundingReviewSchema(ctx); err != nil {
+			return fail(err)
+		}
+	}
 	if c.SearchSummary.Endpoint != "" {
 		if err = store.CheckProductSearchSchema(ctx); err != nil {
 			return fail(err)
