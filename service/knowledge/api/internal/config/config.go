@@ -13,6 +13,12 @@ type Config struct {
 		Token          string `json:",optional"`
 		IntervalMillis int    `json:",default=1000"`
 	}
+	WikiCompileJobs struct {
+		Enabled        bool   `json:",default=false"`
+		Endpoint       string `json:",optional"` // exact loopback /v1/jobs URL
+		Token          string `json:",optional"` // DC job service token, never a model bearer
+		IntervalMillis int    `json:",default=1000"`
+	}
 	rest.RestConf
 	Observability telemetry.Config
 	Auth          struct {
