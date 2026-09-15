@@ -3,6 +3,7 @@ package communityfact
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -64,6 +65,17 @@ func TestAuthorityHandlerUsesInjectedLogger(t *testing.T) {
 		if !strings.Contains(output.String(), `"`+key+`":`) {
 			t.Fatalf("OBS-r3 key %s missing: %s", key, output.String())
 		}
+	}
+}
+
+func TestRTWSubjectWireV2HasNoRealmOrTenant(t *testing.T) {
+	subject, ok := ParseRTWSubject("rtw.identity/platform/1001")
+	if !ok || subject.Issuer != "rtw.identity" || subject.SubjectID != "1001" {
+		t.Fatalf("canonical RTW subject: %+v %v", subject, ok)
+	}
+	raw, err := json.Marshal(subject)
+	if err != nil || string(raw) != `{"issuer":"rtw.identity","subject_id":"1001"}` {
+		t.Fatalf("community subject wire is not v2: %s %v", raw, err)
 	}
 }
 
