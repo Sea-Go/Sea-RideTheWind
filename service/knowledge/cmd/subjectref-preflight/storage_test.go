@@ -122,6 +122,23 @@ func TestSubjectRefV2StorageIsolatedPostgres(t *testing.T) {
 			t.Fatalf("%s projected %d, want %d", relation, got, want)
 		}
 	}
+	// A missing sidecar row is repaired by an exact replay, without creating
+	// another answer or operation in the old authoritative tables.
+	_, err = conn.Exec(context.Background(), `DELETE FROM knowledge_accepted_answers_subject_v2
+ WHERE answer_id='answer-43'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = conn.Exec(context.Background(), `DELETE FROM knowledge_product_search_operations_subject_v2
+ WHERE issuer='rtw.identity' AND subject_id='99'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = applyStorageMigration(t, conn); err != nil ||
+		storageCount(t, conn, "knowledge_accepted_answers_subject_v2") != 2 ||
+		storageCount(t, conn, "knowledge_product_search_operations_subject_v2") != 2 {
+		t.Fatalf("exact replay did not restore missing sidecars: %v", err)
+	}
 	var otherAnswer string
 	if err := conn.QueryRow(context.Background(), `SELECT a.answer_id FROM knowledge_accepted_answers_subject_v2 p
  JOIN knowledge_accepted_answers a ON
@@ -221,6 +238,10 @@ func TestSubjectRefV2StorageRollsBackHistoricalConflict(t *testing.T) {
 			if err != nil || !pre.Blocking {
 				t.Fatalf("preflight did not block %s: %+v %v", tc.name, pre, err)
 			}
+			if tc.name == "unknown-slot-collision" &&
+				pre.Counts["knowledge_answer_sessions.projected_key_collision"] != 1 {
+				t.Fatalf("old slot collision was not classified: %+v", pre.Counts)
+			}
 			if err := applyStorageMigration(t, conn); err == nil {
 				t.Fatalf("migration projected incompatible history: %s", tc.name)
 			}
@@ -229,6 +250,30 @@ func TestSubjectRefV2StorageRollsBackHistoricalConflict(t *testing.T) {
 				t.Fatal("failed transaction touched old accepted bytes")
 			}
 		})
+	}
+}
+
+func TestSubjectRefV2StorageReplayRejectsPostSnapshotCollision(t *testing.T) {
+	conn := fixtureDB(t)
+	addSession(t, conn, "rtw.identity", "platform", "42", "session", 0)
+	if err := applyStorageMigration(t, conn); err != nil {
+		t.Fatal(err)
+	}
+	// Ordinary v1 writers still run after the transaction releases its lock.
+	// A later unmapped slot must block a new backfill rather than collapse into
+	// the already projected issuer+UID+session row.
+	addSession(t, conn, "rtw.identity", "archive", "42", "session", 0)
+	pre, err := preflight(context.Background(), conn)
+	if err != nil || !pre.Blocking ||
+		pre.Counts["knowledge_answer_sessions.projected_key_collision"] != 1 {
+		t.Fatalf("post-snapshot collision not preflighted: %+v %v", pre, err)
+	}
+	if err = applyStorageMigration(t, conn); err == nil {
+		t.Fatal("replay silently merged a post-snapshot old slot")
+	}
+	if storageCount(t, conn, "knowledge_answer_sessions_subject_v2") != 1 ||
+		storageCount(t, conn, "knowledge_answer_sessions") != 2 {
+		t.Fatal("failed replay damaged old rows or prior canonical sidecar")
 	}
 }
 
