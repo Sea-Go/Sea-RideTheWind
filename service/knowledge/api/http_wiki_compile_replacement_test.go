@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -14,6 +16,8 @@ import (
 	"sea-try-go/service/knowledge/api/internal/mqs"
 	"sea-try-go/service/knowledge/api/internal/testenv"
 	"sea-try-go/service/knowledge/api/internal/types"
+
+	jsoncanonicalizer "github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 )
 
 // An old, already claimed Job cannot keep executing at the cost of a newer
@@ -220,5 +224,136 @@ func TestWikiCompileReplacementCancelsOldDCJobBeforeNewSubmit(t *testing.T) {
 	if err := dc.Pool.QueryRow(ctx, "SELECT count(*) FROM jobs.job WHERE job_type=$1",
 		model.WikiCompileJobType).Scan(&jobsCount); err != nil || jobsCount != 2 {
 		t.Fatalf("two source generations emitted duplicate semantic Jobs: %d %v", jobsCount, err)
+	}
+}
+
+// The default-off H04 path still carries both same-transaction source facts
+// to real DC Eventing in their RTW module sequence. A technical H04 receipt
+// cannot be mistaken for a Wiki DC Job or an accepted Wiki revision.
+func TestWikiCompileDefaultH04ReplacementKeepsSourceOrder(t *testing.T) {
+	dcRoot := os.Getenv("SEA_DC_JOB_PLATFORM_ROOT")
+	if os.Getenv("KNOWLEDGE_TEST_DSN") == "" || dcRoot == "" {
+		t.Skip("use wiki_compile_job_acceptance.sh with disposable PG16 and actual DC platform")
+	}
+	ctx := context.Background()
+	store := testenv.Store(t) // no WithWikiCompileJobs option
+	module, err := store.CreateModule(ctx, "admin-fixture", types.CreateModuleReq{
+		Title: "default H04 generation", IdempotencyKey: "h04-module"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := store.CreateSource(ctx, "admin-fixture", types.CreateSourceReq{
+		ModuleId: module.Id, Title: "source r1", Content: "original text",
+		MediaType: "text/plain", Provenance: "synthetic", IdempotencyKey: "h04-source"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := store.CreateCompile(ctx, "admin-fixture", types.CreateCompileReq{
+		ModuleId: module.Id, PageId: "same-page", SourceRevisionIds: []string{source.RevisionId},
+		Guidance: "first guidance", IdempotencyKey: "h04-compile-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.CreateCompile(ctx, "admin-fixture", types.CreateCompileReq{
+		ModuleId: module.Id, PageId: first.PageId,
+		SourceRevisionIds: []string{source.RevisionId}, Guidance: "second guidance",
+		IdempotencyKey: "h04-compile-2"})
+	if err != nil || second.Generation != first.Generation+1 {
+		t.Fatalf("default H04 source generation not fixed: %+v %v", second, err)
+	}
+	type frozen struct {
+		Event model.Event
+		Raw   []byte
+	}
+	read := func(eventType, compileID, compilePath string) frozen {
+		t.Helper()
+		var row frozen
+		query := `SELECT payload FROM knowledge_outbox WHERE event_type=$1 AND ` + compilePath + `=$2`
+		if err := store.DB.QueryRow(ctx, query, eventType, compileID).Scan(&row.Raw); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(row.Raw, &row.Event); err != nil {
+			t.Fatal(err)
+		}
+		return row
+	}
+	oldRequested := read("knowledge.wiki.compile.requested.v1", first.CompileId,
+		"payload->'payload'->>'compile_id'")
+	oldSuperseded := read("knowledge.wiki.compile.superseded.v1", first.CompileId,
+		"payload->'payload'->'compile'->>'compile_id'")
+	newRequested := read("knowledge.wiki.compile.requested.v1", second.CompileId,
+		"payload->'payload'->>'compile_id'")
+	if oldRequested.Event.AggregateVersion >= oldSuperseded.Event.AggregateVersion ||
+		oldSuperseded.Event.AggregateVersion >= newRequested.Event.AggregateVersion ||
+		oldSuperseded.Event.OperationID != newRequested.Event.OperationID {
+		t.Fatalf("default H04 source Event sequence lost replacement order: old=%+v supersede=%+v new=%+v",
+			oldRequested.Event, oldSuperseded.Event, newRequested.Event)
+	}
+	dc := startRealDCJobPlatform(t, t.TempDir(), dcRoot)
+	h04 := &mqs.HTTPSender{Endpoint: dc.BaseURL + "/v1/events", Token: dc.Token,
+		Client: &http.Client{Timeout: 3 * time.Second}}
+	var sent int
+	for i := 0; i < 16; i++ {
+		accepted, err := store.DispatchOne(ctx, h04)
+		if err != nil {
+			t.Fatalf("default H04 Eventing refused frozen Wiki source: %v", err)
+		}
+		if !accepted {
+			break
+		}
+		sent++
+	}
+	if sent < 3 {
+		t.Fatalf("default H04 did not deliver old/request/supersede/new facts: %d", sent)
+	}
+	type receipt struct {
+		Producer        string `json:"producer"`
+		EventID         string `json:"event_id"`
+		InputHash       string `json:"input_hash"`
+		Offset          int64  `json:"offset"`
+		TechnicalStatus string `json:"technical_status"`
+	}
+	readReceipt := func(row frozen) receipt {
+		t.Helper()
+		var got receipt
+		wikiCompileDCHTTP(t, dc, http.MethodGet,
+			"/v1/events/ridethewind.knowledge/"+row.Event.EventID,
+			"", nil, http.StatusOK, &got)
+		canonical, err := jsoncanonicalizer.Transform(row.Raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256(canonical)
+		if got.Producer != row.Event.Producer || got.EventID != row.Event.EventID ||
+			got.TechnicalStatus != "accepted" || got.InputHash != hex.EncodeToString(sum[:]) || got.Offset < 1 {
+			t.Fatalf("default H04 receipt changed frozen RTW EventSpec: %+v", got)
+		}
+		return got
+	}
+	prior := readReceipt(oldRequested)
+	superseded := readReceipt(oldSuperseded)
+	next := readReceipt(newRequested)
+	if prior.Offset >= superseded.Offset || superseded.Offset >= next.Offset {
+		t.Fatalf("DC Eventing offsets violated RTW source sequence: old=%+v supersede=%+v new=%+v",
+			prior, superseded, next)
+	}
+	var jobsCount, wikiCount int64
+	if err := dc.Pool.QueryRow(ctx, "SELECT count(*) FROM jobs.job WHERE job_type=$1",
+		model.WikiCompileJobType).Scan(&jobsCount); err != nil || jobsCount != 0 {
+		t.Fatalf("default H04 receipts were mistaken for DC Jobs: %d %v", jobsCount, err)
+	}
+	if err := store.DB.QueryRow(ctx, "SELECT count(*) FROM knowledge_revisions WHERE kind='wiki'").Scan(&wikiCount); err != nil || wikiCount != 0 {
+		t.Fatalf("default H04 technical receipts became Wiki revisions: %d %v", wikiCount, err)
+	}
+	for _, row := range []frozen{oldRequested, oldSuperseded, newRequested} {
+		var saved []byte
+		if err := store.DB.QueryRow(ctx, "SELECT payload FROM knowledge_outbox WHERE event_id=$1",
+			row.Event.EventID).Scan(&saved); err != nil || !bytes.Equal(saved, row.Raw) {
+			t.Fatalf("default H04 changed frozen source EventID/body: %s %v", row.Event.EventID, err)
+		}
+	}
+	old, err := store.GetCompile(ctx, first.CompileId)
+	if err != nil || old.State != "SUPERSEDED" || old.CancelVersion != 1 {
+		t.Fatalf("default H04 technical ACK lost RTW business supersession: %+v %v", old, err)
 	}
 }
