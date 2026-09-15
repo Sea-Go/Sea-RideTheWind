@@ -44,7 +44,7 @@ func (l *CreateProductSearchLogic) CreateProductSearch(req *types.ProductSearchR
 		AuthorityId: subject.AuthorityID, TenantId: subject.TenantID, SubjectId: subject.SubjectID,
 	}, req.SessionId, req.IdempotencyKey, model.ProductSearchInput{
 		ModuleID: req.ModuleId, Query: req.Query, Depth: req.Depth, Intelligence: req.Intelligence,
-	})
+	}, l.svcCtx.Config.SearchSummary.ScopeVersion)
 	if err != nil {
 		return nil, err
 	}

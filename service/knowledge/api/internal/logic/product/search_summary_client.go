@@ -15,6 +15,7 @@ import (
 	"sea-try-go/service/knowledge/api/internal/model"
 	"sea-try-go/service/knowledge/api/internal/svc"
 	"sea-try-go/service/knowledge/api/internal/types"
+	"sea-try-go/service/user/user/identity"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -36,6 +37,48 @@ type searchScope struct {
 	RequestHash            string                   `json:"request_hash"`
 	IssuedAtUnix           int64                    `json:"issued_at_unix"`
 	ExpiresAtUnix          int64                    `json:"expires_at_unix"`
+}
+
+// v2 has its own audience and exact ordered two-field identity wire. The old
+// searchScope type, HMAC key, and published v1 payload bytes remain unchanged.
+type searchScopeV2 struct {
+	Audience               string                `json:"aud"`
+	Subject                identity.SubjectRefV2 `json:"subject_ref"`
+	SessionID              string                `json:"session_id"`
+	SearchID               string                `json:"search_id"`
+	AnswerID               string                `json:"answer_id"`
+	Snapshot               types.SearchSnapshot  `json:"snapshot"`
+	AllowPartial           bool                  `json:"allow_partial"`
+	AllowLowerIntelligence bool                  `json:"allow_lower_intelligence"`
+	RequestHash            string                `json:"request_hash"`
+	IssuedAtUnix           int64                 `json:"issued_at_unix"`
+	ExpiresAtUnix          int64                 `json:"expires_at_unix"`
+}
+
+func signSearchScopeV2(op model.ProductSearchOperation, subject identity.SubjectRefV2,
+	key string, allowPartial, allowLower bool, now time.Time) (string, error) {
+	if len(key) < 32 || !identity.ValidSubjectRefV2(subject) ||
+		op.Subject.AuthorityId != subject.Issuer || op.Subject.TenantId != identity.PlatformTenantID ||
+		op.Subject.SubjectId != subject.SubjectID {
+		return "", errSearchUpstream
+	}
+	hash, err := op.Search.Hash()
+	if err != nil || hash != op.RequestHash || op.Snapshot.ModuleId != op.Search.ModuleID {
+		return "", errSearchUpstream
+	}
+	payload, err := json.Marshal(searchScopeV2{
+		Audience: "btw.search.summary.v2", Subject: subject, SessionID: op.SessionID,
+		SearchID: op.SearchID, AnswerID: op.AnswerID, Snapshot: op.Snapshot,
+		AllowPartial: allowPartial, AllowLowerIntelligence: allowLower,
+		RequestHash: op.RequestHash, IssuedAtUnix: now.Unix(), ExpiresAtUnix: now.Add(120 * time.Second).Unix(),
+	})
+	if err != nil {
+		return "", err
+	}
+	mac := hmac.New(sha256.New, []byte(key))
+	_, _ = mac.Write(payload)
+	return base64.RawURLEncoding.EncodeToString(payload) + "." +
+		base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
 func signSearchScope(op model.ProductSearchOperation, key string, allowPartial, allowLower bool, now time.Time) (string, error) {
@@ -68,8 +111,25 @@ func callBTWSummary(ctx context.Context, service *svc.ServiceContext, op model.P
 	}
 	callCtx, cancel := context.WithTimeout(ctx, time.Duration(budget)*time.Millisecond)
 	defer cancel()
-	header, err := signSearchScope(op, service.Config.SearchSummary.ScopeKey,
-		service.Config.SearchSummary.AllowPartial, service.Config.SearchSummary.AllowLowerIntelligence, time.Now())
+	version, err := service.Store.ProductSearchScopeVersion(callCtx, op)
+	if err != nil {
+		return empty, err
+	}
+	var header string
+	if version == "v2" {
+		if err = service.Store.RequireSearchScopeVersions(); err != nil {
+			return empty, err
+		}
+		var subject identity.SubjectRefV2
+		subject, err = issuedSearchSubjectV2(callCtx, service, op.Subject)
+		if err == nil {
+			header, err = signSearchScopeV2(op, subject, service.Config.SearchSummary.ScopeKey,
+				service.Config.SearchSummary.AllowPartial, service.Config.SearchSummary.AllowLowerIntelligence, time.Now())
+		}
+	} else {
+		header, err = signSearchScope(op, service.Config.SearchSummary.ScopeKey,
+			service.Config.SearchSummary.AllowPartial, service.Config.SearchSummary.AllowLowerIntelligence, time.Now())
+	}
 	if err != nil {
 		return empty, err
 	}

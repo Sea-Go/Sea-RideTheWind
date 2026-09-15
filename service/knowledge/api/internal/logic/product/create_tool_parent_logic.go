@@ -35,7 +35,7 @@ func (l *CreateToolParentLogic) CreateToolParent(req *types.ToolParentReq) (resp
 		return nil, err
 	}
 	parent, err := l.svcCtx.Store.ReserveToolParent(l.ctx, subject, req.SessionId,
-		req.IdempotencyKey, req.ModuleId)
+		req.IdempotencyKey, req.ModuleId, l.svcCtx.Config.SearchTools.ScopeVersion)
 	if err != nil {
 		return nil, err
 	}
