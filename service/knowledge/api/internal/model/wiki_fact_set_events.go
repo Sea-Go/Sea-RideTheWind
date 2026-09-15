@@ -29,56 +29,66 @@ func (s *Store) GetWikiFactSetEvent(ctx context.Context, eventID string) (
 			if !citationIdentity(eventID) {
 				return result, invalid("Wiki FactSet Event identity required")
 			}
-			var revisionID, setSHA string
-			var data []byte
-			err := s.DB.QueryRow(ctx, `SELECT e.event_id,e.event_json,e.event_raw_sha256,
+			return s.getWikiFactSetEventInQuery(ctx, s.DB, eventID)
+		})
+}
+
+func (s *Store) getWikiFactSetEventInQuery(ctx context.Context, q queryer,
+	eventID string) (types.WikiFactSetEventReceipt, error) {
+	if !citationIdentity(eventID) {
+		return types.WikiFactSetEventReceipt{}, ErrArtifactUnavailable
+	}
+	var result types.WikiFactSetEventReceipt
+	var revisionID, setSHA string
+	var data []byte
+	err := q.QueryRow(ctx, `SELECT e.event_id,e.event_json,e.event_raw_sha256,
  e.event_jcs_sha256,e.revision_id,r.fact_set_jcs_sha256,r.data
  FROM knowledge_wiki_fact_set_events e
  JOIN knowledge_outbox o ON o.event_id=e.event_id
  JOIN knowledge_wiki_fact_set_revisions r ON r.revision_id=e.revision_id
  WHERE e.event_id=$1 AND o.event_type=$2 AND o.payload=e.event_json::jsonb
  AND r.data=(o.payload->'payload')`, eventID, wikiFactSetEventType).
-				Scan(&result.EventId, &result.EventJson, &result.EventRawSha256,
-					&result.EventJcsSha256, &revisionID, &setSHA, &data)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return result, ErrNotFound
-			}
-			if err != nil {
-				return result, err
-			}
-			result.FactSetJcsSha256 = setSHA
-			raw := []byte(result.EventJson)
-			h, hashErr := wikiQualityJCSHash(raw)
-			if object.Hash(raw) != result.EventRawSha256 || hashErr != nil ||
-				h != result.EventJcsSha256 || !citationHash(setSHA) {
-				return types.WikiFactSetEventReceipt{}, ErrArtifactUnavailable
-			}
-			var event Event
-			if json.Unmarshal(raw, &event) != nil || event.EventID != eventID ||
-				event.EventType != wikiFactSetEventType || event.SchemaVersion != 1 ||
-				event.Producer != "ridethewind.knowledge" || event.AggregateVersion < 1 ||
-				event.OperationID == "" {
-				return types.WikiFactSetEventReceipt{}, ErrArtifactUnavailable
-			}
-			var r wikiFactSetRevision
-			payloadHash, payloadErr := wikiQualityJCSHash(event.Payload)
-			dataHash, dataErr := wikiQualityJCSHash(data)
-			if json.Unmarshal(event.Payload, &r) != nil || payloadErr != nil || dataErr != nil ||
-				payloadHash != setSHA || dataHash != setSHA ||
-				r.FactSetRevisionID != revisionID || r.ModuleID != event.AggregateID ||
-				validateFrozenWikiFactSet(r, setSHA) != nil ||
-				s.verifyFrozenWikiFactSetBytes(ctx, r) != nil {
-				return types.WikiFactSetEventReceipt{}, ErrArtifactUnavailable
-			}
-			return result, nil
-		})
+		Scan(&result.EventId, &result.EventJson, &result.EventRawSha256,
+			&result.EventJcsSha256, &revisionID, &setSHA, &data)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return result, ErrNotFound
+	}
+	if err != nil {
+		return result, err
+	}
+	result.FactSetJcsSha256 = setSHA
+	raw := []byte(result.EventJson)
+	h, hashErr := wikiQualityJCSHash(raw)
+	if object.Hash(raw) != result.EventRawSha256 || hashErr != nil ||
+		h != result.EventJcsSha256 || !citationHash(setSHA) {
+		return types.WikiFactSetEventReceipt{}, ErrArtifactUnavailable
+	}
+	var event Event
+	if json.Unmarshal(raw, &event) != nil || event.EventID != eventID ||
+		event.EventType != wikiFactSetEventType || event.SchemaVersion != 1 ||
+		event.Producer != "ridethewind.knowledge" || event.AggregateVersion < 1 ||
+		event.OperationID == "" {
+		return types.WikiFactSetEventReceipt{}, ErrArtifactUnavailable
+	}
+	var r wikiFactSetRevision
+	payloadHash, payloadErr := wikiQualityJCSHash(event.Payload)
+	dataHash, dataErr := wikiQualityJCSHash(data)
+	if json.Unmarshal(event.Payload, &r) != nil || payloadErr != nil || dataErr != nil ||
+		payloadHash != setSHA || dataHash != setSHA ||
+		r.FactSetRevisionID != revisionID || r.ModuleID != event.AggregateID ||
+		validateFrozenWikiFactSet(r, setSHA) != nil ||
+		s.verifyFrozenWikiFactSetBytesInQuery(ctx, q, r) != nil {
+		return types.WikiFactSetEventReceipt{}, ErrArtifactUnavailable
+	}
+	return result, nil
 }
 
 // Historical quality evidence stays readable after a later withdrawal. This
 // verifies the frozen Source and Wiki bytes and exact first quote span; it
 // does not requalify a new FactSet against the current withdrawal state.
-func (s *Store) verifyFrozenWikiFactSetBytes(ctx context.Context, r wikiFactSetRevision) error {
-	wiki, err := revision(ctx, s.DB, r.WikiRevisionID)
+func (s *Store) verifyFrozenWikiFactSetBytesInQuery(ctx context.Context, q queryer,
+	r wikiFactSetRevision) error {
+	wiki, err := revision(ctx, q, r.WikiRevisionID)
 	if err != nil || wiki.Kind != "wiki" || wiki.ModuleId != r.ModuleID ||
 		wiki.EntityId != r.PageID || wiki.BaseRevisionId != r.BaseWikiRevisionID ||
 		wiki.ContentHash != r.WikiContentSHA256 ||
@@ -101,7 +111,7 @@ func (s *Store) verifyFrozenWikiFactSetBytes(ctx context.Context, r wikiFactSetR
 	originals := make(map[string][]byte, len(r.SourceRevisions))
 	var totalBytes int64
 	for _, claim := range r.SourceRevisions {
-		source, err := revision(ctx, s.DB, claim.RevisionId)
+		source, err := revision(ctx, q, claim.RevisionId)
 		if err != nil || source.Kind != "source" || source.ModuleId != r.ModuleID ||
 			source.ContentHash != claim.ContentSha256 ||
 			source.ObjectKey != object.Key(claim.ContentSha256) {
