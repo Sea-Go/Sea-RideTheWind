@@ -81,7 +81,7 @@ func (m *CommentModel) AuthoritativeFact(ctx context.Context, producer, eventID 
 	switch payload.EventType {
 	case "community.comment.created":
 		if payload.Operation != "create" || payload.SourceRef != "rtw.comment/"+payload.CommentID ||
-			eventID != payload.SourceRef+"/created" {
+			eventID != "rtw.comment."+payload.CommentID+".created" {
 			return communityfact.AuthorityFact{}, communityfact.ErrAuthorityUnavailable
 		}
 		var contentCount int64
@@ -94,7 +94,7 @@ func (m *CommentModel) AuthoritativeFact(ctx context.Context, producer, eventID 
 		if comment.State == 2 {
 			var retractCount int64
 			if err := m.conn.WithContext(ctx).Model(&CommentDomainFactOutbox{}).
-				Where("event_id = ?", payload.SourceRef+"/deleted").Count(&retractCount).Error; err != nil {
+				Where("event_id = ?", "rtw.comment."+payload.CommentID+".deleted").Count(&retractCount).Error; err != nil {
 				return communityfact.AuthorityFact{}, err
 			}
 			if retractCount != 1 {
@@ -104,10 +104,10 @@ func (m *CommentModel) AuthoritativeFact(ctx context.Context, producer, eventID 
 		return authority, nil
 	case "community.comment.deleted":
 		if payload.Operation != "retract" || payload.SourceRef != "rtw.comment/"+payload.CommentID ||
-			eventID != payload.SourceRef+"/deleted" || comment.State != 2 {
+			eventID != "rtw.comment."+payload.CommentID+".deleted" || comment.State != 2 {
 			return communityfact.AuthorityFact{}, communityfact.ErrAuthorityUnavailable
 		}
-		predecessorID := payload.SourceRef + "/created"
+		predecessorID := "rtw.comment." + payload.CommentID + ".created"
 		var predecessor CommentDomainFactOutbox
 		query := m.conn.WithContext(ctx).Where("event_id = ?", predecessorID).Limit(1).Find(&predecessor)
 		if query.Error != nil {
@@ -132,7 +132,7 @@ func (m *CommentModel) AuthoritativeFact(ctx context.Context, producer, eventID 
 func (m *CommentModel) authoritativeCommentInteraction(ctx context.Context, authority communityfact.AuthorityFact,
 	payload commentFact, requestedVersion *int64) (communityfact.AuthorityFact, error) {
 	if requestedVersion == nil || payload.OldState == nil || payload.NewState == nil ||
-		payload.SourceRef != payload.EventID || !strings.HasPrefix(payload.EventID, "rtw.comment.interaction/") {
+		payload.SourceRef != payload.EventID || !strings.HasPrefix(payload.EventID, "rtw.comment.interaction.") {
 		return communityfact.AuthorityFact{}, communityfact.ErrAuthorityUnavailable
 	}
 	var rows []CommentDomainFactOutbox

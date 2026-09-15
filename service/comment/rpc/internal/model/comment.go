@@ -140,7 +140,7 @@ func (m *CommentModel) InsertCommentTx(ctx context.Context, msg kqtypes.CommentK
 			}
 		}
 
-		factID := "rtw.comment/" + strconv.FormatInt(msg.CommentId, 10) + "/created"
+		factID := "rtw.comment." + strconv.FormatInt(msg.CommentId, 10) + ".created"
 		fact := commentFact{
 			EventID: factID, EventType: "community.comment.created", AggregateID: strconv.FormatInt(msg.CommentId, 10),
 			OperationID: factID, SubjectRef: subject, TargetType: msg.TargetType, TargetID: msg.TargetId,
@@ -324,7 +324,7 @@ func (m *CommentModel) DeleteCommentTx(ctx context.Context, commentId, userId in
 			if err != nil {
 				return err
 			}
-			factID := "rtw.comment/" + strconv.FormatInt(commentId, 10) + "/deleted"
+			factID := "rtw.comment." + strconv.FormatInt(commentId, 10) + ".deleted"
 			fact := commentFact{
 				EventID: factID, EventType: "community.comment.deleted", AggregateID: strconv.FormatInt(commentId, 10),
 				OperationID: factID, SubjectRef: creatorRef, OperatorRef: operatorRef,

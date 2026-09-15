@@ -29,7 +29,7 @@ func deliveredLikeAuthority(row LikeDomainFactOutbox) (communityfact.AuthorityFa
 		payload.SourceRef != payload.EventID || payload.EventTime.IsZero() || payload.AvailableAt.IsZero() ||
 		payload.EventType != "community.target.interaction" ||
 		payload.AggregateID != payload.TargetType+"/"+payload.TargetID ||
-		payload.EventID != "rtw.like/"+payload.OperationID || event.OperationID != payload.OperationID {
+		payload.EventID != "rtw.like."+payload.OperationID || event.OperationID != payload.OperationID {
 		return communityfact.AuthorityFact{}, likeFact{}, false
 	}
 	hash, err := communityfact.CanonicalHash([]byte(*row.DeliveryEnvelope))

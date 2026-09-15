@@ -162,5 +162,5 @@ func ParseRTWSubject(value string) (SubjectRef, bool) {
 	if err != nil || uid <= 0 || strconv.FormatInt(uid, 10) != id {
 		return SubjectRef{}, false
 	}
-	return SubjectRef{Issuer: "rtw-user-center", Realm: "platform", SubjectID: id}, true
+	return SubjectRef{Issuer: "rtw.identity", Realm: "platform", SubjectID: id}, true
 }

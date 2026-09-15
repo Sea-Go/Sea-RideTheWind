@@ -143,4 +143,4 @@ func appendCommentFact(tx *gorm.DB, fact commentFact) error {
 
 func stringPtr(value string) *string { return &value }
 
-func newCommentInteractionID() string { return "rtw.comment.interaction/" + uuid.NewString() }
+func newCommentInteractionID() string { return "rtw.comment.interaction." + uuid.NewString() }

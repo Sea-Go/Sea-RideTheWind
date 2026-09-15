@@ -81,7 +81,7 @@ func appendLikeFact(tx *gorm.DB, p *LikeProcessPayload, oldState, newState int32
 	if operation == "" {
 		return fmt.Errorf("invalid like operation: %d", p.Record.State)
 	}
-	eventID := "rtw.like/" + p.Inbox.MsgId
+	eventID := "rtw.like." + p.Inbox.MsgId
 	eventTime := time.Unix(p.OccurredAt, 0).UTC()
 	if p.OccurredAt <= 0 {
 		eventTime = time.Now().UTC()

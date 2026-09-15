@@ -37,7 +37,7 @@ func TestConsumerAcknowledgesOnlyCommittedDomainFact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Create(&model.LikeDomainFactOutbox{EventID: "rtw.like/1000", EventType: "conflict", Payload: `{}`}).Error; err != nil {
+	if err := db.Create(&model.LikeDomainFactOutbox{EventID: "rtw.like.1000", EventType: "conflict", Payload: `{}`}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := service.Consume(context.Background(), "501", string(encoded)); err == nil {
@@ -50,7 +50,7 @@ func TestConsumerAcknowledgesOnlyCommittedDomainFact(t *testing.T) {
 	if err := db.Model(&model.LikeRecord{}).Where("user_id = ? AND target_id = ?", msg.UserId, msg.TargetId).Count(&count).Error; err != nil || count != 0 {
 		t.Fatalf("failed consume left state: count=%d err=%v", count, err)
 	}
-	if err := db.Delete(&model.LikeDomainFactOutbox{}, "event_id = ?", "rtw.like/1000").Error; err != nil {
+	if err := db.Delete(&model.LikeDomainFactOutbox{}, "event_id = ?", "rtw.like.1000").Error; err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
@@ -58,7 +58,7 @@ func TestConsumerAcknowledgesOnlyCommittedDomainFact(t *testing.T) {
 			t.Fatalf("consume retry %d: %v", i, err)
 		}
 	}
-	if err := db.Model(&model.LikeDomainFactOutbox{}).Where("event_id = ?", "rtw.like/1000").Count(&count).Error; err != nil || count != 1 {
+	if err := db.Model(&model.LikeDomainFactOutbox{}).Where("event_id = ?", "rtw.like.1000").Count(&count).Error; err != nil || count != 1 {
 		t.Fatalf("retry did not commit exactly one fact: count=%d err=%v", count, err)
 	}
 	var inbox model.LikeConsumeInbox
