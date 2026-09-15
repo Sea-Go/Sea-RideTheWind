@@ -410,6 +410,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Path:    "/wiki-quality/events/:event_id",
 					Handler: worker.GetWikiQualityEventHandler(serverCtx),
 				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/wiki-quality/source-version-witness/read",
+					Handler: worker.ReadWikiQualitySourceVersionCandidateHandler(serverCtx),
+				},
 			}...,
 		),
 		rest.WithPrefix("/internal/v1/knowledge"),

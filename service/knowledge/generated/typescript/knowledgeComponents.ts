@@ -1156,6 +1156,81 @@ export interface WikiQualityEventReceipt {
 	event_jcs_sha256: string
 }
 
+export interface WikiQualitySourceVersionCandidate {
+	schema_version: string
+	source_version: number
+	event_sequence_at_read: number
+	catalog: WikiQualitySourceVersionCatalog
+	sources: Array<WikiQualitySourceVersionSource>
+	required_heads: Array<WikiQualitySourceVersionRequiredHead>
+	module_lifecycle_at_read: string
+	wiki_withdrawn_at_read: boolean
+	wiki_and_sources_available_at_read: boolean
+	all_required_have_head: boolean
+	event_count: number
+	pages: Array<WikiQualitySourceVersionPage>
+}
+
+export interface WikiQualitySourceVersionCatalog {
+	fact_set_revision_id: string
+	wiki_revision_id: string
+	source_scope_revision: string
+	event_id: string
+	event_raw_sha256: string
+	event_jcs_sha256: string
+	fact_set_jcs_sha256: string
+}
+
+export interface WikiQualitySourceVersionEnvelope {
+	code: number
+	msg: string
+	data: WikiQualitySourceVersionCandidate
+}
+
+export interface WikiQualitySourceVersionEvent {
+	aggregate_version: number
+	event_id: string
+	event_type: string
+	event_jcs_sha256: string
+	jcs_source: string
+	delivered_at: string
+	target_kind: string
+	target_id: string
+}
+
+export interface WikiQualitySourceVersionPage {
+	from_version: number
+	to_version: number
+	events: Array<WikiQualitySourceVersionEvent>
+}
+
+export interface WikiQualitySourceVersionReq {
+	module_id: string
+	page_id: string
+	fact_set_revision_id: string
+	wiki_revision_id: string
+	source_scope_revision: string
+	source_version: number
+}
+
+export interface WikiQualitySourceVersionRequiredHead {
+	fact_id: string
+	source_revision_id: string
+	source_content_sha256: string
+	present: boolean
+	judge_revision_id: string
+	event_id: string
+	event_raw_sha256: string
+	event_jcs_sha256: string
+	source_withdrawn_at_read: boolean
+}
+
+export interface WikiQualitySourceVersionSource {
+	revision_id: string
+	content_sha256: string
+	withdrawn_at_read: boolean
+}
+
 export interface WithdrawReq {
 	target_kind: string
 	target_id: string

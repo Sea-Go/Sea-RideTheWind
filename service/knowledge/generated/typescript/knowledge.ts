@@ -599,3 +599,11 @@ export function getWikiFactSetEvent(params: components.WikiFactSetEventPathParam
 export function getWikiQualityEvent(params: components.WikiQualityEventPathParams, event_id: string) {
 	return webapi.get<components.WikiQualityEventEnvelope>(`/internal/v1/knowledge/wiki-quality/events/${event_id}`, params)
 }
+
+/**
+ * @description
+ * @param req
+ */
+export function readWikiQualitySourceVersionCandidate(req: components.WikiQualitySourceVersionReq) {
+	return webapi.post<components.WikiQualitySourceVersionEnvelope>(`/internal/v1/knowledge/wiki-quality/source-version-witness/read`, req)
+}

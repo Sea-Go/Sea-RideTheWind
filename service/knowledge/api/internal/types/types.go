@@ -1134,6 +1134,81 @@ type WikiQualityEventReceipt struct {
 	EventJcsSha256 string `json:"event_jcs_sha256"`
 }
 
+type WikiQualitySourceVersionCandidate struct {
+	SchemaVersion                 string                                 `json:"schema_version"`
+	SourceVersion                 int64                                  `json:"source_version"`
+	EventSequenceAtRead           int64                                  `json:"event_sequence_at_read"`
+	Catalog                       WikiQualitySourceVersionCatalog        `json:"catalog"`
+	Sources                       []WikiQualitySourceVersionSource       `json:"sources"`
+	RequiredHeads                 []WikiQualitySourceVersionRequiredHead `json:"required_heads"`
+	ModuleLifecycleAtRead         string                                 `json:"module_lifecycle_at_read"`
+	WikiWithdrawnAtRead           bool                                   `json:"wiki_withdrawn_at_read"`
+	WikiAndSourcesAvailableAtRead bool                                   `json:"wiki_and_sources_available_at_read"`
+	AllRequiredHaveHead           bool                                   `json:"all_required_have_head"`
+	EventCount                    int                                    `json:"event_count"`
+	Pages                         []WikiQualitySourceVersionPage         `json:"pages"`
+}
+
+type WikiQualitySourceVersionCatalog struct {
+	FactSetRevisionId   string `json:"fact_set_revision_id"`
+	WikiRevisionId      string `json:"wiki_revision_id"`
+	SourceScopeRevision string `json:"source_scope_revision"`
+	EventId             string `json:"event_id"`
+	EventRawSha256      string `json:"event_raw_sha256"`
+	EventJcsSha256      string `json:"event_jcs_sha256"`
+	FactSetJcsSha256    string `json:"fact_set_jcs_sha256"`
+}
+
+type WikiQualitySourceVersionEnvelope struct {
+	Code int                               `json:"code"`
+	Msg  string                            `json:"msg"`
+	Data WikiQualitySourceVersionCandidate `json:"data"`
+}
+
+type WikiQualitySourceVersionEvent struct {
+	AggregateVersion int64  `json:"aggregate_version"`
+	EventId          string `json:"event_id"`
+	EventType        string `json:"event_type"`
+	EventJcsSha256   string `json:"event_jcs_sha256"`
+	JcsSource        string `json:"jcs_source"`
+	DeliveredAt      string `json:"delivered_at"`
+	TargetKind       string `json:"target_kind"`
+	TargetId         string `json:"target_id"`
+}
+
+type WikiQualitySourceVersionPage struct {
+	FromVersion int64                           `json:"from_version"`
+	ToVersion   int64                           `json:"to_version"`
+	Events      []WikiQualitySourceVersionEvent `json:"events"`
+}
+
+type WikiQualitySourceVersionReq struct {
+	ModuleId            string `json:"module_id"`
+	PageId              string `json:"page_id"`
+	FactSetRevisionId   string `json:"fact_set_revision_id"`
+	WikiRevisionId      string `json:"wiki_revision_id"`
+	SourceScopeRevision string `json:"source_scope_revision"`
+	SourceVersion       int64  `json:"source_version"`
+}
+
+type WikiQualitySourceVersionRequiredHead struct {
+	FactId                string `json:"fact_id"`
+	SourceRevisionId      string `json:"source_revision_id"`
+	SourceContentSha256   string `json:"source_content_sha256"`
+	Present               bool   `json:"present"`
+	JudgeRevisionId       string `json:"judge_revision_id"`
+	EventId               string `json:"event_id"`
+	EventRawSha256        string `json:"event_raw_sha256"`
+	EventJcsSha256        string `json:"event_jcs_sha256"`
+	SourceWithdrawnAtRead bool   `json:"source_withdrawn_at_read"`
+}
+
+type WikiQualitySourceVersionSource struct {
+	RevisionId    string `json:"revision_id"`
+	ContentSha256 string `json:"content_sha256"`
+	Withdrawn     bool   `json:"withdrawn_at_read"`
+}
+
 type WithdrawReq struct {
 	ModuleId       string `path:"module_id"`
 	TargetKind     string `json:"target_kind"`

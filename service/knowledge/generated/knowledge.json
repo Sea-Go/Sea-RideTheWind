@@ -2314,6 +2314,282 @@
         }
       }
     },
+    "/internal/v1/knowledge/wiki-quality/source-version-witness/read": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "ReadWikiQualitySourceVersionCandidate",
+        "operationId": "workerReadWikiQualitySourceVersionCandidate",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "module_id",
+                "page_id",
+                "fact_set_revision_id",
+                "wiki_revision_id",
+                "source_scope_revision",
+                "source_version"
+              ],
+              "properties": {
+                "fact_set_revision_id": {
+                  "type": "string"
+                },
+                "module_id": {
+                  "type": "string"
+                },
+                "page_id": {
+                  "type": "string"
+                },
+                "source_scope_revision": {
+                  "type": "string"
+                },
+                "source_version": {
+                  "type": "integer"
+                },
+                "wiki_revision_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "data": {
+                  "type": "object",
+                  "required": [
+                    "schema_version",
+                    "source_version",
+                    "event_sequence_at_read",
+                    "catalog",
+                    "sources",
+                    "required_heads",
+                    "module_lifecycle_at_read",
+                    "wiki_withdrawn_at_read",
+                    "wiki_and_sources_available_at_read",
+                    "all_required_have_head",
+                    "event_count",
+                    "pages"
+                  ],
+                  "properties": {
+                    "all_required_have_head": {
+                      "type": "boolean"
+                    },
+                    "catalog": {
+                      "type": "object",
+                      "required": [
+                        "fact_set_revision_id",
+                        "wiki_revision_id",
+                        "source_scope_revision",
+                        "event_id",
+                        "event_raw_sha256",
+                        "event_jcs_sha256",
+                        "fact_set_jcs_sha256"
+                      ],
+                      "properties": {
+                        "event_id": {
+                          "type": "string"
+                        },
+                        "event_jcs_sha256": {
+                          "type": "string"
+                        },
+                        "event_raw_sha256": {
+                          "type": "string"
+                        },
+                        "fact_set_jcs_sha256": {
+                          "type": "string"
+                        },
+                        "fact_set_revision_id": {
+                          "type": "string"
+                        },
+                        "source_scope_revision": {
+                          "type": "string"
+                        },
+                        "wiki_revision_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "event_count": {
+                      "type": "integer"
+                    },
+                    "event_sequence_at_read": {
+                      "type": "integer"
+                    },
+                    "module_lifecycle_at_read": {
+                      "type": "string"
+                    },
+                    "pages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "from_version",
+                          "to_version",
+                          "events"
+                        ],
+                        "properties": {
+                          "events": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "aggregate_version",
+                                "event_id",
+                                "event_type",
+                                "event_jcs_sha256",
+                                "jcs_source",
+                                "delivered_at",
+                                "target_kind",
+                                "target_id"
+                              ],
+                              "properties": {
+                                "aggregate_version": {
+                                  "type": "integer"
+                                },
+                                "delivered_at": {
+                                  "type": "string"
+                                },
+                                "event_id": {
+                                  "type": "string"
+                                },
+                                "event_jcs_sha256": {
+                                  "type": "string"
+                                },
+                                "event_type": {
+                                  "type": "string"
+                                },
+                                "jcs_source": {
+                                  "type": "string"
+                                },
+                                "target_id": {
+                                  "type": "string"
+                                },
+                                "target_kind": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "from_version": {
+                            "type": "integer"
+                          },
+                          "to_version": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "required_heads": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "fact_id",
+                          "source_revision_id",
+                          "source_content_sha256",
+                          "present",
+                          "judge_revision_id",
+                          "event_id",
+                          "event_raw_sha256",
+                          "event_jcs_sha256",
+                          "source_withdrawn_at_read"
+                        ],
+                        "properties": {
+                          "event_id": {
+                            "type": "string"
+                          },
+                          "event_jcs_sha256": {
+                            "type": "string"
+                          },
+                          "event_raw_sha256": {
+                            "type": "string"
+                          },
+                          "fact_id": {
+                            "type": "string"
+                          },
+                          "judge_revision_id": {
+                            "type": "string"
+                          },
+                          "present": {
+                            "type": "boolean"
+                          },
+                          "source_content_sha256": {
+                            "type": "string"
+                          },
+                          "source_revision_id": {
+                            "type": "string"
+                          },
+                          "source_withdrawn_at_read": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "schema_version": {
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "type": "integer"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "revision_id",
+                          "content_sha256",
+                          "withdrawn_at_read"
+                        ],
+                        "properties": {
+                          "content_sha256": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "type": "string"
+                          },
+                          "withdrawn_at_read": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "wiki_and_sources_available_at_read": {
+                      "type": "boolean"
+                    },
+                    "wiki_withdrawn_at_read": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "msg": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/knowledge/answer-grounding/reviews": {
       "post": {
         "consumes": [
