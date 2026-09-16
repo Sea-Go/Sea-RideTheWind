@@ -299,12 +299,21 @@ func newProductSearchFixture(t *testing.T, rtwBase *string, workerToken string) 
 		}
 		packRaw, _ := json.Marshal(map[string]any{"search_id": scope.SearchID, "snapshot": scope.Snapshot,
 			"status": "empty", "evidence": []any{}})
+		// This double stands in for BTW's boundary commit; the turn must
+		// satisfy BTW's whole-turn contract because later same-session runs
+		// re-read every accepted turn before their next model call.
 		turnRaw, _ := json.Marshal(map[string]any{
 			"Request": map[string]any{"SearchID": scope.SearchID, "AnswerID": scope.AnswerID,
 				"Subject": scope.Subject, "SessionID": scope.SessionID,
 				"Search": map[string]any{"Query": search.Query, "Depth": search.Depth,
 					"Intelligence": search.Intelligence, "Snapshot": scope.Snapshot}},
-			"result": map[string]any{"search": map[string]any{"evidence_pack": json.RawMessage(packRaw)},
+			"result": map[string]any{"search": map[string]any{
+				"retrieval": map[string]any{"status": "empty", "stop_reason": "no_evidence",
+					"profile": map[string]any{"requested_depth": search.Depth, "effective_depth": search.Depth,
+						"requested_intelligence": search.Intelligence, "effective_intelligence": search.Intelligence,
+						"policy_version": "rtw-fixture-recovery-v1"},
+					"snapshot": scope.Snapshot, "used_subqueries": 1},
+				"evidence_pack": json.RawMessage(packRaw)},
 				"answer_id": scope.AnswerID, "answer": "", "citations": []string{}, "summary_status": "insufficient"},
 		})
 		commit, _ := json.Marshal(types.CommitAcceptedAnswerReq{AnswerId: scope.AnswerID,
@@ -428,6 +437,14 @@ func startRealBTWProductServer(t *testing.T, dir, btwRoot, rtwBase, workerToken,
 				"chunk_id": candidate.ChunkId, "quote_hash": candidate.TextHash}}
 		if real != nil {
 			values["real_index"] = real
+		}
+		if os.Getenv("SEA_BTW_SEARCH_HISTORY_ROUND") == "1" && real == nil {
+			// The explicit-budget injection gate: the child re-reads RTW's
+			// accepted turns before its second same-session model call.
+			values["history"] = map[string]any{
+				"budget":      map[string]int{"max_turns": 4, "max_bytes": 8192},
+				"result_path": filepath.Join(dir, "btw-product-cited-history-receipt.json"),
+			}
 		}
 		fixture, err = json.Marshal(values)
 	}

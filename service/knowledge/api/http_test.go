@@ -1302,6 +1302,67 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatalf("real cited BTW answer and RTW operation GET differ: %+v", citedReplay)
 		}
 		request("GET", searchPath+"/"+cited.SearchId, otherToken, nil, nil, 404)
+		if os.Getenv("SEA_BTW_SEARCH_HISTORY_ROUND") == "1" && formalAPI == nil && realSearchEndpoint == "" {
+			// Same-father injection gate: one more search in the SAME session
+			// must reach the model with RTW's first accepted turn injected.
+			historyBody := map[string]any{"module_id": m.Id, "query": citedBody["query"],
+				"depth": "fast", "intelligence": "low", "idempotency_key": "product-search-real-btw-cited-2"}
+			callsBeforeHistory := searchFixture.calls.Load()
+			var second types.ProductSearchResult
+			request("POST", searchPath, productToken, historyBody, &second, 200)
+			if second.Status != "succeeded" || second.SearchId == "" || second.AnswerId == "" ||
+				len(second.Citations) != 1 || second.Citations[0].Quote != quote ||
+				second.Citations[0].QuoteHash != quoteHash ||
+				second.Citations[0].RevisionId != a.RevisionId ||
+				searchFixture.calls.Load() != callsBeforeHistory+1 {
+				t.Fatalf("same-session second search failed through the real boundary: %+v calls=%d",
+					second, searchFixture.calls.Load()-callsBeforeHistory)
+			}
+			var secondAccepted int
+			if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_accepted_answers
+ WHERE answer_id=$1 AND search_id=$2 AND session_id='search-facade-session' AND status='succeeded'`,
+				second.AnswerId, second.SearchId).Scan(&secondAccepted); err != nil || secondAccepted != 1 {
+				t.Fatalf("second same-session answer missing from RTW PG: count=%d err=%v", secondAccepted, err)
+			}
+			receiptPath := filepath.Join(dir, "btw-product-cited-history-receipt.json")
+			var receiptRaw []byte
+			for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+				if raw, readErr := os.ReadFile(receiptPath); readErr == nil {
+					receiptRaw = raw
+					break
+				}
+			}
+			if len(receiptRaw) == 0 {
+				t.Fatal("BTW history-round child never wrote its injection receipt")
+			}
+			var receipt struct {
+				SchemaVersion string `json:"schema_version"`
+				Budget        struct {
+					MaxTurns int `json:"max_turns"`
+					MaxBytes int `json:"max_bytes"`
+				} `json:"budget"`
+				BlockSHA256 string `json:"block_sha256"`
+				SearchID    string `json:"first_search_id"`
+				AnswerID    string `json:"first_answer_id"`
+				Question    string `json:"first_question"`
+				Answer      string `json:"first_answer"`
+				EvidenceID  string `json:"first_evidence_id"`
+				Quote       string `json:"first_quote"`
+			}
+			if json.Unmarshal(receiptRaw, &receipt) != nil ||
+				receipt.SchemaVersion != "sea.btw.search.history-injection-real.v1" ||
+				receipt.Budget.MaxTurns != 4 || receipt.Budget.MaxBytes != 8192 ||
+				len(receipt.BlockSHA256) != 64 ||
+				receipt.SearchID != cited.SearchId || receipt.AnswerID != cited.AnswerId ||
+				receipt.Question != citedBody["query"] || receipt.Answer != cited.Answer ||
+				receipt.EvidenceID != cited.Citations[0].EvidenceId || receipt.Quote != quote {
+				t.Fatalf("injected accepted turn differs from RTW's committed first turn: %s", receiptRaw)
+			}
+			if testing.Verbose() {
+				t.Logf("same-session second search carried RTW accepted turn: block=%s answer=%s",
+					receipt.BlockSHA256, receipt.AnswerID)
+			}
+		}
 		var citedState types.ProductAnswerCitationStates
 		request("GET", "/v1/knowledge/answer-sessions/search-facade-session/accepted-answers/"+
 			cited.AnswerId+"/citations", productToken, nil, &citedState, 200)
@@ -1986,6 +2047,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	}
 	if os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT") != "" {
 		expectedCitationCommits++ // The signed product search accepts one real RTW citation.
+	}
+	if os.Getenv("SEA_BTW_SEARCH_HISTORY_ROUND") == "1" {
+		expectedCitationCommits++ // The same-session injection search accepts one more real citation.
 	}
 	if os.Getenv("SEA_BTW_TOOLS_CONSUMER_ROOT") != "" {
 		expectedCitationCommits++ // The signed Tools child accepts one real RTW citation.
