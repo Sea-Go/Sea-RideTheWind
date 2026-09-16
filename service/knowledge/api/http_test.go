@@ -1350,6 +1350,51 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Logf("RTW signed cited search accepted by real BTW root: search=%s answer=%s receipt=%s evidence=%s",
 				cited.SearchId, cited.AnswerId, cited.CitationReceiptRef, cited.Citations[0].EvidenceId)
 		}
+		if os.Getenv("SEA_BTW_MEDIUM_ROUND") == "1" && formalAPI != nil && formalAPI.liveGateway {
+			// One real fast/medium product search in the SAME published
+			// snapshot: the planner and the summary both go through the live
+			// DataCenter gateway, never the fixed model fixture.
+			// A natural question: the planner must rephrase it, and the three
+			// real BGE lanes still have to recall the published chunk first.
+			mediumBody := map[string]any{"module_id": m.Id,
+				"query": "What evidence does the published source state?",
+				"depth": "fast", "intelligence": "medium",
+				"idempotency_key": "product-search-real-btw-medium-1"}
+			callsBeforeMedium := searchFixture.calls.Load()
+			mediumStarted := time.Now()
+			var medium types.ProductSearchResult
+			request("POST", searchPath, productToken, mediumBody, &medium, 200)
+			mediumAnswer := strings.TrimSpace(medium.Answer) != "" && strings.Contains(strings.ToLower(medium.Answer), "evidence")
+			if medium.Status != "succeeded" || medium.SearchId == "" || medium.AnswerId == "" ||
+				!mediumAnswer || len(medium.Citations) != 1 ||
+				medium.Citations[0].Quote != quote || medium.Citations[0].QuoteHash != quoteHash ||
+				medium.Citations[0].RevisionId != a.RevisionId ||
+				medium.CitationReceiptRef == "" ||
+				searchFixture.calls.Load() != callsBeforeMedium+1 {
+				t.Fatalf("real fast/medium product search failed in the fixed snapshot: %+v calls=%d",
+					medium, searchFixture.calls.Load()-callsBeforeMedium)
+			}
+			var mediumAccepted, mediumCitations int
+			if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_accepted_answers
+ WHERE answer_id=$1 AND search_id=$2 AND session_id='search-facade-session' AND status='succeeded'`,
+				medium.AnswerId, medium.SearchId).Scan(&mediumAccepted); err != nil || mediumAccepted != 1 {
+				t.Fatalf("medium answer missing from RTW PG: count=%d err=%v", mediumAccepted, err)
+			}
+			if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_answer_citations WHERE answer_id=$1`,
+				medium.AnswerId).Scan(&mediumCitations); err != nil || mediumCitations != 1 {
+				t.Fatalf("medium answer citation missing from RTW PG: count=%d err=%v", mediumCitations, err)
+			}
+			var mediumReplay types.ProductSearchResult
+			request("POST", searchPath, productToken, mediumBody, &mediumReplay, 200)
+			if !reflect.DeepEqual(mediumReplay, medium) || searchFixture.calls.Load() != callsBeforeMedium+1 {
+				t.Fatal("medium idempotent replay reran the gateway or changed the answer")
+			}
+			formalAPI.AssertServed(t)
+			if testing.Verbose() {
+				t.Logf("RTW real fast/medium search through live DataCenter gateway: search=%s answer=%s latency=%s",
+					medium.SearchId, medium.AnswerId, time.Since(mediumStarted))
+			}
+		}
 		var acceptedCount, acceptedCitations, citationRecords int
 		if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_accepted_answers
  WHERE answer_id=$1 AND search_id=$2 AND authority_id='rtw.identity' AND tenant_id='platform'

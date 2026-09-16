@@ -129,6 +129,11 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 	}
 	policyFile := filepath.Join(instanceDir, "btw-search-api-policy.json")
 	policy := `{"version":"real-bge-three-lane-fast-low-v1","fast_low":{"max_batches":1,"max_subqueries":1,"top_k_per_lane":2,"max_evidence":1,"wall_time":"25s"}}`
+	if os.Getenv("SEA_BTW_MEDIUM_ROUND") == "1" {
+		// The medium product gate: one native planner stage over the same
+		// fixed snapshot, bounded to one batch and three total queries.
+		policy = `{"version":"real-bge-three-lane-fast-low-v1","fast_low":{"max_batches":1,"max_subqueries":1,"top_k_per_lane":2,"max_evidence":1,"wall_time":"25s"},"fast_medium":{"version":"real-bge-three-lane-fast-medium-v1","max_batches":1,"max_subqueries":3,"top_k_per_lane":2,"max_evidence":1,"wall_time":"25s","planner_max_output_tokens":256}}`
+	}
 	if err = os.WriteFile(policyFile, []byte(policy), 0600); err != nil {
 		t.Fatal(err)
 	}
