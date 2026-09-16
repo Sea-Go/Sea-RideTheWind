@@ -928,7 +928,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 		t.Fatalf("Tool budget did not reserve once/refund verified empty result: %+v", replayedParent.Budget)
 	}
 	if btwRoot := os.Getenv("SEA_BTW_TOOLS_CONSUMER_ROOT"); btwRoot != "" {
-		endpoint := startRealBTWToolsServer(t, dir, btwRoot, base, c.WorkerToken, m.Id, nil)
+		endpoint := startRealBTWToolsServer(t, dir, btwRoot, base, c.WorkerToken, m.Id, nil, false)
 		toolFixture.mu.Lock()
 		toolFixture.forwardURL = endpoint
 		toolFixture.mu.Unlock()
@@ -971,7 +971,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatalf("real BTW Tool budget did not commit once: %+v", replayedParent.Budget)
 		}
 		beforeCited := replayedParent.Budget
-		citedEndpoint := startRealBTWToolsServer(t, t.TempDir(), btwRoot, base, c.WorkerToken, m.Id, &chunk)
+		citedEndpoint := startRealBTWToolsServer(t, t.TempDir(), btwRoot, base, c.WorkerToken, m.Id, &chunk, false)
 		toolFixture.mu.Lock()
 		toolFixture.forwardURL = citedEndpoint
 		toolFixture.mu.Unlock()
@@ -1038,6 +1038,90 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			replayedParent.Budget.QuoteRunes != beforeCited.QuoteRunes-2*utf8.RuneCountInString(quote) {
 			t.Fatalf("RTW Tool reread did not charge once: before=%+v after=%+v",
 				beforeCited, replayedParent.Budget)
+		}
+		if os.Getenv("SEA_BTW_TOOLS_LOST_REPLY_ROUND") == "1" {
+			// True-PG lost-reply gate: RTW durably commits the citation, the
+			// child's reply is dropped, and the same idempotency key must
+			// recover through the same search ID without a second commit or
+			// budget charge.
+			lostEndpoint := startRealBTWToolsServer(t, t.TempDir(), btwRoot, base, c.WorkerToken, m.Id, &chunk, true)
+			toolFixture.mu.Lock()
+			toolFixture.forwardURL = lostEndpoint
+			toolFixture.mu.Unlock()
+			lostBody := map[string]any{"query": "Find the current evidence", "depth": "fast",
+				"intelligence": "low", "read_calls": 8, "quote_runes": 8192,
+				"idempotency_key": "tool-search-real-btw-lost-1"}
+			callsBeforeLost := toolFixture.calls.Load()
+			knownChildren := make(map[string]bool)
+			if rows, queryErr := s.DB.Query(context.Background(),
+				`SELECT search_id FROM knowledge_tool_searches WHERE operation_id=$1`, toolParent.OperationId); queryErr != nil {
+				t.Fatal(queryErr)
+			} else {
+				for rows.Next() {
+					var existing string
+					if scanErr := rows.Scan(&existing); scanErr != nil {
+						rows.Close()
+						t.Fatal(scanErr)
+					}
+					knownChildren[existing] = true
+				}
+				rows.Close()
+			}
+			request("POST", toolSearchPath, productToken, lostBody, nil, 503)
+			if called := toolFixture.calls.Load(); called != callsBeforeLost+1 {
+				t.Fatalf("lost-reply first attempt did not reach the real Tool child: calls=%d", called-callsBeforeLost)
+			}
+			var lostSearchID string
+			if rows, queryErr := s.DB.Query(context.Background(),
+				`SELECT search_id FROM knowledge_tool_searches WHERE operation_id=$1`, toolParent.OperationId); queryErr != nil {
+				t.Fatal(queryErr)
+			} else {
+				defer rows.Close()
+				for rows.Next() {
+					var existing string
+					if scanErr := rows.Scan(&existing); scanErr != nil {
+						t.Fatal(scanErr)
+					}
+					if !knownChildren[existing] {
+						lostSearchID = existing
+					}
+				}
+			}
+			if lostSearchID == "" {
+				t.Fatal("no new Tool child row appeared after the lost reply")
+			}
+			var recovered types.ToolSearchResult
+			request("POST", toolSearchPath, productToken, lostBody, &recovered, 200)
+			if recovered.SearchId != lostSearchID || recovered.Status != "complete" ||
+				len(recovered.Evidence) != 1 || recovered.Evidence[0].Quote != quote ||
+				recovered.Evidence[0].QuoteHash != quoteHash ||
+				recovered.CitationReceipt == nil || recovered.CitationReceipt.DurableRef == "" ||
+				recovered.CitationReceipt.SearchId != lostSearchID ||
+				toolFixture.calls.Load() != callsBeforeLost+2 {
+				t.Fatalf("same-ID retry did not recover the lost Tool reply: %+v calls=%d", recovered,
+					toolFixture.calls.Load()-callsBeforeLost)
+			}
+			var lostCitations int
+			if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_search_citations
+ WHERE search_id=$1`, lostSearchID).Scan(&lostCitations); err != nil || lostCitations != 1 {
+				t.Fatalf("lost-reply retry double-committed the citation: count=%d err=%v", lostCitations, err)
+			}
+			var lostComplete int
+			if err := s.DB.QueryRow(context.Background(), `SELECT count(*) FROM knowledge_tool_searches
+ WHERE operation_id=$1 AND search_id=$2 AND status='complete'`, toolParent.OperationId, lostSearchID).
+				Scan(&lostComplete); err != nil || lostComplete != 1 {
+				t.Fatalf("recovered Tool child not durably complete: count=%d err=%v", lostComplete, err)
+			}
+			// cited(1 read) + one charged reread(1 read) + this recovery(1 read):
+			// the failed first attempt reserves but the retry's completion
+			// settles actual usage exactly once.
+			request("GET", parentPath, productToken, nil, &replayedParent, 200)
+			if replayedParent.Budget.SearchCalls != beforeCited.SearchCalls-2 ||
+				replayedParent.Budget.ReadCalls != beforeCited.ReadCalls-3 ||
+				replayedParent.Budget.QuoteRunes != beforeCited.QuoteRunes-3*utf8.RuneCountInString(quote) {
+				t.Fatalf("lost-reply retry double-charged the Tool budget: before=%+v after=%+v",
+					beforeCited, replayedParent.Budget)
+			}
 		}
 	}
 	searchPath := "/v1/knowledge/answer-sessions/search-facade-session/searches"
@@ -2054,11 +2138,20 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	if os.Getenv("SEA_BTW_TOOLS_CONSUMER_ROOT") != "" {
 		expectedCitationCommits++ // The signed Tools child accepts one real RTW citation.
 	}
+	if os.Getenv("SEA_BTW_TOOLS_LOST_REPLY_ROUND") == "1" {
+		expectedCitationCommits++ // The lost reply's durable accept; RTW's idempotent replay does not recount.
+	}
 	if publishNewRelease {
 		expectedCitationCommits += 3 // old, new and rolled-back versions each accept one real citation.
 	}
 	if !strings.Contains(string(metricBody), fmt.Sprintf(`sea_knowledge_commits_total{operation="knowledge.search.citations.accept"} %d`, expectedCitationCommits)) {
-		t.Fatal("citation replay was counted as another durable commit")
+		var actual string
+		for _, line := range bytes.Split(metricBody, []byte("\n")) {
+			if bytes.HasPrefix(line, []byte(`sea_knowledge_commits_total{operation="knowledge.search.citations.accept"}`)) {
+				actual = string(line)
+			}
+		}
+		t.Fatalf("citation commit metric mismatch: want=%d actual=%s", expectedCitationCommits, actual)
 	}
 	var records []map[string]any
 	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {

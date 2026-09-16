@@ -243,7 +243,7 @@ func newToolSearchFixture(t *testing.T) *toolSearchFixture {
 
 // The optional cross-repository gate starts BTW's independently compiled
 // handler process. This process, not the local relay, owns Tool/Graph output.
-func startRealBTWToolsServer(t *testing.T, dir, btwRoot, rtwBase, workerToken, moduleID string, candidate *types.CitationChunk) string {
+func startRealBTWToolsServer(t *testing.T, dir, btwRoot, rtwBase, workerToken, moduleID string, candidate *types.CitationChunk, lostReply bool) string {
 	t.Helper()
 	readyPath := filepath.Join(dir, "btw-tools-server-url")
 	fixturePath := filepath.Join(dir, "btw-tools-server-fixture.json")
@@ -252,6 +252,9 @@ func startRealBTWToolsServer(t *testing.T, dir, btwRoot, rtwBase, workerToken, m
 	if candidate != nil {
 		fields["candidate"] = map[string]string{"revision_id": candidate.RevisionId,
 			"chunk_id": candidate.ChunkId, "quote_hash": candidate.TextHash}
+	}
+	if lostReply {
+		fields["lost_reply"] = true
 	}
 	fixture, err := json.Marshal(fields)
 	if err != nil {
