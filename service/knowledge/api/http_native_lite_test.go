@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	jsoncanonicalizer "github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 	"sea-try-go/service/knowledge/api/internal/object"
 )
 
@@ -125,6 +126,17 @@ func validRealNativeSettings(raw []byte) bool {
 		settings.MultiVector.EFConstruction == 128 && settings.MultiVector.EFSearch == 64
 }
 
+func realNativeSettingsJCSSHA256(raw []byte) (string, error) {
+	if !validRealNativeSettings(raw) {
+		return "", errors.New("Native Hybrid settings are not the six literal learned-IP fields")
+	}
+	canonical, err := jsoncanonicalizer.Transform(raw)
+	if err != nil {
+		return "", err
+	}
+	return object.Hash(canonical), nil
+}
+
 func writeNativeOnce(path string, raw []byte) error {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
@@ -168,6 +180,12 @@ func startRealBTWNativeLite(t *testing.T, parentDir, btwRoot string) (realNative
 	liteDir := filepath.Join(parentDir, "native-lite")
 	if err := os.Mkdir(liteDir, 0700); err != nil {
 		t.Fatal(err)
+	}
+	// The Python owner resolves the directory through TMPDIR symlinks
+	// (/var/folders -> /private/var/folders) before publishing runtime.json;
+	// compare receipts against the same resolved path.
+	if resolved, resolveErr := filepath.EvalSymlinks(liteDir); resolveErr == nil {
+		liteDir = resolved
 	}
 	logPath := filepath.Join(parentDir, "native-lite-owner.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)

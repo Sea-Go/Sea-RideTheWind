@@ -119,7 +119,7 @@ type realNativeSource struct {
 
 func runRealNativeFourSourceHandoff(t *testing.T, store *model.Store,
 	request httpRequest, dir, rtwBase, adminToken, workerToken, productToken string,
-	relay *productSearchFixture, legacyModuleID, legacyReleaseID string) {
+	relay *productSearchFixture, legacyModuleID string) {
 	t.Helper()
 	btwRoot, dcRuntimePath := os.Getenv("SEA_BTW_SEARCH_API_SOCKET_ROOT"),
 		os.Getenv("SEA_DC_BGE_RUNTIME")
@@ -129,11 +129,12 @@ func runRealNativeFourSourceHandoff(t *testing.T, store *model.Store,
 	if err := nativePinnedBTWSource(btwRoot, os.Getenv("SEA_BTW_NATIVE_SOURCE_SHA")); err != nil {
 		t.Fatal(err)
 	}
+	// The readers verification may have moved the legacy pointer to a later
+	// release; only "untouched across this handoff" is asserted here.
 	var legacyReleaseBefore string
 	if err := store.DB.QueryRow(context.Background(), `SELECT data->>'active_release_id'
- FROM knowledge_modules WHERE id=$1`, legacyModuleID).Scan(&legacyReleaseBefore); err != nil ||
-		legacyReleaseBefore != legacyReleaseID {
-		t.Fatal("legacy module's release pointer changed before Native test", err)
+ FROM knowledge_modules WHERE id=$1`, legacyModuleID).Scan(&legacyReleaseBefore); err != nil {
+		t.Fatal("legacy module's release pointer unreadable before Native test", err)
 	}
 	var module types.Module
 	request("POST", "/v1/knowledge/modules", adminToken, types.CreateModuleReq{
@@ -379,6 +380,15 @@ func runRealNativeFourSourceHandoff(t *testing.T, store *model.Store,
 			t.Fatal("Orange also entered Dense/Sparse TopK2; no Multi-only evidence")
 		}
 	}
+	settingsSHA, settingsErr := realNativeSettingsJCSSHA256(built.NativeProjection.Settings)
+	if settingsErr != nil || !realNativeHash(witness.SettingsJCSSHA256) ||
+		witness.SettingsJCSSHA256 != settingsSHA ||
+		witness.SettingsJCSSHA256 != built.NativeProjection.SettingsJCSSHA256 ||
+		witness.SparseBackend != "frozen_ip_postings" || witness.SparseExaminedPostings < 1 {
+		t.Fatalf("published witness and builder projection settings receipts disagree: sha=%s backend=%s postings=%d err=%v",
+			witness.SettingsJCSSHA256, witness.SparseBackend,
+			witness.SparseExaminedPostings, settingsErr)
+	}
 	formal := startRealBTWSearchAPIProcess(t, dir, btwRoot, rtwBase, workerToken,
 		dcRuntimePath, built, apple.Text, litePath)
 	relay.mu.Lock()
@@ -508,26 +518,29 @@ func mustNativeJSON(t *testing.T, value any) []byte {
 }
 
 type realNativeUniqueResult struct {
-	SchemaVersion         string   `json:"schema_version"`
-	ModuleID              string   `json:"module_id"`
-	ReleaseID             string   `json:"release_id"`
-	Generation            int64    `json:"generation"`
-	PublicationRevision   string   `json:"publication_revision"`
-	Query                 string   `json:"query"`
-	NativeRuntimeSHA256   string   `json:"native_runtime_sha256"`
-	EnginePackageSHA256   string   `json:"engine_package_sha256"`
-	DenseChunkIDs         []string `json:"dense_chunk_ids"`
-	SparseChunkIDs        []string `json:"sparse_chunk_ids"`
-	MultiVectorChunkIDs   []string `json:"multivector_chunk_ids"`
-	UniqueMultiChunkID    string   `json:"unique_multi_chunk_id"`
-	UniqueRevisionID      string   `json:"unique_revision_id"`
-	UniqueQuoteSHA256     string   `json:"unique_quote_sha256"`
-	UniqueOriginalSHA256  string   `json:"unique_original_sha256"`
-	UniqueLocator         string   `json:"unique_locator"`
-	RTWCurrentAndReadable bool     `json:"rtw_current_and_readable"`
-	PhysicalQualified     bool     `json:"physical_qualified"`
-	QrelEvaluable         bool     `json:"qrel_evaluable"`
-	ProductionVerified    bool     `json:"production_verified"`
+	SchemaVersion          string   `json:"schema_version"`
+	ModuleID               string   `json:"module_id"`
+	ReleaseID              string   `json:"release_id"`
+	Generation             int64    `json:"generation"`
+	PublicationRevision    string   `json:"publication_revision"`
+	Query                  string   `json:"query"`
+	NativeRuntimeSHA256    string   `json:"native_runtime_sha256"`
+	EnginePackageSHA256    string   `json:"engine_package_sha256"`
+	SettingsJCSSHA256      string   `json:"settings_jcs_sha256"`
+	SparseBackend          string   `json:"sparse_backend"`
+	SparseExaminedPostings int      `json:"sparse_examined_postings"`
+	DenseChunkIDs          []string `json:"dense_chunk_ids"`
+	SparseChunkIDs         []string `json:"sparse_chunk_ids"`
+	MultiVectorChunkIDs    []string `json:"multivector_chunk_ids"`
+	UniqueMultiChunkID     string   `json:"unique_multi_chunk_id"`
+	UniqueRevisionID       string   `json:"unique_revision_id"`
+	UniqueQuoteSHA256      string   `json:"unique_quote_sha256"`
+	UniqueOriginalSHA256   string   `json:"unique_original_sha256"`
+	UniqueLocator          string   `json:"unique_locator"`
+	RTWCurrentAndReadable  bool     `json:"rtw_current_and_readable"`
+	PhysicalQualified      bool     `json:"physical_qualified"`
+	QrelEvaluable          bool     `json:"qrel_evaluable"`
+	ProductionVerified     bool     `json:"production_verified"`
 }
 
 func runNativeIndependentWitness(t *testing.T, dir, btwRoot, builder,
@@ -601,33 +614,39 @@ func writeNativeParentEvidence(t *testing.T, module types.Module,
 		t.Fatal("Native parent evidence directory must be absolute")
 	}
 	var report = struct {
-		SchemaVersion       string   `json:"schema_version"`
-		ModuleID            string   `json:"module_id"`
-		ReleaseID           string   `json:"release_id"`
-		BuildID             string   `json:"build_id"`
-		Generation          int64    `json:"generation"`
-		PublicationRevision string   `json:"publication_revision"`
-		SourceRevisionIDs   []string `json:"source_revision_ids"`
-		ChunkManifestSHA256 string   `json:"chunk_manifest_sha256"`
-		IndexManifestSHA256 string   `json:"index_manifest_sha256"`
-		NativeRuntimeSHA256 string   `json:"native_runtime_sha256"`
-		EnginePackageSHA256 string   `json:"engine_package_sha256"`
-		WitnessSHA256       string   `json:"witness_sha256"`
-		Query               string   `json:"query"`
-		SearchID            string   `json:"search_id"`
-		AnswerID            string   `json:"answer_id"`
-		PhysicalQualified   bool     `json:"physical_qualified"`
-		QrelEvaluable       bool     `json:"qrel_evaluable"`
-		ProductionVerified  bool     `json:"production_verified"`
+		SchemaVersion          string   `json:"schema_version"`
+		ModuleID               string   `json:"module_id"`
+		ReleaseID              string   `json:"release_id"`
+		BuildID                string   `json:"build_id"`
+		Generation             int64    `json:"generation"`
+		PublicationRevision    string   `json:"publication_revision"`
+		SourceRevisionIDs      []string `json:"source_revision_ids"`
+		ChunkManifestSHA256    string   `json:"chunk_manifest_sha256"`
+		IndexManifestSHA256    string   `json:"index_manifest_sha256"`
+		NativeRuntimeSHA256    string   `json:"native_runtime_sha256"`
+		EnginePackageSHA256    string   `json:"engine_package_sha256"`
+		SettingsJCSSHA256      string   `json:"settings_jcs_sha256"`
+		SparseBackend          string   `json:"sparse_backend"`
+		SparseExaminedPostings int      `json:"sparse_examined_postings"`
+		WitnessSHA256          string   `json:"witness_sha256"`
+		Query                  string   `json:"query"`
+		SearchID               string   `json:"search_id"`
+		AnswerID               string   `json:"answer_id"`
+		PhysicalQualified      bool     `json:"physical_qualified"`
+		QrelEvaluable          bool     `json:"qrel_evaluable"`
+		ProductionVerified     bool     `json:"production_verified"`
 	}{SchemaVersion: "sea.rtw.native-four-source-parent.v1", ModuleID: module.Id,
 		ReleaseID: release.ReleaseId, BuildID: build.BuildId,
 		Generation: build.Generation, PublicationRevision: snapshot.PublicationRevision,
-		SourceRevisionIDs:   release.SourceRevisionIds,
-		ChunkManifestSHA256: chunkManifest.SHA256,
-		IndexManifestSHA256: built.IndexManifest.SHA256,
-		NativeRuntimeSHA256: lite.RawSHA256,
-		EnginePackageSHA256: lite.EnginePackageSHA256,
-		WitnessSHA256:       object.Hash(witnessRaw), Query: realNativeQuery,
+		SourceRevisionIDs:      release.SourceRevisionIds,
+		ChunkManifestSHA256:    chunkManifest.SHA256,
+		IndexManifestSHA256:    built.IndexManifest.SHA256,
+		NativeRuntimeSHA256:    lite.RawSHA256,
+		EnginePackageSHA256:    lite.EnginePackageSHA256,
+		SettingsJCSSHA256:      witness.SettingsJCSSHA256,
+		SparseBackend:          witness.SparseBackend,
+		SparseExaminedPostings: witness.SparseExaminedPostings,
+		WitnessSHA256:          object.Hash(witnessRaw), Query: realNativeQuery,
 		SearchID: product.SearchId, AnswerID: product.AnswerId}
 	persistNativeTestBytes(t, "native-four-source-parent.json",
 		append(mustNativeJSON(t, report), '\n'))

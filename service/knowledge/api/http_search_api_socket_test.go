@@ -85,13 +85,19 @@ func startRealBTWSearchAPIProcess(t *testing.T, dir, btwRoot, rtwBase, workerTok
 	mode, nativeAddress, nativeSettingsPath := "local-exact", "", ""
 	if nativeRuntimePath != "" {
 		runtime, nativeErr := readRealNativeLiteRuntime(nativeRuntimePath)
+		settingsSHA, settingsErr := realNativeSettingsJCSSHA256(nil)
+		if built.NativeProjection != nil {
+			settingsSHA, settingsErr = realNativeSettingsJCSSHA256(built.NativeProjection.Settings)
+		}
 		if nativeErr != nil || built.NativeProjection == nil ||
 			built.NativeProjection.Status != "test_projection_before_RTW_READY" ||
 			built.NativeProjection.PhysicalQualified ||
 			built.NativeProjection.Endpoint != runtime.Endpoint ||
 			built.NativeProjection.EnginePackageSHA256 != runtime.EnginePackageSHA256 ||
 			built.NativeProjection.RuntimeSHA256 != runtime.RawSHA256 ||
-			!validRealNativeSettings(built.NativeProjection.Settings) {
+			!realNativeHash(built.NativeProjection.SettingsJCSSHA256) ||
+			settingsErr != nil ||
+			built.NativeProjection.SettingsJCSSHA256 != settingsSHA {
 			t.Fatal("formal native cmd/api lacks the same task-owned Lite projection receipt")
 		}
 		mode, nativeAddress = "native-hybrid", runtime.Endpoint

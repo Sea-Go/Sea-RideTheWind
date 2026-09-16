@@ -60,6 +60,7 @@ type realNativeProjection struct {
 	RuntimeSHA256       string          `json:"runtime_sha256"`
 	EnginePackageSHA256 string          `json:"engine_package_sha256"`
 	Settings            json.RawMessage `json:"settings"`
+	SettingsJCSSHA256   string          `json:"settings_jcs_sha256"`
 	PhysicalQualified   bool            `json:"physical_qualified"`
 }
 

@@ -655,7 +655,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			t.Fatalf("HTTP %s index ref differs from accepted build", lane.Profile.Lane)
 		}
 	}
-	if socketRoot := os.Getenv("SEA_BTW_SEARCH_API_SOCKET_ROOT"); socketRoot != "" {
+	if socketRoot := os.Getenv("SEA_BTW_SEARCH_API_SOCKET_ROOT"); socketRoot != "" && !nativeFourSource {
 		if realBGE == "" {
 			t.Fatal("formal cmd/api real-socket gate requires actual DC BGE runtime")
 		}
@@ -1624,10 +1624,12 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	}
 	if realUser && !publishNewRelease {
 		disableRealOwner()
-	} else if !publishNewRelease {
+	} else if !publishNewRelease && !nativeFourSource {
+		// The Native four-Source handoff still needs the user RPC to verify
+		// the product owner; ordinary workflow keeps its unavailability gate.
 		userServer.Stop()
 	}
-	if !publishNewRelease {
+	if !publishNewRelease && !nativeFourSource {
 		request("GET", productPath, productToken, nil, nil, 503)
 		request("GET", parentPath, productToken, nil, nil, 503)
 		request("POST", searchPath, productToken, searchBody, nil, 503)
@@ -2081,7 +2083,7 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	}
 	if nativeFourSource {
 		runRealNativeFourSourceHandoff(t, s, request, dir, base, token,
-			c.WorkerToken, productToken, searchFixture, m.Id, r.ReleaseId)
+			c.WorkerToken, productToken, searchFixture, m.Id)
 	}
 }
 func fmtInt(n int) string { b, _ := json.Marshal(n); return string(b) }
