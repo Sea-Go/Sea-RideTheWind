@@ -271,7 +271,13 @@ func newProductSearchFixture(t *testing.T, rtwBase *string, workerToken string) 
 				return
 			}
 			forwarded.Header = r.Header.Clone()
-			upstream, forwardErr := (&http.Client{Timeout: 30 * time.Second}).Do(forwarded)
+			// A live DataCenter model run includes cold model loads; keep the
+			// fixed-fixture pace for local-exact runs.
+			forwardTimeout := 30 * time.Second
+			if os.Getenv("SEA_BTW_SUMMARY_DC_RUNTIME_FILE") != "" {
+				forwardTimeout = 95 * time.Second
+			}
+			upstream, forwardErr := (&http.Client{Timeout: forwardTimeout}).Do(forwarded)
 			if forwardErr != nil {
 				t.Errorf("real BTW request failed: %v", forwardErr)
 				http.Error(w, "real BTW unavailable", http.StatusBadGateway)

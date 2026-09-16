@@ -1423,8 +1423,15 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 			citedBody["idempotency_key"] = browserIdempotencyKey
 		}
 		request("POST", searchPath, productToken, citedBody, &citedReplay, 200)
-		if !reflect.DeepEqual(citedReplay, cited) || searchFixture.calls.Load() != callsBeforeCited+1 {
-			t.Fatalf("real cited BTW idempotent replay changed answer: %+v calls=%d", citedReplay, searchFixture.calls.Load())
+		expectedCalls := callsBeforeCited + 1
+		if os.Getenv("SEA_BTW_MEDIUM_ROUND") == "1" && formalAPI != nil && formalAPI.liveGateway {
+			expectedCalls++ // the medium round's own gateway search ran between the two reads
+		}
+		if !reflect.DeepEqual(citedReplay, cited) || searchFixture.calls.Load() != expectedCalls {
+			firstJSON, _ := json.Marshal(cited)
+			replayJSON, _ := json.Marshal(citedReplay)
+			t.Fatalf("real cited BTW idempotent replay changed answer: first=%s replay=%s calls=%d",
+				firstJSON, replayJSON, searchFixture.calls.Load())
 		}
 		request("GET", searchPath+"/"+cited.SearchId, productToken, nil, &citedReplay, 200)
 		if !reflect.DeepEqual(citedReplay, cited) {
@@ -2176,6 +2183,9 @@ func runRealHTTPKnowledgeWorkflow(t *testing.T, realUser bool) {
 	}
 	if os.Getenv("SEA_BTW_PRODUCT_SEARCH_ROOT") != "" {
 		expectedCitationCommits++ // The signed product search accepts one real RTW citation.
+	}
+	if os.Getenv("SEA_BTW_MEDIUM_ROUND") == "1" {
+		expectedCitationCommits++ // the real fast/medium search accepts one more real citation.
 	}
 	if os.Getenv("SEA_BTW_SEARCH_HISTORY_ROUND") == "1" {
 		expectedCitationCommits++ // The same-session injection search accepts one more real citation.
