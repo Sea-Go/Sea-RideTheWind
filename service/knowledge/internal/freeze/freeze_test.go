@@ -109,6 +109,33 @@ func TestFreezeIdempotentReplay(t *testing.T) {
 	}
 }
 
+func TestFreezeReplayRejectsEnvelopeDrift(t *testing.T) {
+	svc := NewMemoryService()
+	ctx := context.Background()
+	fr := docA()
+	if _, err := svc.Freeze(ctx, fr); err != nil {
+		t.Fatalf("freeze: %v", err)
+	}
+	// Same revID + same source derive the identical treeSHA, so the tree
+	// check alone cannot see the drift — replaying with a different DocKey
+	// or ModuleID must hit the revision immutability check instead.
+	drift := fr
+	drift.DocKey = "page:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee@v2"
+	if _, err := svc.Freeze(ctx, drift); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected ErrConflict for drifted doc key, got %v", err)
+	}
+	drift = fr
+	drift.ModuleID = "mod-2"
+	if _, err := svc.Freeze(ctx, drift); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected ErrConflict for drifted module id, got %v", err)
+	}
+	// The stored record keeps the original envelope.
+	loaded, err := svc.revisions.Load(ctx, fr.RevisionID)
+	if err != nil || !sameRevision(loaded, fr) {
+		t.Fatalf("stored revision drifted: %v %+v", err, loaded)
+	}
+}
+
 func TestReleaseDeterministicEventID(t *testing.T) {
 	ctx := context.Background()
 	docs := []FrozenRevision{docA(), docB(), docC()}
@@ -297,6 +324,31 @@ func TestReleaseThenAcceptRoundtrip(t *testing.T) {
 	}
 	if receipt.TreeSHA != expectedTreeSHA(t, target) {
 		t.Fatalf("receipt tree sha %s != frozen tree sha %s (canonical encoder drift)", receipt.TreeSHA, expectedTreeSHA(t, target))
+	}
+}
+
+func TestAcceptRejectsForeignDocKey(t *testing.T) {
+	ctx := context.Background()
+	svc := NewMemoryService()
+	fr := docA()
+	if _, err := svc.Freeze(ctx, fr); err != nil {
+		t.Fatalf("freeze: %v", err)
+	}
+	// The locator is valid for the frozen revision, but the citation names
+	// another document: a receipt must not anchor this revision's evidence
+	// under a foreign DocKey.
+	req := citation.AcceptRequest{
+		AnswerID: "ans-x",
+		SearchID: "search-x",
+		Citations: []citation.Citation{{
+			DocKey:     "page:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee@v2",
+			RevisionID: fr.RevisionID,
+			Locator:    structure.Locator{ParaIndex: 0, Quote: "Evidence paragraph one."},
+		}},
+	}
+	_, err := svc.Accept(ctx, req, fr.RevisionID)
+	if err == nil || !strings.Contains(err.Error(), "does not match frozen document") {
+		t.Fatalf("expected doc key mismatch rejection, got %v", err)
 	}
 }
 
