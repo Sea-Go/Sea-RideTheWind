@@ -1,0 +1,182 @@
+syntax = "v1"
+
+// 评估领域类型（与 eval.proto 对齐）
+type (
+	// 评估指标类型（0=未指定 1=Recall@K 2=NDCG@K 3=CTR 4=CVR 5=LLM_JUDGE）
+	EvalMetricType int32
+
+	// 评估用例（golden case）
+	EvalCase {
+		CaseId            string            `json:"case_id"`
+		Name              string            `json:"name"`
+		Channel           string            `json:"channel"`
+		Ip                string            `json:"ip"`
+		Intent            string            `json:"intent"`
+		Query             string            `json:"query"`
+		ExpectedArticleIds []string         `json:"expected_article_ids"`
+		ExpectedTags      []string          `json:"expected_tags"`
+		ExpectedMetadata  map[string]string `json:"expected_metadata"`
+		Rubric            Rubric            `json:"rubric,optional"`
+		AnnotatorId       string            `json:"annotator_id"`
+		CreateTime        int64             `json:"create_time"`
+		UpdateTime        int64             `json:"update_time"`
+		Enabled           bool              `json:"enabled"`
+		ExtInfo           map[string]string `json:"ext_info,optional"`
+	}
+
+	// Rubric（LLM Judge 评分标准）
+	Rubric {
+		Name        string            `json:"name"`
+		Criteria    []RubricCriterion `json:"criteria"`
+		JudgeModel  string            `json:"judge_model"`
+		Version     int64             `json:"version"`
+		ExtInfo     map[string]string `json:"ext_info,optional"`
+	}
+
+	// Rubric 维度
+	RubricCriterion {
+		Name        string  `json:"name"`
+		Weight      float64 `json:"weight"`
+		Description string  `json:"description"`
+		Scale       string  `json:"scale"`
+		ExtInfo     map[string]string `json:"ext_info,optional"`
+	}
+
+	// 评估指标
+	EvalMetric {
+		Type        EvalMetricType    `json:"type"`
+		K           int32             `json:"k"`
+		Value       float64           `json:"value"`
+		Unit        string            `json:"unit"`
+		SampleCount int32             `json:"sample_count"`
+		ExtInfo     map[string]string `json:"ext_info,optional"`
+	}
+
+	// 用例级评估结果
+	EvalCaseResult {
+		CaseId            string      `json:"case_id"`
+		ActualArticleIds  []string    `json:"actual_article_ids"`
+		Metrics           []EvalMetric `json:"metrics"`
+		Passed            bool        `json:"passed"`
+		Rationale         string      `json:"rationale"`
+	}
+
+	// 行为漂移报告
+	BehaviorDriftReport {
+		ReportId              string            `json:"report_id"`
+		WindowStart           int64             `json:"window_start"`
+		WindowEnd             int64             `json:"window_end"`
+		CurrentDistribution   map[string]float64 `json:"current_distribution"`
+		BaselineDistribution  map[string]float64 `json:"baseline_distribution"`
+		DriftScores           map[string]float64 `json:"drift_scores"`
+		DriftedMetrics        []string          `json:"drifted_metrics"`
+		Threshold             float64           `json:"threshold"`
+		Drifted               bool              `json:"drifted"`
+		GeneratedAt           int64             `json:"generated_at"`
+		ExtInfo               map[string]string `json:"ext_info,optional"`
+	}
+
+	// 人工标注
+	Annotation {
+		AnnotationId     string   `json:"annotation_id"`
+		CaseId           string   `json:"case_id"`
+		AnnotatorId      string   `json:"annotator_id"`
+		RecommendationId string   `json:"recommendation_id"`
+		ArticleIds       []string `json:"article_ids"`
+		Label            string   `json:"label"`
+		Score            float64  `json:"score"`
+		Comment          string   `json:"comment"`
+		CreateTime       int64    `json:"create_time"`
+		ExtInfo          map[string]string `json:"ext_info,optional"`
+	}
+)
+
+// 评估网关请求/响应类型
+type (
+	// 列出评估用例请求
+	ListEvalCasesReq {
+		Channel     string `form:"channel,optional"`
+		Ip          string `form:"ip,optional"`
+		Intent      string `form:"intent,optional"`
+		EnabledOnly bool   `form:"enabled_only,optional"`
+		Page        int32  `form:"page,default=1"`
+		PageSize    int32  `form:"page_size,default=20"`
+	}
+
+	// 列出评估用例响应
+	ListEvalCasesResp {
+		Cases    []EvalCase `json:"cases"`
+		Total    int64      `json:"total"`
+		Page     int32      `json:"page"`
+		PageSize int32      `json:"page_size"`
+	}
+
+	// 创建评估用例请求
+	CreateEvalCaseReq {
+		Case EvalCase `json:"case"`
+	}
+
+	// 运行评估请求
+	EvalRunReq {
+		CaseIds          []string       `json:"case_ids"`
+		Channel          string         `json:"channel,optional"`
+		Ip               string         `json:"ip,optional"`
+		Intent           string         `json:"intent,optional"`
+		Metrics          []EvalMetricType `json:"metrics"`
+		K                int32          `json:"k"`
+		BaselineVersion  string         `json:"baseline_version,optional"`
+		DetectDrift      bool           `json:"detect_drift"`
+		JudgeModel       string         `json:"judge_model,optional"`
+		ExtInfo          map[string]string `json:"ext_info,optional"`
+	}
+
+	// 运行评估响应
+	EvalRunResp {
+		RunId       string             `json:"run_id"`
+		Metrics     []EvalMetric       `json:"metrics"`
+		CaseResults []EvalCaseResult   `json:"case_results"`
+		DriftReport BehaviorDriftReport `json:"drift_report,optional"`
+		RunAt       int64              `json:"run_at"`
+		ErrMsg      string             `json:"err_msg"`
+		ExtInfo     map[string]string  `json:"ext_info,optional"`
+	}
+
+	// 获取评估报告请求
+	GetEvalReportReq {
+		RunId string `path:"run_id"`
+	}
+
+	// 提交标注请求
+	SubmitAnnotationReq {
+		Annotation Annotation `json:"annotation"`
+	}
+
+	// 提交标注响应
+	SubmitAnnotationResp {
+		AnnotationId string `json:"annotation_id"`
+		Success      bool   `json:"success"`
+	}
+)
+
+// 管理员后台（jwt 鉴权）
+@server (
+	prefix: api/v1/v2/admin
+	group:  eval-admin
+	jwt:    Auth
+)
+service eval-api {
+	@handler ListEvalCases
+	get /eval/cases (ListEvalCasesReq) returns (ListEvalCasesResp)
+
+	@handler CreateEvalCase
+	post /eval/cases (CreateEvalCaseReq) returns (EvalCase)
+
+	@handler RunEval
+	post /eval/run (EvalRunReq) returns (EvalRunResp)
+
+	@handler GetEvalReport
+	get /eval/reports/:run_id (GetEvalReportReq) returns (EvalRunResp)
+
+	@handler SubmitAnnotation
+	post /eval/annotate (SubmitAnnotationReq) returns (SubmitAnnotationResp)
+}

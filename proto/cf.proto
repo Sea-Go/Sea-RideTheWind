@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package cf;
+option go_package = ".";
+
+// CF 算法类型
+enum CFAlgoType {
+  CF_ALGO_TYPE_UNSPECIFIED = 0; // 未指定
+  USER_CF = 1;                  // User-based CF（用户行为序列 + 余弦相似）
+  ITEM_CF = 2;                  // Item-based CF（共现矩阵 + Jaccard/余弦）
+  MF_ALS = 3;                   // 矩阵分解 ALS（64/128 维隐因子）
+}
+
+// CF 分数
+message CFScore {
+  string article_id = 1;                       // 文章ID
+  double user_cf_score = 2;                    // User-CF 分
+  double item_cf_score = 3;                    // Item-CF 分
+  double mf_score = 4;                         // MF 分
+  double fused_score = 5;                      // 融合分
+  string source = 6;                           // 来源（user_cf/item_cf/mf/coldstart）
+  map<string, string> ext_info = 7;            // 扩展字段
+}
+
+// CF 配置（User-CF/Item-CF/MF 三算法融合）
+message CFConfig {
+  CFAlgoType algo = 1;                         // 主算法
+  map<CFAlgoType, double> weights = 2;         // 各算法权重（融合）
+  int32 top_n_similar = 3;                     // Top-N 相似数
+  int32 mf_factors = 4;                        // MF 隐因子维度（64/128）
+  int32 refresh_interval_sec = 5;              // 增量刷新间隔（秒，5min 增量 / 1h 全量）
+  bool online_update = 6;                      // 是否实时增量更新
+  map<string, string> ext_info = 7;            // 扩展字段
+}
+
+// 冷启动配置
+message ColdStartConfig {
+  bool use_profile_recall = 1;                 // 新用户用画像召回
+  bool use_hot_fallback = 2;                   // 热门兜底
+  bool use_content_cf_transfer = 3;            // 新文章用内容向量迁移 CF 分
+  int32 hot_top_k = 4;                         // 热门兜底条数
+  map<string, string> ext_info = 5;            // 扩展字段
+}
+
+// 相似用户查询请求
+message CFSimilarUsersRequest {
+  string user_id = 1;                          // 用户ID
+  int32 top_n = 2;                             // 返回条数
+  CFAlgoType algo = 3;                         // 算法类型
+}
+
+// 相似用户
+message SimilarUser {
+  string user_id = 1;                          // 用户ID
+  double similarity = 2;                       // 相似度
+  repeated string shared_articles = 3;         // 共同文章
+}
+
+// 相似用户查询响应
+message CFSimilarUsersResponse {
+  repeated SimilarUser users = 1;              // 相似用户列表
+}
+
+// 相似文章查询请求
+message CFSimilarItemsRequest {
+  string article_id = 1;                       // 文章ID
+  int32 top_n = 2;                             // 返回条数
+  CFAlgoType algo = 3;                         // 算法类型
+}
+
+// 相似文章
+message SimilarItem {
+  string article_id = 1;                       // 文章ID
+  double similarity = 2;                       // 相似度
+  int32 co_occur_count = 3;                    // 共现次数
+}
+
+// 相似文章查询响应
+message CFSimilarItemsResponse {
+  repeated SimilarItem items = 1;              // 相似文章列表
+}
+
+// 获取 CF 配置请求
+message GetCFConfigRequest {}
+
+// 更新 CF 配置请求
+message UpdateCFConfigRequest {
+  optional CFConfig config = 1;                // CF 配置
+  optional ColdStartConfig cold_start = 2;     // 冷启动配置
+}
+
+// CF 配置响应
+message CFConfigResponse {
+  CFConfig config = 1;                         // CF 配置
+  ColdStartConfig cold_start = 2;              // 冷启动配置
+  bool success = 3;                            // 是否成功
+}
+
+// 协同过滤服务
+service CFService {
+  rpc GetSimilarUsers(CFSimilarUsersRequest) returns (CFSimilarUsersResponse);  // 相似用户
+  rpc GetSimilarItems(CFSimilarItemsRequest) returns (CFSimilarItemsResponse);  // 相似文章
+  rpc GetCFConfig(GetCFConfigRequest) returns (CFConfigResponse);              // 获取 CF 配置
+  rpc UpdateCFConfig(UpdateCFConfigRequest) returns (CFConfigResponse);        // 更新 CF 配置
+}

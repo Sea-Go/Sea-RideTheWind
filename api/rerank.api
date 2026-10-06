@@ -1,0 +1,102 @@
+syntax = "v1"
+
+type (
+	// rerank 模型类型枚举（0=UNSPECIFIED 1=SELF_CROSS_ENCODER 2=SELF_TWO_TOWER 3=SELF_LTR_LAMBDAMART 4=EXTERNAL_DASHSCOPE）
+
+	// rerank 模型
+	RerankModel {
+		Version      string            `json:"version"`
+		Type         int32             `json:"type"`
+		ArtifactPath string            `json:"artifact_path"`
+		Enabled      bool              `json:"enabled"`
+		TrafficRatio float64           `json:"traffic_ratio"`
+		CreateTime   int64             `json:"create_time"`
+		Metrics      map[string]string `json:"metrics"`
+		ExtInfo      map[string]string `json:"ext_info"`
+	}
+
+	// rerank 特征（特征工程输出）
+	RerankFeatures {
+		ArticleId         string             `json:"article_id"`
+		TextFeatures      map[string]float64 `json:"text_features"`
+		BehaviorFeatures  map[string]float64 `json:"behavior_features"`
+		TemporalFeatures  map[string]float64 `json:"temporal_features"`
+		QualityFeatures   map[string]float64 `json:"quality_features"`
+		ProfileFeatures   map[string]float64 `json:"profile_features"`
+		DiversityFeatures map[string]float64 `json:"diversity_features"`
+		ExtInfo           map[string]string  `json:"ext_info"`
+	}
+
+	// A/B 测试配置
+	ABTestConfig {
+		Name             string            `json:"name"`
+		ControlVersion   string            `json:"control_version"`
+		TreatmentVersion string            `json:"treatment_version"`
+		ControlRatio     float64           `json:"control_ratio"`
+		TreatmentRatio   float64           `json:"treatment_ratio"`
+		Metrics          []string          `json:"metrics"`
+		Enabled          bool              `json:"enabled"`
+		StartTime        int64             `json:"start_time"`
+		EndTime          int64             `json:"end_time"`
+		ExtInfo          map[string]string `json:"ext_info"`
+	}
+
+	// 模型列表查询请求
+	ListRerankModelsReq {
+		Type        int32 `form:"type,optional"`
+		EnabledOnly bool  `form:"enabled_only,optional"`
+	}
+
+	// 模型列表查询响应
+	ListRerankModelsResp {
+		Models []RerankModel `json:"models"`
+		Total  int32         `json:"total"`
+	}
+
+	// 获取 A/B 测试配置请求
+	GetABTestConfigReq {}
+
+	// rerank 请求（内部 RPC 调试暴露）
+	RerankReq {
+		TraceId      string            `json:"trace_id"`
+		UserId       string            `json:"user_id"`
+		Query        string            `json:"query"`
+		ArticleIds   []string          `json:"article_ids"`
+		Features     []RerankFeatures  `json:"features"`
+		ModelVersion string            `json:"model_version,optional"`
+		ModelType    int32             `json:"model_type"`
+		TopK         int32             `json:"top_k"`
+		ExtInfo      map[string]string `json:"ext_info,optional"`
+	}
+
+	// rerank 响应
+	RerankResp {
+		TraceId           string             `json:"trace_id"`
+		RankedArticleIds  []string           `json:"ranked_article_ids"`
+		Scores            map[string]float64 `json:"scores"`
+		ModelVersion      string             `json:"model_version"`
+		ModelType         int32              `json:"model_type"`
+		FallbackTriggered bool               `json:"fallback_triggered"`
+		ErrMsg            string             `json:"err_msg"`
+		ExtInfo           map[string]string  `json:"ext_info"`
+	}
+)
+
+@server (
+	prefix: api/v1/v2
+	group:  rerank-admin
+	jwt:    Auth
+)
+service rerank-api {
+	@handler ListRerankModels
+	get /admin/rerank/models (ListRerankModelsReq) returns (ListRerankModelsResp)
+
+	@handler GetRerankABTest
+	get /admin/rerank/abtest (GetABTestConfigReq) returns (ABTestConfig)
+
+	@handler UpdateRerankABTest
+	put /admin/rerank/abtest (ABTestConfig) returns (ABTestConfig)
+
+	@handler RerankInfer
+	post /admin/rerank/infer (RerankReq) returns (RerankResp)
+)

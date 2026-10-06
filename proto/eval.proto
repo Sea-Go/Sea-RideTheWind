@@ -1,0 +1,179 @@
+syntax = "proto3";
+
+package eval;
+option go_package = ".";
+
+// 评估指标类型
+enum EvalMetricType {
+  EVAL_METRIC_TYPE_UNSPECIFIED = 0; // 未指定
+  RECALL_AT_K = 1;                  // Recall@K
+  NDCG_AT_K = 2;                    // NDCG@K
+  CTR = 3;                          // 点击率
+  CVR = 4;                          // 转化率
+  LLM_JUDGE = 5;                    // LLM Judge
+}
+
+// 评估用例（golden case）
+message EvalCase {
+  string case_id = 1;                       // 用例ID
+  string name = 2;                          // 用例名
+  string channel = 3;                       // 所属频道
+  string ip = 4;                            // 所属 IP
+  string intent = 5;                        // 所属意图
+  string query = 6;                         // 输入 query
+  repeated string expected_article_ids = 7; // 期望文章ID（确定性指标）
+  repeated string expected_tags = 8;        // 期望标签
+  map<string, string> expected_metadata = 9; // 期望元数据
+  Rubric rubric = 10;                       // LLM Judge rubric
+  string annotator_id = 11;                 // 标注人
+  int64 create_time = 12;                   // 创建时间（毫秒）
+  int64 update_time = 13;                   // 更新时间（毫秒）
+  bool enabled = 14;                        // 是否启用
+  map<string, string> ext_info = 15;        // 扩展字段
+}
+
+// Rubric（LLM Judge 评分标准）
+message Rubric {
+  string name = 1;                          // Rubric 名
+  repeated RubricCriterion criteria = 2;    // 评分维度
+  string judge_model = 3;                   // 评判模型
+  int64 version = 4;                        // 版本
+  map<string, string> ext_info = 5;         // 扩展字段
+}
+
+// Rubric 维度（accuracy/authority/depth/freshness/completeness/readability/citation）
+message RubricCriterion {
+  string name = 1;                          // 维度名
+  double weight = 2;                        // 权重
+  string description = 3;                   // 评分描述
+  string scale = 4;                         // 评分尺度（A~T 或 0~1）
+  map<string, string> ext_info = 5;         // 扩展字段
+}
+
+// 评估指标
+message EvalMetric {
+  EvalMetricType type = 1;                  // 指标类型
+  int32 k = 2;                              // K 值（Recall@K/NDCG@K）
+  double value = 3;                         // 指标值
+  string unit = 4;                          // 单位
+  int32 sample_count = 5;                   // 样本数
+  map<string, string> ext_info = 6;         // 扩展字段
+}
+
+// 行为漂移报告
+message BehaviorDriftReport {
+  string report_id = 1;                     // 报告ID
+  int64 window_start = 2;                   // 窗口起（毫秒）
+  int64 window_end = 3;                     // 窗口止（毫秒）
+  map<string, double> current_distribution = 4;  // 当前指标分布
+  map<string, double> baseline_distribution = 5; // 历史基线分布
+  map<string, double> drift_scores = 6;     // 各指标漂移分
+  repeated string drifted_metrics = 7;      // 漂移指标列表
+  double threshold = 8;                     // 漂移阈值
+  bool drifted = 9;                         // 是否漂移
+  int64 generated_at = 10;                  // 生成时间（毫秒）
+  map<string, string> ext_info = 11;        // 扩展字段
+}
+
+// 人工标注
+message Annotation {
+  string annotation_id = 1;                 // 标注ID
+  string case_id = 2;                       // 关联用例
+  string annotator_id = 3;                  // 标注人
+  string recommendation_id = 4;             // 关联推荐结果
+  repeated string article_ids = 5;          // 标注的文章ID
+  string label = 6;                         // 标签（relevant/irrelevant/partial）
+  double score = 7;                         // 标注分
+  string comment = 8;                       // 备注
+  int64 create_time = 9;                    // 标注时间（毫秒）
+  map<string, string> ext_info = 10;        // 扩展字段
+}
+
+// 评估运行请求
+message EvalRunRequest {
+  repeated string case_ids = 1;             // 指定用例（空则全量）
+  optional string channel = 2;              // 按频道筛选
+  optional string ip = 3;                   // 按 IP 筛选
+  optional string intent = 4;               // 按意图筛选
+  repeated EvalMetricType metrics = 5;      // 指标
+  int32 k = 6;                              // K 值
+  string baseline_version = 7;              // 对比基线版本
+  bool detect_drift = 8;                    // 是否检测漂移
+  string judge_model = 9;                   // LLM Judge 模型
+  map<string, string> ext_info = 10;        // 扩展字段
+}
+
+// 评估运行响应
+message EvalRunResponse {
+  string run_id = 1;                        // 运行ID
+  repeated EvalMetric metrics = 2;          // 指标结果
+  repeated EvalCaseResult case_results = 3; // 每用例结果
+  BehaviorDriftReport drift_report = 4;     // 漂移报告（detect_drift=true）
+  int64 run_at = 5;                         // 运行时间（毫秒）
+  string err_msg = 6;                       // 错误信息
+  map<string, string> ext_info = 7;         // 扩展字段
+}
+
+// 用例级评估结果
+message EvalCaseResult {
+  string case_id = 1;                       // 用例ID
+  repeated string actual_article_ids = 2;   // 实际推荐
+  repeated EvalMetric metrics = 3;          // 用例级指标
+  bool passed = 4;                          // 是否通过
+  string rationale = 5;                     // LLM Judge 理由
+}
+
+// 列出评估用例请求
+message ListEvalCasesRequest {
+  optional string channel = 1;              // 按频道筛选
+  optional string ip = 2;                   // 按 IP 筛选
+  optional string intent = 3;               // 按意图筛选
+  bool enabled_only = 4;                    // 仅启用
+  int32 page = 5;                           // 页码（从1开始）
+  int32 page_size = 6;                      // 每页数量
+}
+
+// 列出评估用例响应
+message ListEvalCasesResponse {
+  repeated EvalCase cases = 1;              // 用例列表
+  int64 total = 2;                          // 总数
+  int32 page = 3;                           // 当前页
+  int32 page_size = 4;                      // 每页数量
+}
+
+// 创建评估用例请求
+message CreateEvalCaseRequest {
+  EvalCase case = 1;                        // 用例内容
+}
+
+// 获取评估报告请求
+message GetEvalReportRequest {
+  string run_id = 1;                        // 运行ID
+}
+
+// 提交标注请求
+message SubmitAnnotationRequest {
+  Annotation annotation = 1;                // 标注内容
+}
+
+// 提交标注响应
+message SubmitAnnotationResponse {
+  string annotation_id = 1;                 // 标注ID
+  bool success = 2;                         // 是否成功
+}
+
+// 获取漂移报告请求
+message GetDriftReportRequest {
+  optional int64 window_start = 1;          // 窗口起（毫秒）
+  optional int64 window_end = 2;            // 窗口止（毫秒）
+}
+
+// 评估服务
+service EvalService {
+  rpc ListEvalCases(ListEvalCasesRequest) returns (ListEvalCasesResponse);         // 列出评估用例
+  rpc CreateEvalCase(CreateEvalCaseRequest) returns (EvalCase);                    // 创建/更新评估用例
+  rpc RunEval(EvalRunRequest) returns (EvalRunResponse);                           // 运行评估
+  rpc GetEvalReport(GetEvalReportRequest) returns (EvalRunResponse);               // 获取评估报告
+  rpc SubmitAnnotation(SubmitAnnotationRequest) returns (SubmitAnnotationResponse); // 提交人工标注
+  rpc GetDriftReport(GetDriftReportRequest) returns (BehaviorDriftReport);         // 获取漂移报告
+}

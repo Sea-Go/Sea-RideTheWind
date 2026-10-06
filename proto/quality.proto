@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package quality;
+option go_package = ".";
+
+// 文章质量 6 维评分（LLM Verifier + Best-of-N）
+message ArticleQuality {
+  string article_id = 1;                       // 文章ID
+  double authority = 2;                        // 权威性（0~1）
+  double depth = 3;                            // 深度（0~1）
+  double freshness = 4;                        // 时效性（0~1）
+  double completeness = 5;                     // 完整性（0~1）
+  double readability = 6;                      // 可读性（0~1）
+  double citation = 7;                         // 引用质量（0~1）
+  double overall = 8;                          // 综合分（加权）
+  string grade = 9;                            // 等级（A~T，logprobs 概率分布取 max）
+  map<string, double> grade_distribution = 10; // 等级概率分布
+  string judge_model = 11;                     // 评判模型版本
+  int64 judged_at = 12;                        // 评判时间（毫秒）
+  map<string, string> ext_info = 13;           // 扩展字段
+}
+
+// 质量报告（含 Rubrics 维度 + 评语）
+message ArticleQualityReport {
+  string article_id = 1;                       // 文章ID
+  ArticleQuality quality = 2;                  // 6 维评分
+  repeated RubricDimension rubrics = 3;        // Rubric 各维度明细
+  string summary = 4;                          // 质量总结
+  string grounding_result = 5;                 // validate grounding 结果（PASS/FAIL + 原因）
+  int64 create_time = 6;                       // 报告生成时间（毫秒）
+  map<string, string> ext_info = 7;            // 扩展字段
+}
+
+// Rubric 维度（accuracy/authority/depth/freshness/completeness/readability/citation）
+message RubricDimension {
+  string name = 1;                             // 维度名
+  double score = 2;                            // 得分（0~1）
+  string rationale = 3;                        // 评判理由
+  string evidence = 4;                         // 证据片段
+  map<string, string> ext_info = 5;            // 扩展字段
+}
+
+// 质量反馈（反馈闭环）
+message QualityFeedback {
+  string article_id = 1;                       // 文章ID
+  string feedback_type = 2;                    // upvote / downvote / flag
+  string reason = 3;                           // 反馈原因
+  string annotator_id = 4;                     // 标注人ID（管理员）
+  int64 create_time = 5;                       // 反馈时间（毫秒）
+  map<string, string> ext_info = 6;            // 扩展字段
+}
+
+// 质量评估请求
+message QualityEvaluateRequest {
+  string article_id = 1;                       // 文章ID
+  bool use_best_of_n = 2;                      // 是否 Best-of-N
+  int32 n = 3;                                 // Best-of-N 次数
+  string judge_model = 4;                      // 指定评判模型
+  bool logprobs = 5;                           // 是否返回概率分布
+  map<string, string> ext_info = 6;            // 扩展字段
+}
+
+// 质量评估响应
+message QualityEvaluateResponse {
+  ArticleQualityReport report = 1;             // 质量报告
+  bool success = 2;                            // 是否成功
+  string err_msg = 3;                          // 错误信息
+}
+
+// 批量质量评估请求
+message BatchEvaluateQualityRequest {
+  repeated string article_ids = 1;             // 文章ID列表
+  bool use_best_of_n = 2;                      // 是否 Best-of-N
+  int32 n = 3;                                 // Best-of-N 次数
+  string judge_model = 4;                      // 指定评判模型
+  bool logprobs = 5;                           // 是否返回概率分布
+  map<string, string> ext_info = 6;            // 扩展字段
+}
+
+// 批量质量评估响应
+message BatchEvaluateQualityResponse {
+  repeated ArticleQualityReport reports = 1;   // 各文章质量报告
+  bool success = 2;                            // 是否成功
+  string err_msg = 3;                          // 错误信息
+}
+
+// 获取质量报告请求
+message GetQualityReportRequest {
+  string article_id = 1;                       // 文章ID
+}
+
+// 质量反馈响应
+message QualityFeedbackResp {
+  bool success = 1;                            // 是否成功
+  string err_msg = 2;                          // 错误信息
+}
+
+// 文章质量服务
+service QualityService {
+  rpc EvaluateQuality(QualityEvaluateRequest) returns (QualityEvaluateResponse);               // 单文章质量评估
+  rpc BatchEvaluateQuality(BatchEvaluateQualityRequest) returns (BatchEvaluateQualityResponse); // 批量质量评估
+  rpc SubmitFeedback(QualityFeedback) returns (QualityFeedbackResp);                           // 提交质量反馈
+  rpc GetQualityReport(GetQualityReportRequest) returns (ArticleQualityReport);                // 获取质量报告
+}

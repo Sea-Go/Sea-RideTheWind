@@ -1,0 +1,212 @@
+syntax = "proto3";
+
+package skill;
+option go_package = ".";
+
+// Skill 类别（12 类，对应 SKILL_CATEGORY 枚举）
+// 1. 召回 RECALL（6 个）
+// 2. 排序 RANK（5 个）
+// 3. 质量 QUALITY（5 个）
+// 4. 搜索 SEARCH（8 个）
+// 5. 图谱 GRAPH（6 个）
+// 6. 画像 PROFILE（5 个）
+// 7. 频道 CHANNEL（5 个）
+// 8. 事件 EVENT（3 个）
+// 9. 解释 EXPLAIN（2 个）
+// 10. 评估 EVAL（4 个）
+// 11. 工具 TOOL（6 个）
+// 12. 观测 OBS（4 个）
+// 合计：6+5+5+8+6+5+5+3+2+4+6+4 = 59 个 Skill
+enum SkillCategory {
+  SKILL_CATEGORY_UNSPECIFIED = 0; // 未指定
+  RECALL = 1;                     // 召回类
+  RANK = 2;                       // 排序类
+  QUALITY = 3;                    // 质量类
+  SEARCH = 4;                     // 搜索类
+  GRAPH = 5;                      // 图谱类
+  PROFILE = 6;                    // 画像类
+  CHANNEL = 7;                    // 频道类
+  EVENT = 8;                      // 事件类
+  EXPLAIN = 9;                    // 解释类
+  EVAL = 10;                      // 评估类
+  TOOL = 11;                      // 工具类
+  OBS = 12;                       // 观测类
+}
+
+// Skill 清单完整列表（59 个，按 12 类分组，与 spec.md 一致）
+//
+// ── 召回 RECALL（6 个）──
+//   recall.content      内容召回（向量 + BM25）
+//   recall.rule         规则召回（热点/最新/编辑）
+//   recall.cf           协同过滤召回（User-CF/Item-CF/MF）
+//   recall.graph        图谱召回（Neo4j 多跳）
+//   recall.channel      频道独立池召回
+//   recall.hybrid       混合召回编排
+//
+// ── 排序 RANK（5 个）──
+//   rank.traditional    传统排序（LR/GBDT/加权）
+//   rerank.self         自研 rerank（Cross-encoder + Two-tower + LambdaMART）
+//   rerank.external     外部 rerank（DashScope 兜底）
+//   rerank.llm          LLM rerank（大模型精排）
+//   rerank.ab_test      A/B 测试切换
+//
+// ── 质量 QUALITY（5 个）──
+//   quality.score       文章多维质量评分
+//   quality.batch_score 批量质量评分
+//   quality.judge       LLM Verifier Best-of-N 评判
+//   quality.feedback    质量反馈闭环
+//   quality.report      质量报告生成
+//
+// ── 搜索 SEARCH（8 个）──
+//   search.hybrid       语义混合搜索
+//   search.understand   查询理解（intent/实体/时效）
+//   search.rewrite      查询重写（同义/拼改/相关）
+//   search.personalize  个性化搜索
+//   search.filter       搜索过滤
+//   search.suggest      搜索补全
+//   search.history      搜索历史与反馈
+//   search.graph        图谱知识搜索
+//
+// ── 图谱 GRAPH（6 个）──
+//   graph.query         Cypher 查询执行
+//   graph.generate_cypher LLM 生成 Cypher
+//   graph.recall        图谱多跳召回
+//   graph.entity_link   实体链接
+//   graph.image_search  图片关联搜索
+//   graph.similar       相似实体查询
+//
+// ── 画像 PROFILE（5 个）──
+//   profile.load        用户画像加载
+//   profile.update      画像增量更新
+//   profile.temporal    时间画像管理（衰减/强化/淘汰）
+//   profile.summary     Session Summary 画像压缩
+//   profile.tune        画像参数调优
+//
+// ── 频道 CHANNEL（5 个）──
+//   channel.list        频道列表
+//   channel.register    频道注册（二开点）
+//   channel.get_pool    频道独立池
+//   channel.ensure_pool 频道池维护
+//   channel.route       频道路由
+//
+// ── 事件 EVENT（3 个）──
+//   event.report        行为事件上报
+//   event.feedback      反馈事件
+//   event.hook_register Hook 注册（二开点）
+//
+// ── 解释 EXPLAIN（2 个）──
+//   explain.recommend   推荐解释生成
+//   explain.search      搜索解释生成
+//
+// ── 评估 EVAL（4 个）──
+//   eval.run            评估集运行
+//   eval.regression     回归测试
+//   eval.drift          行为漂移检测
+//   eval.annotate       人工标注闭环
+//
+// ── 工具 TOOL（6 个）──
+//   tool.milvus_search  Milvus 向量搜索
+//   tool.pool_manage    候选池管理
+//   tool.memory_manage  记忆管理
+//   tool.user_history   用户历史
+//   tool.doc_ingest     文档摄入
+//   tool.session_search Session 事实恢复
+//
+// ── 观测 OBS（4 个）──
+//   obs.cost            成本统计
+//   obs.trace           链路追踪
+//   obs.metric          指标暴露
+//   obs.pprof           CPU profiling
+
+// Skill 定义（一个 Skill 对应一个 SKILL.md 清单 + 绑定工具/资源）
+message Skill {
+  string name = 1;                       // 唯一名（如 recall.content）
+  SkillCategory category = 2;            // 类别
+  string display_name = 3;               // 展示名
+  string description = 4;                // 描述
+  SkillManifest manifest = 5;            // SKILL.md 清单
+  repeated string tools = 6;             // 绑定工具
+  repeated string resources = 7;         // 绑定资源
+  bool enabled = 8;                      // 是否启用
+  bool builtin = 9;                      // 是否内置（false 表示业务二开）
+  int64 create_time = 10;                // 创建时间（毫秒）
+  map<string, string> ext_info = 11;     // 扩展字段
+}
+
+// Skill 清单（SKILL.md 内容，描述触发条件与使用说明）
+message SkillManifest {
+  string name = 1;                       // 名称
+  string description = 2;                // 描述
+  string trigger_condition = 3;          // 触发条件
+  string usage = 4;                      // 使用说明
+  string version = 5;                    // 版本
+  string author = 6;                     // 作者
+  map<string, string> ext_info = 7;      // 扩展字段
+}
+
+// 注册 Skill 请求（二开点：业务方放置技能目录，由 SkillManager 扫描加载）
+message RegisterSkillRequest {
+  string name = 1;                       // Skill 名
+  SkillCategory category = 2;            // 类别
+  string display_name = 3;               // 展示名
+  string description = 4;                // 描述
+  SkillManifest manifest = 5;            // SKILL.md 清单
+  repeated string tools = 6;             // 绑定工具
+  repeated string resources = 7;         // 绑定资源
+  bool enabled = 8;                      // 是否启用
+  string skill_dir = 9;                  // 技能目录路径（扫描加载）
+  map<string, string> ext_info = 10;     // 扩展字段
+}
+
+// 列出 Skill 请求
+message ListSkillsRequest {
+  optional SkillCategory category = 1;   // 按类别筛选
+  bool enabled_only = 2;                 // 仅启用
+  bool builtin_only = 3;                 // 仅内置
+  bool custom_only = 4;                  // 仅二开
+}
+
+// 列出 Skill 响应
+message ListSkillsResponse {
+  repeated Skill skills = 1;             // Skill 列表
+  int32 total = 2;                       // 总数
+  map<string, int32> category_counts = 3; // 各类 Skill 计数
+}
+
+// 调用 Skill 请求
+message InvokeSkillRequest {
+  string name = 1;                       // Skill 名
+  string input = 2;                      // 输入（JSON）
+  string trace_id = 3;                   // 链路追踪ID
+  bool materialize_to_tool_result = 4;   // 是否物化到 tool result（不污染 Prompt Cache 前缀）
+  int32 timeout_sec = 5;                 // 超时（秒）
+  map<string, string> ext_info = 6;      // 扩展字段
+}
+
+// 调用 Skill 响应
+message InvokeSkillResponse {
+  string output = 1;                     // 输出（JSON）
+  bool success = 2;                      // 是否成功
+  int64 latency_ms = 3;                  // 执行延迟（毫秒）
+  string err_msg = 4;                    // 错误信息
+  map<string, string> ext_info = 5;      // 扩展字段
+}
+
+// 注销 Skill 请求（按名注销，二开 Skill 可注销；内置 Skill 拒绝注销）
+message UnregisterSkillRequest {
+  string name = 1;                       // Skill 名
+}
+
+// 获取 Skill Manifest 请求
+message GetSkillManifestRequest {
+  string name = 1;                       // Skill 名
+}
+
+// Skill 核心服务定义
+service SkillService {
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse);              // 列出 Skill（支持按类别/启用/内置筛选）
+  rpc RegisterSkill(RegisterSkillRequest) returns (Skill);                     // 注册 Skill（二开点）
+  rpc UnregisterSkill(UnregisterSkillRequest) returns (Skill);                 // 注销 Skill
+  rpc InvokeSkill(InvokeSkillRequest) returns (InvokeSkillResponse);           // 调用 Skill
+  rpc GetSkillManifest(GetSkillManifestRequest) returns (SkillManifest);       // 获取指定 Skill 的 SKILL.md 清单
+}

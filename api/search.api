@@ -1,0 +1,150 @@
+syntax = "v1"
+
+type (
+	// 搜索意图
+	SearchIntent {
+		Label      int32             `json:"label,optional"`
+		Confidence float64            `json:"confidence,optional"`
+		Signals    []string          `json:"signals,optional"`
+		Complexity float64            `json:"complexity,optional"`
+		Entities   []string          `json:"entities,optional"`
+		TimeIntent string            `json:"time_intent,optional"`
+		ExtInfo    map[string]string `json:"ext_info,optional"`
+	}
+
+	// 重写后的查询
+	RewrittenQuery {
+		Original   string            `json:"original,optional"`
+		Rewritten  string            `json:"rewritten,optional"`
+		Synonyms   []string          `json:"synonyms,optional"`
+		Related    []string          `json:"related,optional"`
+		Correction string            `json:"correction,optional"`
+		ExtInfo    map[string]string `json:"ext_info,optional"`
+	}
+
+	// 搜索过滤
+	SearchFilter {
+		Tags             []string `json:"tags,optional"`
+		ManualTypeTag    string   `json:"manual_type_tag,optional"`
+		Channel          string   `json:"channel,optional"`
+		AuthorId         string   `json:"author_id,optional"`
+		TimeFrom         int64    `json:"time_from,optional"`
+		TimeTo           int64    `json:"time_to,optional"`
+		QualityThreshold float64  `json:"quality_threshold,optional"`
+		ExtInfo          map[string]string `json:"ext_info,optional"`
+	}
+
+	// 图谱知识
+	GraphKnowledge {
+		Entities         []string `json:"entities,optional"`
+		RelatedArticles  []string `json:"related_articles,optional"`
+		RelatedAuthors   []string `json:"related_authors,optional"`
+		RelatedIps       []string `json:"related_ips,optional"`
+		Cypher           string   `json:"cypher,optional"`
+		Subgraph         string   `json:"subgraph,optional"`
+		ExtInfo          map[string]string `json:"ext_info,optional"`
+	}
+
+	// 搜索命中（单条）
+	SearchHit {
+		ArticleId      string   `json:"article_id,optional"`
+		Title          string   `json:"title,optional"`
+		Brief          string   `json:"brief,optional"`
+		CoverImageUrl  string   `json:"cover_image_url,optional"`
+		ManualTypeTag  string   `json:"manual_type_tag,optional"`
+		SecondaryTags  []string `json:"secondary_tags,optional"`
+		AuthorId       string   `json:"author_id,optional"`
+		AuthorName     string   `json:"author_name,optional"`
+		Snippet        string   `json:"snippet,optional"`
+		ChunkId        string   `json:"chunk_id,optional"`
+		ArticleScore   float64  `json:"article_score,optional"`
+		VectorScore    float64  `json:"vector_score,optional"`
+		RerankScore    float64  `json:"rerank_score,optional"`
+		MatchScore     float64  `json:"match_score,optional"`
+		ExtInfo        map[string]string `json:"ext_info,optional"`
+	}
+
+	// 解释 trace 项
+	ExplainTraceItem {
+		Name string `json:"name,optional"`
+		Data string `json:"data,optional"`
+	}
+
+	// 搜索请求
+	SearchReq {
+		SearchRequestId string            `json:"search_request_id"`
+		UserId          string            `json:"user_id,optional"`
+		SessionId       string            `json:"session_id,optional"`
+		TraceId         string            `json:"trace_id,optional"`
+		Query           string            `json:"query"`
+		Topk            int32             `json:"topk,optional"`
+		NeedAnswer      bool              `json:"need_answer,optional"`
+		Explain         bool              `json:"explain,optional"`
+		Filter          *SearchFilter     `json:"filter,optional"`
+		Personalize     bool              `json:"personalize,optional"`
+		UseGraph        bool              `json:"use_graph,optional"`
+		ImageUrl        string            `json:"image_url,optional"`
+		ExtInfo         map[string]string `json:"ext_info,optional"`
+	}
+
+	// 搜索响应
+	SearchResp {
+		TraceId         string             `json:"trace_id,optional"`
+		SearchRequestId string             `json:"search_request_id,optional"`
+		Status          string             `json:"status,optional"`
+		Answer          string             `json:"answer,optional"`
+		Intent          *SearchIntent      `json:"intent,optional"`
+		Rewritten       *RewrittenQuery    `json:"rewritten,optional"`
+		Hits            []SearchHit        `json:"hits,optional"`
+		Items           []SearchHit        `json:"items,optional"`
+		GraphKnowledge  *GraphKnowledge    `json:"graph_knowledge,optional"`
+		Explanation     string             `json:"explanation,optional"`
+		ExplainTrace    []ExplainTraceItem `json:"explain_trace,optional"`
+		Debug           map[string]string  `json:"debug,optional"`
+		ErrMsg          string             `json:"err_msg,optional"`
+		ExtInfo         map[string]string  `json:"ext_info,optional"`
+	}
+
+	// 补全请求
+	SuggestReq {
+		Query   string `form:"query"`
+		UserId  string `form:"user_id,optional"`
+		TopK    int32  `form:"top_k,optional"`
+		Channel string `form:"channel,optional"`
+	}
+
+	// 补全响应
+	SuggestResp {
+		Suggestions []SearchSuggestion `json:"suggestions,optional"`
+		ExtInfo     map[string]string  `json:"ext_info,optional"`
+	}
+
+	// 搜索补全（单条）
+	SearchSuggestion {
+		Text    string            `json:"text,optional"`
+		Score   float64            `json:"score,optional"`
+		Source  string            `json:"source,optional"`
+		ExtInfo map[string]string `json:"ext_info,optional"`
+	}
+)
+
+@server (
+	prefix: /api/v1/v2
+	group:  search
+)
+service search-api {
+	@handler Search
+	post /reco/search (SearchReq) returns (SearchResp)
+
+	@handler Suggest
+	get /reco/search/suggest (SuggestReq) returns (SuggestResp)
+
+	@handler SearchAuthor
+	post /reco/search/author (SearchReq) returns (SearchResp)
+
+	@handler SearchTitle
+	post /reco/search/title (SearchReq) returns (SearchResp)
+
+	@handler SearchImage
+	post /reco/search/image (SearchReq) returns (SearchResp)
+}

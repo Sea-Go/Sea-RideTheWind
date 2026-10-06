@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package channel;
+option go_package = ".";
+
+// IP 绑定规则（type_tag + secondary_tags 组合绑定 IP 主题）
+message IPBindingRule {
+  string type_tag = 1;                   // 一级标签
+  repeated string secondary_tags = 2;    // 二级标签组合
+  string ip_name = 3;                    // IP 名称（如"旅游"）
+  bool exclusive = 4;                    // 是否独占（命中后不再进默认流）
+  map<string, string> ext_info = 5;      // 扩展字段
+}
+
+// 频道配置（独立池 + 质量阈值 + filterKey + rerank 版本 + IP 绑定）
+message ChannelConfig {
+  int32 pool_min_size = 1;               // 独立召回池最小水位（不足触发兜底）
+  int32 pool_max_size = 2;               // 独立召回池最大水位
+  double quality_threshold = 3;          // 频道独立质量阈值
+  string filter_key = 4;                 // 画像 filterKey（频道切换隔离）
+  string rerank_model_version = 5;       // 频道独立 rerank 模型版本
+  string rerank_model_type = 6;          // self / external / llm
+  IPBindingRule ip_binding = 7;          // IP 绑定规则
+  map<string, string> ext_info = 8;      // 扩展字段
+}
+
+// 频道（IP 主题频道）
+message Channel {
+  string name = 1;                       // 频道名（唯一键，如 travel / game）
+  string display_name = 2;               // 展示名
+  string description = 3;                // 描述
+  string ip_name = 4;                    // 绑定 IP
+  ChannelConfig config = 5;              // 频道配置
+  int32 pool_current_size = 6;           // 当前池水位
+  bool enabled = 7;                      // 是否启用
+  int64 create_time = 8;                 // 创建时间（毫秒）
+  int64 update_time = 9;                 // 更新时间（毫秒）
+  map<string, string> ext_info = 10;     // 扩展字段
+}
+
+// 注册频道请求（二开点：业务方注册自定义 IP 频道）
+message RegisterChannelRequest {
+  string name = 1;                       // 频道名
+  string display_name = 2;               // 展示名
+  string description = 3;                // 描述
+  string ip_name = 4;                    // 绑定 IP
+  ChannelConfig config = 5;              // 频道配置
+  IPBindingRule ip_binding = 6;          // IP 绑定规则
+  bool enabled = 7;                      // 是否启用
+  map<string, string> ext_info = 8;      // 扩展字段
+}
+
+// 注册频道响应
+message RegisterChannelResponse {
+  string name = 1;                       // 注册成功的频道名
+  bool success = 2;                      // 是否成功
+}
+
+// 频道列表查询请求
+message ListChannelsRequest {
+  bool enabled_only = 1;                 // 仅返回启用频道（用户前台传 true）
+}
+
+// 频道列表查询响应
+message ListChannelsResponse {
+  repeated Channel channels = 1;         // 频道列表
+  int32 total = 2;                       // 总数
+}
+
+// 频道详情查询请求
+message GetChannelRequest {
+  string name = 1;                       // 频道名
+}
+
+// 更新频道请求
+message UpdateChannelRequest {
+  string name = 1;                       // 频道名（必传）
+  optional string display_name = 2;      // 展示名
+  optional string description = 3;       // 描述
+  optional ChannelConfig config = 4;     // 频道配置
+  optional bool enabled = 5;             // 是否启用
+}
+
+// 删除频道请求
+message DeleteChannelRequest {
+  string name = 1;                       // 频道名
+}
+
+// 频道服务定义
+service ChannelService {
+  rpc RegisterChannel(RegisterChannelRequest) returns (RegisterChannelResponse);
+  rpc ListChannels(ListChannelsRequest) returns (ListChannelsResponse);
+  rpc GetChannel(GetChannelRequest) returns (Channel);
+  rpc UpdateChannel(UpdateChannelRequest) returns (RegisterChannelResponse);
+  rpc DeleteChannel(DeleteChannelRequest) returns (RegisterChannelResponse);
+}

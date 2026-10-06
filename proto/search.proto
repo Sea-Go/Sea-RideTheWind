@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package search;
+option go_package = ".";
+
+// 搜索意图类型（ParseIntent 结构化输出）
+enum SearchIntentType {
+  SEARCH_INTENT_UNSPECIFIED = 0; // 未指定
+  INFORMATIONAL = 1;             // 信息型
+  NAVIGATIONAL = 2;              // 导航型
+  TRANSACTIONAL = 3;             // 事务型
+  COMPARATIVE = 4;               // 比较型
+}
+
+// 搜索意图（SearchAgent.understand 输出）
+message SearchIntent {
+  SearchIntentType label = 1;           // 意图类型
+  double confidence = 2;                // 置信度
+  repeated string signals = 3;          // 触发信号
+  double complexity = 4;                // 复杂度（0~1）
+  repeated string entities = 5;         // 实体（作者/IP/标签/标题）
+  string time_intent = 6;               // 时效意图（latest/within_7d/within_30d/ever）
+  map<string, string> ext_info = 7;     // 扩展字段
+}
+
+// 重写后的查询（SearchAgent.rewrite 输出）
+message RewrittenQuery {
+  string original = 1;                   // 原始 query
+  string rewritten = 2;                  // 重写后 query
+  repeated string synonyms = 3;          // 同义词扩展
+  repeated string related = 4;           // 相关词
+  string correction = 5;                 // 拼写纠正（空表示无需纠正）
+  map<string, string> ext_info = 6;      // 扩展字段
+}
+
+// 搜索过滤
+message SearchFilter {
+  repeated string tags = 1;              // 标签过滤
+  optional string manual_type_tag = 2;   // 一级标签
+  optional string channel = 3;           // IP 频道
+  optional string author_id = 4;         // 作者
+  optional int64 time_from = 5;          // 时间范围起（毫秒）
+  optional int64 time_to = 6;            // 时间范围止（毫秒）
+  optional double quality_threshold = 7; // 质量阈值
+  map<string, string> ext_info = 8;      // 扩展字段
+}
+
+// 图谱知识（实体识别后查图谱获取）
+message GraphKnowledge {
+  repeated string entities = 1;          // 命中实体
+  repeated string related_articles = 2;  // 关联文章ID
+  repeated string related_authors = 3;   // 关联作者ID
+  repeated string related_ips = 4;       // 关联 IP
+  string cypher = 5;                     // 生成的 Cypher（调试用）
+  string subgraph = 6;                   // 子图 JSON（节点+边，前端可视化）
+  map<string, string> ext_info = 7;      // 扩展字段
+}
+
+// 搜索命中（单条）
+message SearchHit {
+  string article_id = 1;                 // 文章ID
+  string title = 2;                      // 标题
+  string brief = 3;                      // 摘要
+  string cover_image_url = 4;            // 封面
+  string manual_type_tag = 5;            // 一级标签
+  repeated string secondary_tags = 6;    // 二级标签
+  string author_id = 7;                  // 作者ID
+  string author_name = 8;                // 作者名
+  string snippet = 9;                    // 命中片段（高亮）
+  string chunk_id = 10;                  // 向量块ID
+  double article_score = 11;             // 文章综合分
+  double vector_score = 12;              // 向量分
+  double rerank_score = 13;              // rerank 分
+  double match_score = 14;               // 匹配分
+  map<string, string> ext_info = 15;     // 扩展字段
+}
+
+// 搜索查询
+message SearchQuery {
+  string search_request_id = 1;          // 搜索请求ID
+  string user_id = 2;                    // 用户ID（个性化）
+  string session_id = 3;                 // 会话ID
+  string trace_id = 4;                   // 链路追踪ID
+  string query = 5;                      // 原始 query
+  int32 topk = 6;                        // 返回条数
+  bool need_answer = 7;                  // 是否需要直接答案（FAQ 式）
+  bool explain = 8;                      // 是否返回 explain_trace
+  SearchFilter filter = 9;               // 过滤
+  bool personalize = 10;                 // 是否个性化
+  bool use_graph = 11;                   // 是否启用图谱知识
+  string image_url = 12;                 // 以图搜文图片URL（非空触发图片搜索）
+  map<string, string> ext_info = 13;     // 扩展字段
+}
+
+// 搜索结果
+message SearchResult {
+  string trace_id = 1;                       // 链路追踪ID
+  string search_request_id = 2;              // 搜索请求ID
+  string status = 3;                         // 状态
+  string answer = 4;                         // 直接答案（need_answer=true）
+  SearchIntent intent = 5;                   // 意图
+  RewrittenQuery rewritten = 6;              // 重写查询
+  repeated SearchHit hits = 7;               // 命中列表
+  repeated SearchHit items = 8;              // 命中列表（别名，前端兼容）
+  GraphKnowledge graph_knowledge = 9;        // 图谱知识
+  string explanation = 10;                   // 搜索解释
+  repeated ExplainTraceItem explain_trace = 11; // 解释 trace
+  map<string, string> debug = 12;            // 调试信息
+  string err_msg = 13;                       // 错误信息
+  map<string, string> ext_info = 14;         // 扩展字段
+}
+
+// 解释 trace 项
+message ExplainTraceItem {
+  string name = 1;                       // 阶段名（understand/rewrite/hybrid/graph/rerank）
+  string data = 2;                       // JSON 数据
+}
+
+// 搜索补全
+message SearchSuggestion {
+  string text = 1;                       // 补全文本
+  double score = 2;                      // 补全分
+  string source = 3;                     // 来源（prefix/hot/personalize）
+  map<string, string> ext_info = 4;      // 扩展字段
+}
+
+// 搜索补全请求（< 100ms，前缀补全）
+message SearchSuggestionRequest {
+  string query = 1;                      // 输入前缀
+  optional string user_id = 2;           // 用户ID（个性化补全）
+  int32 top_k = 3;                       // 返回条数
+  optional string channel = 4;           // 频道
+  map<string, string> ext_info = 5;      // 扩展字段
+}
+
+// 搜索补全响应
+message SearchSuggestionResponse {
+  repeated SearchSuggestion suggestions = 1; // 补全列表
+  map<string, string> ext_info = 2;      // 扩展字段
+}
+
+// 搜索服务定义
+service SearchService {
+  rpc Search(SearchQuery) returns (SearchResult);
+  rpc Suggest(SearchSuggestionRequest) returns (SearchSuggestionResponse);
+  rpc SearchByTitle(SearchQuery) returns (SearchResult);  // 按标题
+  rpc SearchByAuthor(SearchQuery) returns (SearchResult); // 按作者
+  rpc SearchByImage(SearchQuery) returns (SearchResult);  // 以图搜文
+}

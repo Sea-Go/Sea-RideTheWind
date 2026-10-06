@@ -1,0 +1,114 @@
+syntax = "v1"
+
+type (
+	// SkillCategory 技能类别枚举（12 类，与 proto/skill.proto 一致）
+	// 0=UNSPECIFIED 1=RECALL 2=RANK 3=QUALITY 4=SEARCH 5=GRAPH 6=PROFILE
+	// 7=CHANNEL 8=EVENT 9=EXPLAIN 10=EVAL 11=TOOL 12=OBS
+	// 完整 59 个 Skill 清单见 proto/skill.proto 顶部注释。
+
+	// SkillManifest Skill 清单（SKILL.md 内容）
+	SkillManifest {
+		Name              string            `json:"name"`
+		Description       string            `json:"description,optional"`
+		TriggerCondition  string            `json:"trigger_condition,optional"`
+		Usage             string            `json:"usage,optional"`
+		Version           string            `json:"version,optional"`
+		Author            string            `json:"author,optional"`
+		ExtInfo           map[string]string `json:"ext_info,optional"`
+	}
+
+	// Skill 技能定义
+	Skill {
+		Name        string            `json:"name"`
+		Category    int32             `json:"category"`
+		DisplayName string            `json:"display_name,optional"`
+		Description string            `json:"description,optional"`
+		Manifest    SkillManifest     `json:"manifest,optional"`
+		Tools       []string          `json:"tools,optional"`
+		Resources   []string          `json:"resources,optional"`
+		Enabled     bool              `json:"enabled"`
+		Builtin     bool              `json:"builtin"`
+		CreateTime  int64             `json:"create_time"`
+		ExtInfo     map[string]string `json:"ext_info,optional"`
+	}
+
+	// ListSkillsReq 列出 Skill 请求
+	ListSkillsReq {
+		Category    int32 `form:"category,optional"`
+		EnabledOnly bool  `form:"enabled_only,optional"`
+		BuiltinOnly bool  `form:"builtin_only,optional"`
+		CustomOnly  bool  `form:"custom_only,optional"`
+	}
+
+	// ListSkillsResp 列出 Skill 响应
+	ListSkillsResp {
+		Skills         []Skill           `json:"skills,optional"`
+		Total          int32             `json:"total"`
+		CategoryCounts map[string]int32  `json:"category_counts,optional"`
+	}
+
+	// RegisterSkillReq 注册 Skill 请求（二开点：业务方放置技能目录）
+	RegisterSkillReq {
+		Name        string            `json:"name"`
+		Category    int32             `json:"category"`
+		DisplayName string            `json:"display_name,optional"`
+		Description string            `json:"description,optional"`
+		Manifest    SkillManifest     `json:"manifest,optional"`
+		Tools       []string          `json:"tools,optional"`
+		Resources   []string          `json:"resources,optional"`
+		Enabled     bool              `json:"enabled,optional"`
+		SkillDir    string            `json:"skill_dir,optional"`
+		ExtInfo     map[string]string `json:"ext_info,optional"`
+	}
+
+	// UnregisterSkillReq 注销 Skill 请求（路径参数 :name）
+	UnregisterSkillReq {
+		Name string `path:"name"`
+	}
+
+	// InvokeSkillReq 调用 Skill 请求
+	InvokeSkillReq {
+		Name                   string            `json:"name"`
+		Input                  string            `json:"input,optional"`
+		TraceId                string            `json:"trace_id,optional"`
+		MaterializeToToolResult bool             `json:"materialize_to_tool_result,optional"`
+		TimeoutSec             int32             `json:"timeout_sec,optional"`
+		ExtInfo                map[string]string `json:"ext_info,optional"`
+	}
+
+	// InvokeSkillResp 调用 Skill 响应
+	InvokeSkillResp {
+		Output    string            `json:"output,optional"`
+		Success   bool              `json:"success"`
+		LatencyMs int64             `json:"latency_ms"`
+		ErrorMsg  string            `json:"err_msg,optional"`
+		ExtInfo   map[string]string `json:"ext_info,optional"`
+	}
+
+	// GetSkillManifestReq 获取 Skill Manifest 请求
+	GetSkillManifestReq {
+		Name string `form:"name"`
+	}
+)
+
+@server (
+	prefix: /api/v1/v2/admin/skill
+	group:  skill-admin
+	jwt:    Auth
+)
+service skill-api {
+	@handler SkillList
+	get /list (ListSkillsReq) returns (ListSkillsResp)
+
+	@handler SkillRegister
+	post /register (RegisterSkillReq) returns (Skill)
+
+	@handler SkillUnregister
+	delete /:name (UnregisterSkillReq) returns (Skill)
+
+	@handler SkillInvoke
+	post /invoke (InvokeSkillReq) returns (InvokeSkillResp)
+
+	@handler SkillManifest
+	get /manifest (GetSkillManifestReq) returns (SkillManifest)
+}

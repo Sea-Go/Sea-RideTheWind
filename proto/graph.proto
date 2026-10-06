@@ -1,0 +1,217 @@
+syntax = "proto3";
+
+package graph;
+option go_package = ".";
+
+// 图谱节点类型（12 类，与 agent_v3 图谱 schema 节点约束一一对应）
+enum GraphNodeType {
+  GRAPH_NODE_TYPE_UNSPECIFIED = 0; // 未指定
+  ARTICLE = 1;                     // 文章节点
+  TAG = 2;                         // 标签节点
+  TYPE_TAG = 3;                    // 一级标签节点
+  AUTHOR = 4;                      // 作者节点
+  IP = 5;                          // IP 主题节点
+  CHANNEL = 6;                     // 频道节点
+  TOPIC = 7;                       // 话题节点
+  ENTITY = 8;                      // 实体节点
+  IMAGE = 9;                       // 图片节点
+  USER = 10;                       // 用户节点
+  BEHAVIOR = 11;                   // 行为节点
+  QUALITY_REPORT = 12;             // 质量报告节点
+}
+
+// 图谱节点
+message GraphNode {
+  string id = 1;                         // 节点ID
+  GraphNodeType type = 2;                // 节点类型
+  string name = 3;                       // 节点名
+  map<string, string> properties = 4;    // 节点属性
+  repeated string labels = 5;            // 标签
+  map<string, string> ext_info = 6;      // 扩展字段
+}
+
+// 图谱边
+message GraphEdge {
+  string source_id = 1;                  // 起点ID
+  string target_id = 2;                  // 终点ID
+  string relation = 3;                   // 关系类型（HAS_TAG/WROTE_BY/LIKED/CO_OCCURRED_WITH/VISUALLY_SIMILAR/...）
+  GraphNodeType source_type = 4;         // 起点类型
+  GraphNodeType target_type = 5;         // 终点类型
+  map<string, string> properties = 6;    // 边属性（如 count/weight）
+  map<string, string> ext_info = 7;      // 扩展字段
+}
+
+// Cypher 执行请求（管理员调试，直接执行参数化 Cypher）
+message CypherRequest {
+  string cypher = 1;                     // Cypher 语句（参数化）
+  map<string, string> params = 2;        // 参数
+  int32 limit = 3;                       // 结果上限
+  bool read_only = 4;                    // 只读（默认 true）
+  map<string, string> ext_info = 5;      // 扩展字段
+}
+
+// Cypher 执行响应
+message CypherResponse {
+  repeated GraphNode nodes = 1;          // 命中节点
+  repeated GraphEdge edges = 2;          // 命中边
+  repeated map<string, string> rows = 3; // 原始行结果
+  int64 latency_ms = 4;                  // 执行延迟（毫秒）
+  string err_msg = 5;                    // 错误信息
+  map<string, string> ext_info = 6;      // 扩展字段
+}
+
+// 图谱查询请求（自然语言 → LLM 生成 Cypher → 执行）
+message GraphQueryRequest {
+  string trace_id = 1;                   // 链路追踪ID
+  string user_id = 2;                    // 用户ID
+  string query = 3;                      // 自然语言查询
+  bool generate_cypher = 4;              // 是否 LLM 生成 Cypher
+  int32 hop_limit = 5;                   // 多跳上限
+  int32 top_k = 6;                       // 返回条数
+  map<string, string> ext_info = 7;      // 扩展字段
+}
+
+// 图谱查询响应
+message GraphQueryResponse {
+  string cypher = 1;                     // 生成的 Cypher
+  repeated GraphNode nodes = 2;          // 命中节点
+  repeated GraphEdge edges = 3;          // 命中边
+  string subgraph = 4;                   // 子图 JSON（前端可视化）
+  int64 latency_ms = 5;                  // 执行延迟（毫秒）
+  string err_msg = 6;                    // 错误信息
+  map<string, string> ext_info = 7;      // 扩展字段
+}
+
+// 图谱召回请求（多跳召回候选文章）
+message GraphRecallRequest {
+  string user_id = 1;                    // 用户ID
+  string channel = 2;                    // 频道
+  repeated string seed_article_ids = 3;  // 种子文章
+  repeated string seed_entities = 4;     // 种子实体
+  string template = 5;                   // 召回模板（user_liked_similar/user_similar_user/co_occur/entity/article_author/ip/...）
+  int32 top_k = 6;                       // 返回条数
+  int32 hop_limit = 7;                   // 多跳上限
+  map<string, string> ext_info = 8;      // 扩展字段
+}
+
+// 图谱召回响应
+message GraphRecallResponse {
+  repeated GraphRecallCandidate candidates = 1; // 召回候选
+  string cypher = 2;                     // 执行的 Cypher
+  int64 latency_ms = 3;                  // 执行延迟（毫秒）
+  map<string, string> ext_info = 4;      // 扩展字段
+}
+
+// 图谱召回候选（单条）
+message GraphRecallCandidate {
+  string article_id = 1;                 // 文章ID
+  double score = 2;                      // 召回分
+  string path = 3;                       // 召回路径（JSON，如 user→liked→article→similar→article）
+  map<string, string> ext_info = 4;      // 扩展字段
+}
+
+// 实体链接请求（query → 图谱实体）
+message EntityLinkRequest {
+  string query = 1;                      // 输入文本
+  repeated GraphNodeType candidate_types = 2; // 候选实体类型
+  int32 top_k = 3;                       // 返回条数
+  double threshold = 4;                  // 相似度阈值
+  map<string, string> ext_info = 5;      // 扩展字段
+}
+
+// 实体链接响应
+message EntityLinkResponse {
+  repeated LinkedEntity entities = 1;    // 命中实体
+  map<string, string> ext_info = 2;      // 扩展字段
+}
+
+// 链接实体（单条）
+message LinkedEntity {
+  string entity_id = 1;                  // 实体ID
+  GraphNodeType type = 2;                // 实体类型
+  string name = 3;                       // 实体名
+  double similarity = 4;                 // 相似度
+  repeated string aliases = 5;           // 别名
+}
+
+// 图片搜索请求（以图搜文 / 以图搜图）
+message ImageSearchRequest {
+  string image_url = 1;                  // 图片URL
+  bytes image_bytes = 2;                 // 图片字节（与 image_url 二选一）
+  string search_type = 3;                // 搜索类型（image_to_article / image_to_image）
+  int32 top_k = 4;                       // 返回条数
+  double threshold = 5;                  // 相似度阈值
+  map<string, string> ext_info = 6;      // 扩展字段
+}
+
+// 图片搜索响应
+message ImageSearchResponse {
+  repeated ImageSearchHit hits = 1;      // 命中列表
+  int64 latency_ms = 2;                  // 执行延迟（毫秒）
+  string err_msg = 3;                    // 错误信息
+  map<string, string> ext_info = 4;      // 扩展字段
+}
+
+// 图片搜索命中（单条）
+message ImageSearchHit {
+  string article_id = 1;                 // 关联文章ID（以图搜文）
+  string image_id = 2;                   // 图片节点ID
+  string image_url = 3;                  // 图片URL
+  double similarity = 4;                 // 相似度
+  map<string, string> ext_info = 5;      // 扩展字段
+}
+
+// 图谱 Schema 响应（12 类节点 + 关系定义 + 索引 + 约束）
+message GraphSchemaResponse {
+  repeated NodeTypeSchema node_types = 1;     // 12 类节点
+  repeated RelationSchema relations = 2;      // 关系定义
+  repeated IndexSchema indexes = 3;           // 索引
+  repeated ConstraintSchema constraints = 4;  // 约束
+  int64 version = 5;                          // Schema 版本
+  map<string, string> ext_info = 6;           // 扩展字段
+}
+
+// 节点类型 Schema
+message NodeTypeSchema {
+  GraphNodeType type = 1;                // 节点类型
+  string name = 2;                       // 节点名
+  repeated string properties = 3;        // 属性列表
+  repeated string indexes = 4;           // 索引字段（user_id/channel/ip/author/time）
+  string description = 5;                // 描述
+}
+
+// 关系 Schema
+message RelationSchema {
+  string relation = 1;                   // 关系名
+  GraphNodeType source_type = 2;         // 起点类型
+  GraphNodeType target_type = 3;         // 终点类型
+  repeated string properties = 4;        // 关系属性
+  string description = 5;                // 描述
+}
+
+// 索引 Schema
+message IndexSchema {
+  GraphNodeType node_type = 1;           // 节点类型
+  repeated string fields = 2;            // 索引字段
+  bool unique = 3;                       // 是否唯一索引
+}
+
+// 约束 Schema
+message ConstraintSchema {
+  GraphNodeType node_type = 1;           // 节点类型
+  string field = 2;                      // 约束字段
+  string constraint_type = 3;            // 约束类型（uniqueness/existence）
+}
+
+// 获取 Schema 请求
+message GetSchemaRequest {}
+
+// 图谱核心服务定义
+service GraphService {
+  rpc ExecuteCypher(CypherRequest) returns (CypherResponse);           // 直接执行 Cypher（管理员调试）
+  rpc Query(GraphQueryRequest) returns (GraphQueryResponse);           // 自然语言查询（LLM 生成 Cypher）
+  rpc Recall(GraphRecallRequest) returns (GraphRecallResponse);        // 图谱多跳召回
+  rpc EntityLink(EntityLinkRequest) returns (EntityLinkResponse);      // 实体链接
+  rpc ImageSearch(ImageSearchRequest) returns (ImageSearchResponse);   // 以图搜文/以图搜图
+  rpc GetSchema(GetSchemaRequest) returns (GraphSchemaResponse);       // 获取图谱 Schema
+}
