@@ -1,0 +1,195 @@
+syntax = "v1"
+
+type (
+	// GraphNodeType 图谱节点类型枚举（12 类，与 proto/graph.proto 一致）
+	// 0=UNSPECIFIED 1=ARTICLE 2=TAG 3=TYPE_TAG 4=AUTHOR 5=IP 6=CHANNEL
+	// 7=TOPIC 8=ENTITY 9=IMAGE 10=USER 11=BEHAVIOR 12=QUALITY_REPORT
+
+	// GraphNode 图谱节点
+	GraphNode {
+		Id         string            `json:"id"`
+		Type       int32             `json:"type"`
+		Name       string            `json:"name"`
+		Properties map[string]string `json:"properties,optional"`
+		Labels     []string          `json:"labels,optional"`
+		ExtInfo    map[string]string `json:"ext_info,optional"`
+	}
+
+	// GraphEdge 图谱边
+	GraphEdge {
+		SourceId   string            `json:"source_id"`
+		TargetId   string            `json:"target_id"`
+		Relation   string            `json:"relation"`
+		SourceType int32             `json:"source_type,optional"`
+		TargetType int32             `json:"target_type,optional"`
+		Properties map[string]string `json:"properties,optional"`
+		ExtInfo    map[string]string `json:"ext_info,optional"`
+	}
+
+	// GraphQueryReq 图谱查询请求（自然语言 → LLM 生成 Cypher → 执行）
+	GraphQueryReq {
+		TraceId       string `json:"trace_id,optional"`
+		UserId        string `json:"user_id,optional"`
+		Query         string `json:"query"`
+		GenerateCypher bool  `json:"generate_cypher,optional"`
+		HopLimit      int32  `json:"hop_limit,optional"`
+		TopK          int32  `json:"top_k,optional"`
+		ExtInfo       map[string]string `json:"ext_info,optional"`
+	}
+
+	// GraphQueryResp 图谱查询响应
+	GraphQueryResp {
+		Cypher    string        `json:"cypher"`
+		Nodes     []GraphNode   `json:"nodes,optional"`
+		Edges     []GraphEdge   `json:"edges,optional"`
+		Subgraph  string        `json:"subgraph,optional"`
+		LatencyMs int64         `json:"latency_ms"`
+		ErrMsg    string        `json:"err_msg,optional"`
+		ExtInfo   map[string]string `json:"ext_info,optional"`
+	}
+
+	// GraphRecallCandidate 图谱召回候选
+	GraphRecallCandidate {
+		ArticleId string            `json:"article_id"`
+		Score     float64           `json:"score"`
+		Path      string            `json:"path,optional"`
+		ExtInfo   map[string]string `json:"ext_info,optional"`
+	}
+
+	// GraphRecallReq 图谱召回请求
+	GraphRecallReq {
+		UserId          string   `json:"user_id,optional"`
+		Channel         string   `json:"channel,optional"`
+		SeedArticleIds  []string `json:"seed_article_ids,optional"`
+		SeedEntities    []string `json:"seed_entities,optional"`
+		Template        string   `json:"template,optional"`
+		TopK            int32    `json:"top_k,optional"`
+		HopLimit        int32    `json:"hop_limit,optional"`
+		ExtInfo         map[string]string `json:"ext_info,optional"`
+	}
+
+	// GraphRecallResp 图谱召回响应
+	GraphRecallResp {
+		Candidates []GraphRecallCandidate `json:"candidates,optional"`
+		Cypher     string                 `json:"cypher,optional"`
+		LatencyMs  int64                  `json:"latency_ms"`
+		ExtInfo    map[string]string      `json:"ext_info,optional"`
+	}
+
+	// LinkedEntity 链接实体
+	LinkedEntity {
+		EntityId   string   `json:"entity_id"`
+		Type       int32    `json:"type"`
+		Name       string   `json:"name"`
+		Similarity float64  `json:"similarity"`
+		Aliases    []string `json:"aliases,optional"`
+	}
+
+	// EntityLinkReq 实体链接请求
+	EntityLinkReq {
+		Query           string  `json:"query"`
+		CandidateTypes  []int32 `json:"candidate_types,optional"`
+		TopK            int32   `json:"top_k,optional"`
+		Threshold       float64 `json:"threshold,optional"`
+		ExtInfo         map[string]string `json:"ext_info,optional"`
+	}
+
+	// EntityLinkResp 实体链接响应
+	EntityLinkResp {
+		Entities []LinkedEntity    `json:"entities,optional"`
+		ExtInfo  map[string]string `json:"ext_info,optional"`
+	}
+
+	// ImageSearchHit 图片搜索命中
+	ImageSearchHit {
+		ArticleId string            `json:"article_id,optional"`
+		ImageId   string            `json:"image_id"`
+		ImageUrl  string            `json:"image_url"`
+		Similarity float64          `json:"similarity"`
+		ExtInfo   map[string]string `json:"ext_info,optional"`
+	}
+
+	// ImageSearchReq 图片搜索请求（以图搜文/以图搜图）
+	ImageSearchReq {
+		ImageUrl   string  `json:"image_url,optional"`
+		SearchType string  `json:"search_type,optional"`
+		TopK       int32   `json:"top_k,optional"`
+		Threshold  float64 `json:"threshold,optional"`
+		ExtInfo    map[string]string `json:"ext_info,optional"`
+	}
+
+	// ImageSearchResp 图片搜索响应
+	ImageSearchResp {
+		Hits      []ImageSearchHit  `json:"hits,optional"`
+		LatencyMs int64             `json:"latency_ms"`
+		ErrorMsg  string            `json:"err_msg,optional"`
+		ExtInfo   map[string]string `json:"ext_info,optional"`
+	}
+
+	// NodeTypeSchema 节点类型 Schema
+	NodeTypeSchema {
+		Type        int32    `json:"type"`
+		Name        string   `json:"name"`
+		Properties  []string `json:"properties,optional"`
+		Indexes     []string `json:"indexes,optional"`
+		Description string   `json:"description,optional"`
+	}
+
+	// RelationSchema 关系 Schema
+	RelationSchema {
+		Relation    string   `json:"relation"`
+		SourceType  int32    `json:"source_type"`
+		TargetType  int32    `json:"target_type"`
+		Properties  []string `json:"properties,optional"`
+		Description string   `json:"description,optional"`
+	}
+
+	// IndexSchema 索引 Schema
+	IndexSchema {
+		NodeType int32    `json:"node_type"`
+		Fields   []string `json:"fields"`
+		Unique   bool     `json:"unique"`
+	}
+
+	// ConstraintSchema 约束 Schema
+	ConstraintSchema {
+		NodeType       int32  `json:"node_type"`
+		Field          string `json:"field"`
+		ConstraintType string `json:"constraint_type"`
+	}
+
+	// GraphSchemaReq 获取图谱 Schema 请求
+	GraphSchemaReq {}
+
+	// GraphSchemaResp 图谱 Schema 响应（12 类节点 + 关系 + 索引 + 约束）
+	GraphSchemaResp {
+		NodeTypes   []NodeTypeSchema    `json:"node_types,optional"`
+		Relations   []RelationSchema    `json:"relations,optional"`
+		Indexes     []IndexSchema       `json:"indexes,optional"`
+		Constraints []ConstraintSchema  `json:"constraints,optional"`
+		Version     int64               `json:"version"`
+		ExtInfo     map[string]string   `json:"ext_info,optional"`
+	}
+)
+
+@server (
+	prefix: /api/v1/v2/admin/graph
+	group:  graph-admin
+	jwt:    Auth
+)
+service graph-api {
+	@handler GraphQuery
+	post /query (GraphQueryReq) returns (GraphQueryResp)
+
+	@handler GraphRecall
+	post /recall (GraphRecallReq) returns (GraphRecallResp)
+
+	@handler GraphEntityLink
+	post /entity_link (EntityLinkReq) returns (EntityLinkResp)
+
+	@handler GraphImageSearch
+	post /image_search (ImageSearchReq) returns (ImageSearchResp)
+
+	@handler GraphSchema
+	get /schema (GraphSchemaReq) returns (GraphSchemaResp)
+}

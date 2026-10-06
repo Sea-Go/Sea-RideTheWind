@@ -1,0 +1,144 @@
+syntax = "v1"
+
+type (
+	// 标签过滤（召回阶段硬过滤）
+	TagFilter {
+		IncludeTags    []string `json:"include_tags,optional"`
+		ExcludeTags    []string `json:"exclude_tags,optional"`
+		ManualTypeTag  string   `json:"manual_type_tag,optional"`
+		SecondaryTags  []string `json:"secondary_tags,optional"`
+	}
+
+	// 推荐自定义配置（业务二开 + 模型二开 + A/B 分桶）
+	RecommendConfig {
+		TopK                  int32             `json:"top_k,optional"`
+		RecallStrategy        string            `json:"recall_strategy,optional"`
+		RerankModel           string            `json:"rerank_model,optional"`
+		RerankWeights         map[string]float64 `json:"rerank_weights,optional"`
+		AgentLoopEnabled      bool              `json:"agent_loop_enabled,optional"`
+		FallbackEnabled       bool              `json:"fallback_enabled,optional"`
+		MaxToolCalls          int32             `json:"max_tool_calls,optional"`
+		PromptCacheEnabled    bool              `json:"prompt_cache_enabled,optional"`
+		SummaryEnabled        bool              `json:"summary_enabled,optional"`
+		BestOfN               int32             `json:"best_of_n,optional"`
+		QualityThreshold      float64            `json:"quality_threshold,optional"`
+		CfEnabled             bool              `json:"cf_enabled,optional"`
+		SearchEnabled         bool              `json:"search_enabled,optional"`
+		TemporalDecayEnabled  bool              `json:"temporal_decay_enabled,optional"`
+		PathMode              int32             `json:"path_mode,optional"`
+		QualityModel          string            `json:"quality_model,optional"`
+		PromptCacheKey        string            `json:"prompt_cache_key,optional"`
+	}
+
+	// 成本报告（响应回填，含 token 与缓存命中）
+	CostReport {
+		InputTokens         int64            `json:"input_tokens,optional"`
+		OutputTokens        int64            `json:"output_tokens,optional"`
+		CachedTokens        int64            `json:"cached_tokens,optional"`
+		CostYuan            float64           `json:"cost_yuan,optional"`
+		LatencyMs           int64            `json:"latency_ms,optional"`
+		PerStageTokens      map[string]int64 `json:"per_stage_tokens,optional"`
+		PerStageLatencyMs   map[string]int64 `json:"per_stage_latency_ms,optional"`
+	}
+
+	// 推荐请求
+	RecommendReq {
+		UserId        string           `json:"user_id"`
+		SessionId     string           `json:"session_id"`
+		TraceId       string           `json:"trace_id,optional"`
+		Surface       string           `json:"surface"`
+		Query         string           `json:"query,optional"`
+		Channel       string           `json:"channel,optional"`
+		TagFilter     *TagFilter       `json:"tag_filter,optional"`
+		Config        *RecommendConfig `json:"config,optional"`
+		PathMode      int32            `json:"path_mode,optional"`
+		TopK          int32            `json:"top_k,optional"`
+		PeriodBucket  string           `json:"period_bucket,optional"`
+		Explain       bool             `json:"explain,optional"`
+		Stream        bool             `json:"stream,optional"`
+		ExtInfo       map[string]string `json:"ext_info,optional"`
+	}
+
+	// 推荐响应
+	RecommendResp {
+		TraceId                 string            `json:"trace_id,optional"`
+		RecRequestId            string            `json:"rec_request_id,optional"`
+		Status                  string            `json:"status,optional"`
+		ArticleIds              []string          `json:"article_ids,optional"`
+		PathTaken               int32             `json:"path_taken,optional"`
+		Cost                    *CostReport       `json:"cost,optional"`
+		Config                  *RecommendConfig  `json:"config,optional"`
+		Channel                 string            `json:"channel,optional"`
+		QualityScores           map[string]float64 `json:"quality_scores,optional"`
+		CfScores                map[string]float64 `json:"cf_scores,optional"`
+		RerankScores            map[string]float64 `json:"rerank_scores,optional"`
+		TemporalProfileSnapshot string            `json:"temporal_profile_snapshot,optional"`
+		GraphTrace              string            `json:"graph_trace,optional"`
+		Explanation             string            `json:"explanation,optional"`
+		IntentLabel             string            `json:"intent_label,optional"`
+		IntentComplexity        float64            `json:"intent_complexity,optional"`
+		ErrMsg                  string            `json:"err_msg,optional"`
+		ExtInfo                 map[string]string `json:"ext_info,optional"`
+	}
+
+	// 频道摘要（用户前台列表用）
+	Channel {
+		Name        string            `json:"name"`
+		DisplayName string            `json:"display_name"`
+		Description string            `json:"description,optional"`
+		IpName      string            `json:"ip_name,optional"`
+		Enabled     bool              `json:"enabled"`
+		ExtInfo     map[string]string `json:"ext_info,optional"`
+	}
+
+	ListChannelsReq {
+		EnabledOnly bool `form:"enabled_only,optional"`
+	}
+
+	ListChannelsResp {
+		Channels []Channel `json:"channels"`
+		Total    int32     `json:"total"`
+	}
+
+	// 行为事件（单条）
+	RecoEvent {
+		RecRequestId string            `json:"rec_request_id"`
+		UserId       string            `json:"user_id,optional"`
+		SessionId    string            `json:"session_id,optional"`
+		Surface      string            `json:"surface"`
+		ArticleId    string            `json:"article_id"`
+		Rank         int32             `json:"rank,optional"`
+		EventType    string            `json:"event_type"`
+		Metadata     map[string]string `json:"metadata,optional"`
+		ExtInfo      map[string]string `json:"ext_info,optional"`
+	}
+
+	ReportEventsReq {
+		Events  []RecoEvent       `json:"events"`
+		ExtInfo map[string]string `json:"ext_info,optional"`
+	}
+
+	ReportEventsResp {
+		Accepted int32  `json:"accepted"`
+		ErrMsg   string `json:"err_msg,optional"`
+		ExtInfo  map[string]string `json:"ext_info,optional"`
+	}
+)
+
+@server (
+	prefix: /api/v1/v2
+	group:  reco
+)
+service reco-api {
+	@handler Recommend
+	post /reco/recommend (RecommendReq) returns (RecommendResp)
+
+	@handler RecommendStream
+	post /reco/recommend/stream (RecommendReq) returns (RecommendResp)
+
+	@handler ListChannels
+	get /reco/channels (ListChannelsReq) returns (ListChannelsResp)
+
+	@handler ReportEvents
+	post /reco/events (ReportEventsReq) returns (ReportEventsResp)
+}

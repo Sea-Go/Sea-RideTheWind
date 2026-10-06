@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package cpu;
+option go_package = ".";
+
+// CPU profile 快照
+message CPUProfile {
+  int64 captured_at = 1;                    // 采样时间（毫秒）
+  int32 goroutines = 2;                     // goroutine 数
+  int32 pool_size = 3;                      // ants 池大小
+  int32 pool_active = 4;                    // ants 池活跃数
+  int32 pprof_samples = 5;                  // pprof 采样数
+  double cpu_usage = 6;                     // CPU 利用率
+  int64 gc_pause_ns = 7;                    // GC 暂停（纳秒）
+  int32 gc_count = 8;                       // GC 次数
+  repeated PoolStat pools = 9;              // 各池统计
+  repeated CacheStat caches = 10;           // 各缓存统计
+  GOMAXPROCSConfig gomaxprocs = 11;         // GOMAXPROCS 配置
+  string flame_graph = 12;                  // 火焰图 SVG/JSON
+  map<string, string> ext_info = 13;        // 扩展字段
+}
+
+// pprof 请求
+message PProfRequest {
+  string profile_type = 1;                  // profile 类型（cpu/heap/goroutine/block/mutex）
+  int32 duration_sec = 2;                   // 采样时长（秒）
+  bool flame_graph = 3;                     // 是否返回火焰图
+  int32 sample_rate = 4;                    // 采样频率
+  map<string, string> ext_info = 5;         // 扩展字段
+}
+
+// pprof 响应
+message PProfResponse {
+  bytes profile_data = 1;                   // pprof 原始数据
+  string flame_graph = 2;                   // 火焰图（SVG/JSON）
+  int64 captured_at = 3;                    // 采样时间（毫秒）
+  string err_msg = 4;                       // 错误信息
+}
+
+// 池统计
+message PoolStat {
+  string name = 1;                          // 池名（recall/rerank/cf/graph/...）
+  int32 size = 2;                           // 当前大小
+  int32 active = 3;                         // 活跃数
+  int32 waiting = 4;                        // 等待数
+  int32 capacity = 5;                       // 容量
+  double utilization = 6;                   // 利用率
+  int64 total_processed = 7;                // 累计处理数
+  map<string, string> ext_info = 8;         // 扩展字段
+}
+
+// GOMAXPROCS 配置
+message GOMAXPROCSConfig {
+  int32 current = 1;                        // 当前 GOMAXPROCS
+  int32 quota = 2;                          // CPU 配额（automaxprocs 读取）
+  bool automaxprocs_enabled = 3;            // 是否启用 automaxprocs
+  int32 recommended = 4;                    // 推荐值
+  map<string, string> ext_info = 5;         // 扩展字段
+}
+
+// 缓存统计
+message CacheStat {
+  string name = 1;                          // 缓存名（L1_article_meta/L2_recall/L3_prompt）
+  string level = 2;                         // L1/L2/L3
+  int64 size = 3;                           // 当前条目数
+  int64 capacity = 4;                       // 容量
+  int64 hits = 5;                           // 命中数
+  int64 misses = 6;                         // 未命中数
+  double hit_ratio = 7;                     // 命中率
+  int64 evictions = 8;                      // 淘汰数
+  int64 latency_us = 9;                     // 平均延迟（微秒）
+  map<string, string> ext_info = 10;        // 扩展字段
+}
+
+// 列出池请求
+message ListPoolsRequest {}
+
+// 列出池响应
+message ListPoolsResponse {
+  repeated PoolStat pools = 1;              // 池统计列表
+}
+
+// 列出缓存请求
+message ListCacheStatsRequest {}
+
+// 列出缓存响应
+message ListCacheStatsResponse {
+  repeated CacheStat caches = 1;            // 缓存统计列表
+}
+
+// 获取 GOMAXPROCS 请求
+message GetGOMAXPROCSRequest {}
+
+// CPU 服务
+service CPUService {
+  rpc GetPProf(PProfRequest) returns (PProfResponse);                          // 获取 pprof 数据
+  rpc ListPools(ListPoolsRequest) returns (ListPoolsResponse);                 // 列出协程池统计
+  rpc ListCacheStats(ListCacheStatsRequest) returns (ListCacheStatsResponse);  // 列出缓存统计
+  rpc GetGOMAXPROCSConfig(GetGOMAXPROCSRequest) returns (GOMAXPROCSConfig);    // 获取 GOMAXPROCS 配置
+  rpc UpdateGOMAXPROCSConfig(GOMAXPROCSConfig) returns (GOMAXPROCSConfig);     // 更新 GOMAXPROCS 配置
+}

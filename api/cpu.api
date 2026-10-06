@@ -1,0 +1,114 @@
+syntax = "v1"
+
+// CPU 监控领域类型（与 cpu.proto 对齐）
+type (
+	// CPU profile 快照
+	CPUProfile {
+		CapturedAt   int64             `json:"captured_at"`
+		Goroutines   int32             `json:"goroutines"`
+		PoolSize     int32             `json:"pool_size"`
+		PoolActive   int32             `json:"pool_active"`
+		PprofSamples int32             `json:"pprof_samples"`
+		CpuUsage     float64           `json:"cpu_usage"`
+		GcPauseNs    int64             `json:"gc_pause_ns"`
+		GcCount      int32             `json:"gc_count"`
+		Pools        []PoolStat        `json:"pools"`
+		Caches       []CacheStat       `json:"caches"`
+		Gomaxprocs   GOMAXPROCSConfig  `json:"gomaxprocs"`
+		FlameGraph   string            `json:"flame_graph"`
+		ExtInfo      map[string]string `json:"ext_info,optional"`
+	}
+
+	// pprof 请求
+	PProfReq {
+		ProfileType string `form:"profile,default=cpu"`
+		DurationSec int32  `form:"seconds,default=30"`
+		FlameGraph  bool   `form:"flame_graph,optional"`
+		SampleRate  int32  `form:"sample_rate,optional"`
+	}
+
+	// pprof 响应
+	PProfResp {
+		ProfileData []byte `json:"profile_data"`
+		FlameGraph  string `json:"flame_graph"`
+		CapturedAt  int64  `json:"captured_at"`
+		ErrMsg      string `json:"err_msg"`
+	}
+
+	// 池统计
+	PoolStat {
+		Name           string  `json:"name"`
+		Size           int32   `json:"size"`
+		Active         int32   `json:"active"`
+		Waiting        int32   `json:"waiting"`
+		Capacity       int32   `json:"capacity"`
+		Utilization    float64 `json:"utilization"`
+		TotalProcessed int64   `json:"total_processed"`
+		ExtInfo        map[string]string `json:"ext_info,optional"`
+	}
+
+	// GOMAXPROCS 配置
+	GOMAXPROCSConfig {
+		Current             int32  `json:"current"`
+		Quota               int32  `json:"quota"`
+		AutomaxprocsEnabled bool   `json:"automaxprocs_enabled"`
+		Recommended         int32  `json:"recommended"`
+		ExtInfo             map[string]string `json:"ext_info,optional"`
+	}
+
+	// 缓存统计
+	CacheStat {
+		Name      string  `json:"name"`
+		Level     string  `json:"level"`
+		Size      int64   `json:"size"`
+		Capacity  int64   `json:"capacity"`
+		Hits      int64   `json:"hits"`
+		Misses    int64   `json:"misses"`
+		HitRatio  float64 `json:"hit_ratio"`
+		Evictions int64   `json:"evictions"`
+		LatencyUs int64   `json:"latency_us"`
+		ExtInfo   map[string]string `json:"ext_info,optional"`
+	}
+
+	// 列出池请求（无入参）
+	ListPoolsReq {}
+
+	// 列出池响应
+	ListPoolsResp {
+		Pools []PoolStat `json:"pools"`
+	}
+
+	// 列出缓存统计请求（无入参）
+	ListCacheStatsReq {}
+
+	// 列出缓存统计响应
+	ListCacheStatsResp {
+		Caches []CacheStat `json:"caches"`
+	}
+
+	// 获取 GOMAXPROCS 请求（无入参）
+	GetGOMAXPROCSReq {}
+)
+
+// 管理员后台（jwt 鉴权）
+@server (
+	prefix: api/v1/v2/admin
+	group:  cpu-admin
+	jwt:    Auth
+)
+service cpu-api {
+	@handler GetPProf
+	get /cpu/pprof (PProfReq) returns (PProfResp)
+
+	@handler ListPools
+	get /cpu/pools (ListPoolsReq) returns (ListPoolsResp)
+
+	@handler ListCacheStats
+	get /cpu/cache (ListCacheStatsReq) returns (ListCacheStatsResp)
+
+	@handler GetGOMAXPROCSConfig
+	get /cpu/maxprocs (GetGOMAXPROCSReq) returns (GOMAXPROCSConfig)
+
+	@handler UpdateGOMAXPROCSConfig
+	put /cpu/maxprocs (GOMAXPROCSConfig) returns (GOMAXPROCSConfig)
+}

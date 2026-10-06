@@ -1,0 +1,201 @@
+syntax = "v1"
+
+// 画像领域类型（与 profile.proto 对齐）
+type (
+	// 用户画像（三层 + 时间画像）
+	UserProfile {
+		UserId     string            `json:"user_id"`
+		Static     StaticProfile     `json:"static,optional"`
+		Dynamic    DynamicProfile    `json:"dynamic,optional"`
+		Behavior   BehaviorProfile   `json:"behavior,optional"`
+		Temporal   TemporalProfile   `json:"temporal,optional"`
+		UpdateTime int64             `json:"update_time"`
+		ExtInfo    map[string]string `json:"ext_info,optional"`
+	}
+
+	// 静态画像（注册/onboarding）
+	StaticProfile {
+		Username                        string   `json:"username"`
+		Interests                       []string `json:"interests"`
+		PrimaryPurpose                  string   `json:"primary_purpose"`
+		PreferredArticleTypes           []string `json:"preferred_article_types"`
+		PreferredArticleLength          string   `json:"preferred_article_length"`
+		PreferredStyle                  string   `json:"preferred_style"`
+		Backgrounds                     []string `json:"backgrounds"`
+		DifficultyPreference            string   `json:"difficulty_preference"`
+		ExcludedContents                []string `json:"excluded_contents"`
+		ReadingTimeSlots                []string `json:"reading_time_slots"`
+		PersonalizedRecommendationTypes []string `json:"personalized_recommendation_types"`
+		OnboardedAt                     int64    `json:"onboarded_at"`
+		ExtInfo                         map[string]string `json:"ext_info,optional"`
+	}
+
+	// 动态画像（偏好演化）
+	DynamicProfile {
+		CurrentTags   []string `json:"current_tags"`
+		CurrentTopics []string `json:"current_topics"`
+		Tier          string   `json:"tier"`
+		LongTermTags  []string `json:"long_term_tags"`
+		ShortTermTags []string `json:"short_term_tags"`
+		ExtInfo       map[string]string `json:"ext_info,optional"`
+	}
+
+	// 行为画像（事件统计）
+	BehaviorProfile {
+		TotalClicks       int32            `json:"total_clicks"`
+		TotalLikes        int32            `json:"total_likes"`
+		TotalDislikes     int32            `json:"total_dislikes"`
+		TotalFavorites    int32            `json:"total_favorites"`
+		TotalReadComplete int32            `json:"total_read_complete"`
+		TotalSearches     int32            `json:"total_searches"`
+		TagClicks         map[string]int32 `json:"tag_clicks"`
+		AuthorFollows     map[string]int32 `json:"author_follows"`
+		LastActiveTime    int64            `json:"last_active_time"`
+		ExtInfo           map[string]string `json:"ext_info,optional"`
+	}
+
+	// 时间画像（长期/短期/会话/周期/趋势 + 衰减 + 淘汰）
+	TemporalProfile {
+		LongTerm        LongTermInterests  `json:"long_term,optional"`
+		ShortTerm       ShortTermInterests `json:"short_term,optional"`
+		Session         []InterestEntry    `json:"session"`
+		Periodic        PeriodicPattern    `json:"periodic,optional"`
+		Trending        TrendingInterests  `json:"trending,optional"`
+		DecayState      DecayState         `json:"decay_state,optional"`
+		EliminationPool EliminationPool    `json:"elimination_pool,optional"`
+		ExtInfo         map[string]string  `json:"ext_info,optional"`
+	}
+
+	// 兴趣条目
+	InterestEntry {
+		Tag              string  `json:"tag"`
+		Weight           float64 `json:"weight"`
+		Strength         float64 `json:"strength"`
+		LastReinforcedAt int64   `json:"last_reinforced_at"`
+		DecayTau         float64 `json:"decay_tau"`
+		Archived         bool    `json:"archived"`
+		ExtInfo          map[string]string `json:"ext_info,optional"`
+	}
+
+	// 兴趣条目列表（map value 包装）
+	InterestEntryList {
+		Entries []InterestEntry `json:"entries"`
+	}
+
+	// 长期兴趣
+	LongTermInterests {
+		Entries    []InterestEntry `json:"entries"`
+		ComputedAt int64           `json:"computed_at"`
+	}
+
+	// 短期兴趣
+	ShortTermInterests {
+		Entries     []InterestEntry `json:"entries"`
+		WindowStart int64           `json:"window_start"`
+		WindowEnd   int64           `json:"window_end"`
+	}
+
+	// 周期模式
+	PeriodicPattern {
+		SlotTags    map[string]InterestEntryList `json:"slot_tags"`
+		Granularity string                       `json:"granularity"`
+		ComputedAt  int64                        `json:"computed_at"`
+	}
+
+	// 趋势兴趣
+	TrendingInterests {
+		Entries    []TrendingEntry `json:"entries"`
+		DetectedAt int64           `json:"detected_at"`
+	}
+
+	// 趋势条目
+	TrendingEntry {
+		Tag          string  `json:"tag"`
+		CurrentRate  float64 `json:"current_rate"`
+		BaselineRate float64 `json:"baseline_rate"`
+		ZScore       float64 `json:"z_score"`
+		IsTrending   bool    `json:"is_trending"`
+	}
+
+	// 衰减状态
+	DecayState {
+		GlobalDecayTau float64           `json:"global_decay_tau"`
+		EbbinghausS    float64           `json:"ebbinghaus_s"`
+		LastTickAt     int64             `json:"last_tick_at"`
+		PerTagTau      map[string]float64 `json:"per_tag_tau"`
+	}
+
+	// 淘汰池
+	EliminationPool {
+		ArchivedTags     []string         `json:"archived_tags"`
+		ReviveCandidates []ReviveCandidate `json:"revive_candidates"`
+		LastTickAt       int64            `json:"last_tick_at"`
+	}
+
+	// 复活候选
+	ReviveCandidate {
+		Tag           string  `json:"tag"`
+		ArchivedScore float64 `json:"archived_score"`
+		ArchivedAt    int64   `json:"archived_at"`
+	}
+)
+
+// 画像网关请求/响应类型
+type (
+	// 用户前台查自己画像
+	GetMyProfileReq {
+		IncludeTemporal bool `form:"include_temporal,optional"`
+	}
+
+	// 管理员查指定用户画像
+	GetProfileReq {
+		UserId          string `path:"user_id"`
+		IncludeTemporal bool   `form:"include_temporal,optional"`
+	}
+
+	// 画像响应
+	GetProfileResp {
+		Profile UserProfile `json:"profile"`
+	}
+
+	// 画像调优请求（管理员调参）
+	ProfileTuningReq {
+		UserId           string           `json:"user_id"`
+		DecayState       DecayState       `json:"decay_state,optional"`
+		ForceReviveTags  []string         `json:"force_revive_tags"`
+		ForceArchiveTags []string         `json:"force_archive_tags"`
+		Override         TemporalProfile  `json:"override,optional"`
+		ExtInfo          map[string]string `json:"ext_info,optional"`
+	}
+
+	// 画像调优响应
+	ProfileTuningResp {
+		Profile  UserProfile `json:"profile"`
+		Success  bool        `json:"success"`
+		ErrMsg   string      `json:"err_msg"`
+	}
+)
+
+// 用户前台（无 jwt，self 画像）
+@server (
+	prefix: api/v1/v2/reco
+	group:  profile
+)
+service profile-api {
+	@handler GetMyProfile
+	get /profile/me (GetMyProfileReq) returns (GetProfileResp)
+}
+
+// 管理员后台（jwt 鉴权）
+@server (
+	prefix: api/v1/v2/admin
+	group:  profile-admin
+	jwt:    Auth
+)
+service profile-api {
+	@handler GetProfile
+	get /profile/:user_id (GetProfileReq) returns (GetProfileResp)
+
+	@handler TuneProfile
+	post /profile/tune (ProfileTuningReq) returns (ProfileTuningResp)
+}

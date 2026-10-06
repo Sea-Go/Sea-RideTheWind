@@ -1,0 +1,109 @@
+syntax = "v1"
+
+type (
+	// CF 算法类型枚举（0=UNSPECIFIED 1=USER_CF 2=ITEM_CF 3=MF_ALS）
+
+	// CF 分数
+	CFScore {
+		ArticleId   string            `json:"article_id"`
+		UserCfScore float64           `json:"user_cf_score"`
+		ItemCfScore float64           `json:"item_cf_score"`
+		MfScore     float64           `json:"mf_score"`
+		FusedScore  float64           `json:"fused_score"`
+		Source      string            `json:"source"`
+		ExtInfo     map[string]string `json:"ext_info"`
+	}
+
+	// CF 配置（User-CF/Item-CF/MF 三算法融合）
+	CFConfig {
+		Algo               int32             `json:"algo"`
+		Weights            map[int32]float64 `json:"weights"`
+		TopNSimilar        int32             `json:"top_n_similar"`
+		MfFactors          int32             `json:"mf_factors"`
+		RefreshIntervalSec int32             `json:"refresh_interval_sec"`
+		OnlineUpdate       bool              `json:"online_update"`
+		ExtInfo            map[string]string `json:"ext_info"`
+	}
+
+	// 冷启动配置
+	ColdStartConfig {
+		UseProfileRecall     bool              `json:"use_profile_recall"`
+		UseHotFallback       bool              `json:"use_hot_fallback"`
+		UseContentCfTransfer bool              `json:"use_content_cf_transfer"`
+		HotTopK              int32             `json:"hot_top_k"`
+		ExtInfo              map[string]string `json:"ext_info"`
+	}
+
+	// CF 配置响应
+	CFConfigResp {
+		Config    CFConfig        `json:"config"`
+		ColdStart ColdStartConfig `json:"cold_start"`
+		Success   bool            `json:"success"`
+	}
+
+	// 更新 CF 配置请求
+	UpdateCFConfigReq {
+		Config    CFConfig        `json:"config,optional"`
+		ColdStart ColdStartConfig `json:"cold_start,optional"`
+	}
+
+	// 获取 CF 配置请求
+	GetCFConfigReq {}
+
+	// 相似用户
+	SimilarUser {
+		UserId         string   `json:"user_id"`
+		Similarity     float64  `json:"similarity"`
+		SharedArticles []string `json:"shared_articles"`
+	}
+
+	// 相似用户查询请求
+	CFSimilarUsersReq {
+		UserId string `json:"user_id"`
+		TopN   int32  `json:"top_n"`
+		Algo   int32  `json:"algo"`
+	}
+
+	// 相似用户查询响应
+	CFSimilarUsersResp {
+		Users []SimilarUser `json:"users"`
+	}
+
+	// 相似文章
+	SimilarItem {
+		ArticleId    string  `json:"article_id"`
+		Similarity   float64 `json:"similarity"`
+		CoOccurCount int32   `json:"co_occur_count"`
+	}
+
+	// 相似文章查询请求
+	CFSimilarItemsReq {
+		ArticleId string `json:"article_id"`
+		TopN      int32  `json:"top_n"`
+		Algo      int32  `json:"algo"`
+	}
+
+	// 相似文章查询响应
+	CFSimilarItemsResp {
+		Items []SimilarItem `json:"items"`
+	}
+)
+
+@server (
+	prefix: api/v1/v2
+	group:  cf-admin
+	jwt:    Auth
+)
+service cf-api {
+	@handler GetCFConfig
+	get /admin/cf/config (GetCFConfigReq) returns (CFConfigResp)
+
+	@handler UpdateCFConfig
+	put /admin/cf/config (UpdateCFConfigReq) returns (CFConfigResp)
+
+	@handler GetCFSimilarUsers
+	post /admin/cf/similar/users (CFSimilarUsersReq) returns (CFSimilarUsersResp)
+
+	@handler GetCFSimilarItems
+	post /admin/cf/similar/items (CFSimilarItemsReq) returns (CFSimilarItemsResp)
+)

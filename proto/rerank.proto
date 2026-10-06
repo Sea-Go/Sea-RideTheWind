@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package rerank;
+option go_package = ".";
+
+// rerank 模型类型（self/external 切换）
+enum RerankModelType {
+  RERANK_MODEL_TYPE_UNSPECIFIED = 0; // 未指定
+  SELF_CROSS_ENCODER = 1;            // 自研 Cross-encoder
+  SELF_TWO_TOWER = 2;                // 自研 Two-tower
+  SELF_LTR_LAMBDAMART = 3;           // 自研 LTR LambdaMART
+  EXTERNAL_DASHSCOPE = 4;            // 外部 DashScope 兜底
+}
+
+// rerank 模型
+message RerankModel {
+  string version = 1;                          // 版本号
+  RerankModelType type = 2;                    // 模型类型
+  string artifact_path = 3;                    // 模型产物路径（ONNX/GGUF）
+  bool enabled = 4;                            // 是否启用
+  double traffic_ratio = 5;                    // 流量占比（A/B 分桶）
+  int64 create_time = 6;                       // 创建时间（毫秒）
+  map<string, string> metrics = 7;             // 离线指标（NDCG@10/CTR 等）
+  map<string, string> ext_info = 8;            // 扩展字段
+}
+
+// rerank 特征（特征工程输出）
+message RerankFeatures {
+  string article_id = 1;                       // 文章ID
+  map<string, double> text_features = 2;       // 文本特征
+  map<string, double> behavior_features = 3;   // 行为特征
+  map<string, double> temporal_features = 4;   // 时间特征
+  map<string, double> quality_features = 5;    // 质量特征
+  map<string, double> profile_features = 6;    // 画像特征
+  map<string, double> diversity_features = 7;  // 多样性特征
+  map<string, string> ext_info = 8;            // 扩展字段
+}
+
+// A/B 测试配置
+message ABTestConfig {
+  string name = 1;                             // 实验名
+  string control_version = 2;                  // 对照组版本
+  string treatment_version = 3;                // 实验组版本
+  double control_ratio = 4;                    // 对照组流量
+  double treatment_ratio = 5;                  // 实验组流量
+  repeated string metrics = 6;                 // 对比指标（CTR/CVR/latency/cost）
+  bool enabled = 7;                            // 是否启用
+  int64 start_time = 8;                        // 开始时间（毫秒）
+  int64 end_time = 9;                          // 结束时间（毫秒）
+  map<string, string> ext_info = 10;           // 扩展字段
+}
+
+// 模型版本切换（self/external 切换 + 降级 + A/B）
+message ModelVersion {
+  string current_version = 1;                  // 当前生效版本
+  RerankModelType current_type = 2;            // 当前类型
+  string fallback_version = 3;                 // 降级版本（self 失败回退 external）
+  RerankModelType fallback_type = 4;           // 降级类型
+  ABTestConfig ab_test = 5;                    // 进行中的 A/B
+  map<string, string> ext_info = 6;            // 扩展字段
+}
+
+// rerank 请求（内部 RPC，inference 服务）
+message RerankRequest {
+  string trace_id = 1;                         // 链路追踪ID
+  string user_id = 2;                          // 用户ID
+  string query = 3;                            // 查询/上下文
+  repeated string article_ids = 4;             // 候选文章ID
+  repeated RerankFeatures features = 5;        // 候选特征
+  string model_version = 6;                    // 指定版本（空则用当前生效）
+  RerankModelType model_type = 7;              // 指定类型
+  int32 top_k = 8;                             // 返回条数
+  map<string, string> ext_info = 9;            // 扩展字段
+}
+
+// rerank 响应
+message RerankResponse {
+  string trace_id = 1;                         // 链路追踪ID
+  repeated string ranked_article_ids = 2;      // 排序后文章ID
+  map<string, double> scores = 3;              // article_id → rerank 分
+  string model_version = 4;                    // 实际使用版本
+  RerankModelType model_type = 5;              // 实际使用类型
+  bool fallback_triggered = 6;                 // 是否触发降级
+  string err_msg = 7;                          // 错误信息
+  map<string, string> ext_info = 8;            // 扩展字段
+}
+
+// 模型列表查询请求
+message ListRerankModelsRequest {
+  optional RerankModelType type = 1;           // 按类型筛选
+  bool enabled_only = 2;                       // 仅返回启用模型
+}
+
+// 模型列表查询响应
+message ListRerankModelsResponse {
+  repeated RerankModel models = 1;             // 模型列表
+  int32 total = 2;                             // 总数
+}
+
+// 获取 A/B 测试配置请求
+message GetABTestConfigRequest {}
+
+// rerank 服务
+service RerankService {
+  rpc Rerank(RerankRequest) returns (RerankResponse);                          // 内部 inference RPC
+  rpc ListModels(ListRerankModelsRequest) returns (ListRerankModelsResponse);  // 模型列表
+  rpc GetABTestConfig(GetABTestConfigRequest) returns (ABTestConfig);          // 获取 A/B 配置
+  rpc UpdateABTestConfig(ABTestConfig) returns (ABTestConfig);                 // 更新 A/B 配置
+  rpc Infer(RerankRequest) returns (RerankResponse);                           // 内部 RPC（调试暴露）
+}

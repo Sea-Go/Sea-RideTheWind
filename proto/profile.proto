@@ -1,0 +1,218 @@
+syntax = "proto3";
+
+package profile;
+option go_package = ".";
+
+// 用户画像三层（静态/动态/行为）+ 时间画像层
+message UserProfile {
+  string user_id = 1;                       // 用户ID
+  StaticProfile static = 2;                 // 静态层（注册信息）
+  DynamicProfile dynamic = 3;               // 动态层（偏好）
+  BehaviorProfile behavior = 4;             // 行为层（事件统计）
+  TemporalProfile temporal = 5;             // 时间画像层
+  int64 update_time = 6;                    // 更新时间（毫秒）
+  map<string, string> ext_info = 7;         // 扩展字段
+}
+
+// 静态画像（注册/onboarding）
+message StaticProfile {
+  string username = 1;                      // 用户名
+  repeated string interests = 2;            // 兴趣
+  string primary_purpose = 3;               // 主要目的
+  repeated string preferred_article_types = 4; // 偏好文章类型
+  string preferred_article_length = 5;      // 偏好长度
+  string preferred_style = 6;               // 偏好风格
+  repeated string backgrounds = 7;          // 背景
+  string difficulty_preference = 8;         // 难度偏好
+  repeated string excluded_contents = 9;    // 排除内容
+  repeated string reading_time_slots = 10;  // 阅读时段
+  repeated string personalized_recommendation_types = 11; // 个性化推荐类型
+  int64 onboarded_at = 12;                  // onboarding 时间（毫秒）
+  map<string, string> ext_info = 13;        // 扩展字段
+}
+
+// 动态画像（偏好演化）
+message DynamicProfile {
+  repeated string current_tags = 1;         // 当前活跃标签
+  repeated string current_topics = 2;       // 当前活跃主题
+  string tier = 3;                          // 用户层级
+  repeated string long_term_tags = 4;       // 长期标签
+  repeated string short_term_tags = 5;      // 短期标签
+  map<string, string> ext_info = 6;         // 扩展字段
+}
+
+// 行为画像（事件统计）
+message BehaviorProfile {
+  int32 total_clicks = 1;                   // 总点击数
+  int32 total_likes = 2;                    // 总点赞数
+  int32 total_dislikes = 3;                 // 总踩数
+  int32 total_favorites = 4;                // 总收藏数
+  int32 total_read_complete = 5;            // 总阅读完成数
+  int32 total_searches = 6;                 // 总搜索数
+  map<string, int32> tag_clicks = 7;        // 标签 → 点击数
+  map<string, int32> author_follows = 8;    // 作者 → 关注数
+  int64 last_active_time = 9;               // 最近活跃时间（毫秒）
+  map<string, string> ext_info = 10;        // 扩展字段
+}
+
+// 时间画像（长期/短期/会话/周期/趋势 + 衰减 + 淘汰）
+message TemporalProfile {
+  LongTermInterests long_term = 1;          // 长期兴趣
+  ShortTermInterests short_term = 2;        // 短期兴趣
+  repeated InterestEntry session = 3;       // 会话兴趣
+  PeriodicPattern periodic = 4;             // 周期模式
+  TrendingInterests trending = 5;           // 趋势兴趣
+  DecayState decay_state = 6;               // 衰减状态
+  EliminationPool elimination_pool = 7;     // 淘汰池
+  map<string, string> ext_info = 8;         // 扩展字段
+}
+
+// 兴趣条目（每兴趣含 Tag/Weight/Strength/LastReinforcedAt/DecayTau/Archived）
+message InterestEntry {
+  string tag = 1;                           // 标签
+  double weight = 2;                        // 权重
+  double strength = 3;                      // 强度 S
+  int64 last_reinforced_at = 4;             // 最近强化时间（毫秒）
+  double decay_tau = 5;                     // 衰减时间常数（秒）
+  bool archived = 6;                        // 是否归档（淘汰池）
+  map<string, string> ext_info = 7;         // 扩展字段
+}
+
+// 兴趣条目列表（map value 不能直接 repeated，需包装）
+message InterestEntryList {
+  repeated InterestEntry entries = 1;       // 兴趣条目
+}
+
+// 长期兴趣
+message LongTermInterests {
+  repeated InterestEntry entries = 1;       // 兴趣条目
+  int64 computed_at = 2;                    // 计算时间（毫秒）
+}
+
+// 短期兴趣
+message ShortTermInterests {
+  repeated InterestEntry entries = 1;       // 兴趣条目
+  int64 window_start = 2;                   // 窗口起（毫秒）
+  int64 window_end = 3;                     // 窗口止（毫秒）
+}
+
+// 周期模式（按时间槽位）
+message PeriodicPattern {
+  map<string, InterestEntryList> slot_tags = 1; // slot（如 "0-6"/"6-12"）→ 兴趣列表
+  string granularity = 2;                   // 粒度（hour/day/weekday）
+  int64 computed_at = 3;                    // 计算时间（毫秒）
+}
+
+// 趋势兴趣（24h vs 7d 基线，2σ 突增）
+message TrendingInterests {
+  repeated TrendingEntry entries = 1;       // 趋势条目
+  int64 detected_at = 2;                    // 检测时间（毫秒）
+}
+
+// 趋势条目
+message TrendingEntry {
+  string tag = 1;                           // 标签
+  double current_rate = 2;                  // 当前速率
+  double baseline_rate = 3;                 // 基线速率
+  double z_score = 4;                       // 突增 z-score
+  bool is_trending = 5;                     // 是否突增
+}
+
+// 衰减状态
+message DecayState {
+  double global_decay_tau = 1;              // 全局衰减常数
+  double ebbinghaus_s = 2;                  // Ebbinghaus 强度
+  int64 last_tick_at = 3;                   // 最近衰减 tick（毫秒）
+  map<string, double> per_tag_tau = 4;      // 标签级衰减常数
+}
+
+// 淘汰池
+message EliminationPool {
+  repeated string archived_tags = 1;        // 已淘汰标签
+  repeated ReviveCandidate revive_candidates = 2; // 复活候选
+  int64 last_tick_at = 3;                   // 最近 tick（毫秒）
+}
+
+// 复活候选
+message ReviveCandidate {
+  string tag = 1;                           // 标签
+  double archived_score = 2;                // 淘汰时分数
+  int64 archived_at = 3;                    // 淘汰时间（毫秒）
+}
+
+// 画像调优请求（管理员调参）
+message ProfileTuningRequest {
+  string user_id = 1;                       // 用户ID
+  optional DecayState decay_state = 2;      // 调整衰减参数
+  repeated string force_revive_tags = 3;    // 强制复活标签
+  repeated string force_archive_tags = 4;   // 强制淘汰标签
+  optional TemporalProfile override = 5;    // 覆盖时间画像（调试）
+  map<string, string> ext_info = 6;         // 扩展字段
+}
+
+// 画像调优响应
+message ProfileTuningResponse {
+  UserProfile profile = 1;                  // 调优后画像
+  bool success = 2;                         // 是否成功
+  string err_msg = 3;                       // 错误信息
+}
+
+// 获取画像请求
+message GetProfileRequest {
+  string user_id = 1;                       // 用户ID（管理员查他人；用户前台查自己时空）
+  bool include_temporal = 2;                // 是否含时间画像
+}
+
+// 获取画像响应
+message GetProfileResponse {
+  UserProfile profile = 1;                  // 用户画像
+}
+
+// 更新画像请求
+message UpdateProfileRequest {
+  string user_id = 1;                       // 用户ID
+  optional StaticProfile static = 2;        // 静态层
+  optional DynamicProfile dynamic = 3;      // 动态层
+  optional BehaviorProfile behavior = 4;    // 行为层
+  map<string, string> ext_info = 5;         // 扩展字段
+}
+
+// 更新画像响应
+message UpdateProfileResponse {
+  UserProfile profile = 1;                  // 更新后画像
+  bool success = 2;                         // 是否成功
+  string err_msg = 3;                       // 错误信息
+}
+
+// 获取时间画像请求
+message GetTemporalProfileRequest {
+  string user_id = 1;                       // 用户ID
+}
+
+// 获取时间画像响应
+message GetTemporalProfileResponse {
+  TemporalProfile temporal = 1;             // 时间画像
+}
+
+// 更新时间画像请求
+message UpdateTemporalProfileRequest {
+  string user_id = 1;                       // 用户ID
+  optional TemporalProfile temporal = 2;    // 时间画像覆盖
+  map<string, string> ext_info = 3;         // 扩展字段
+}
+
+// 更新时间画像响应
+message UpdateTemporalProfileResponse {
+  TemporalProfile temporal = 1;             // 更新后时间画像
+  bool success = 2;                         // 是否成功
+  string err_msg = 3;                       // 错误信息
+}
+
+// 画像服务
+service ProfileService {
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse);                  // 获取用户画像（前台 self / 管理员 by user_id）
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);         // 更新用户画像
+  rpc TuneProfile(ProfileTuningRequest) returns (ProfileTuningResponse);           // 画像调优（管理员）
+  rpc GetTemporalProfile(GetTemporalProfileRequest) returns (GetTemporalProfileResponse); // 获取时间画像
+  rpc UpdateTemporalProfile(UpdateTemporalProfileRequest) returns (UpdateTemporalProfileResponse); // 更新时间画像
+}

@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package reco;
+option go_package = ".";
+
+// 推荐路径模式（OrchestratorAgent 路由决策依据）
+enum PathMode {
+  PATH_MODE_UNSPECIFIED = 0; // 未指定，由 OrchestratorAgent 自动决策
+  AUTO = 1;                  // 自动：简单→fast / 中等→hybrid / 复杂→slow
+  FAST = 2;                  // 快路径：纯传统推荐，0 LLM token，P99 < 100ms
+  SLOW = 3;                  // 慢路径：多 Agent 全流程，高质量高 token
+  HYBRID = 4;                // 混合：快路径 Top-50 → 慢路径 Rerank Top-20 → Top-10
+}
+
+// 实际走过的路径（响应回填，便于观测与 A/B 对比）
+enum PathTaken {
+  PATH_TAKEN_UNSPECIFIED = 0; // 未指定
+  PATH_TAKEN_FAST = 1;        // 走了快路径
+  PATH_TAKEN_SLOW = 2;        // 走了慢路径
+  PATH_TAKEN_HYBRID = 3;      // 走了混合路径
+}
+
+// 行为事件类型（与前端 reco.ts RecoEventType 对齐）
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0; // 未指定
+  IMPRESSION = 1;             // 曝光
+  CLICK = 2;                  // 点击
+  LIKE = 3;                   // 点赞
+  DISLIKE = 4;                // 不感兴趣
+  FAVORITE = 5;               // 收藏
+  READ_COMPLETE = 6;          // 阅读完成
+}
+
+// 标签过滤（召回阶段硬过滤，配合频道独立池）
+message TagFilter {
+  repeated string include_tags = 1;      // 命中任一即保留（OR）
+  repeated string exclude_tags = 2;      // 命中任一即排除（NOT）
+  optional string manual_type_tag = 3;   // 一级标签精确匹配
+  repeated string secondary_tags = 4;    // 二级标签
+}
+
+// 推荐自定义配置（业务二开 + 模型二开 + A/B 分桶）
+message RecommendConfig {
+  int32 top_k = 1;                        // 返回条数，默认 10
+  string recall_strategy = 2;             // 召回策略组合：content,cf,graph,channel,rule
+  string rerank_model = 3;                // rerank 模型版本：self / external / llm
+  map<string, double> rerank_weights = 4; // rerank 各源权重
+  bool agent_loop_enabled = 5;            // 是否启用 Agent 循环（slow 路径）
+  bool fallback_enabled = 6;              // 召回不足时是否兜底
+  int32 max_tool_calls = 7;               // Agent 最大工具调用次数（WithMaxIterations）
+  bool prompt_cache_enabled = 8;          // Prompt Cache 开关
+  bool summary_enabled = 9;               // Session Summary 开关
+  int32 best_of_n = 10;                   // QualityAgent Best-of-N 次数
+  double quality_threshold = 11;          // 质量阈值过滤
+  bool cf_enabled = 12;                   // 是否启用 CF 召回
+  bool search_enabled = 13;               // 是否启用搜索召回
+  bool temporal_decay_enabled = 14;       // 时间画像衰减开关
+  PathMode path_mode = 15;                // 路径模式
+  string quality_model = 16;              // 质量评判模型版本
+  string prompt_cache_key = 17;           // Prompt Cache 分桶键（频道+用户）
+}
+
+// 成本报告（响应回填，含 token 与缓存命中）
+message CostReport {
+  int64 input_tokens = 1;                   // 输入 token
+  int64 output_tokens = 2;                  // 输出 token
+  int64 cached_tokens = 3;                  // 缓存命中 token
+  double cost_yuan = 4;                     // 估算成本（元）
+  int64 latency_ms = 5;                     // 端到端延迟（毫秒）
+  map<string, int64> per_stage_tokens = 6;  // 分阶段 token（intent/recall/graph/rerank/quality/explain）
+  map<string, int64> per_stage_latency_ms = 7; // 分阶段延迟
+}
+
+// 推荐请求
+message RecommendRequest {
+  string user_id = 1;                    // 用户ID
+  string session_id = 2;                 // 会话ID（Session 隔离）
+  string trace_id = 3;                   // 链路追踪ID（透传 OTel）
+  string surface = 4;                    // 展示场景（dashboard_recommend / channel_xxx）
+  string query = 5;                      // 用户查询/上下文（可空）
+  string channel = 6;                    // 频道名（IP 主题频道，空表示默认流）
+  TagFilter tag_filter = 7;              // 标签过滤
+  RecommendConfig config = 8;            // 自定义配置
+  PathMode path_mode = 9;                // 路径模式（与 config.path_mode 二选一，request 优先）
+  int32 top_k = 10;                      // 返回条数（与 config.top_k 二选一）
+  string period_bucket = 11;             // 时间桶（与前端 reco.ts 对齐，画像时段）
+  bool explain = 12;                     // 是否生成推荐解释
+  bool stream = 13;                      // 是否流式（AG-UI）
+  map<string, string> ext_info = 14;     // 扩展字段
+}
+
+// 推荐响应
+message RecommendResponse {
+  string trace_id = 1;                      // 链路追踪ID
+  string rec_request_id = 2;                // 推荐请求ID
+  string status = 3;                        // 状态（ok / fallback / partial）
+  repeated string article_ids = 4;          // 推荐文章ID列表
+  PathTaken path_taken = 5;                 // 实际路径（fast/slow/hybrid）
+  CostReport cost = 6;                      // 成本报告
+  RecommendConfig config = 7;               // 实际生效配置（含默认值回填）
+  string channel = 8;                       // 命中频道
+  map<string, double> quality_scores = 9;   // article_id → 质量分
+  map<string, double> cf_scores = 10;       // article_id → CF 分
+  map<string, double> rerank_scores = 11;   // article_id → rerank 分
+  string temporal_profile_snapshot = 12;    // 时间画像快照（JSON，调试用）
+  string graph_trace = 13;                  // 图谱查询 trace（Cypher + 结果数 + 耗时，JSON）
+  string explanation = 14;                  // 推荐解释文本
+  string intent_label = 15;                 // 意图标签（slow/hybrid 回填）
+  double intent_complexity = 16;            // 意图复杂度（0~1，驱动路由）
+  string err_msg = 17;                      // 错误信息（status!=ok 时）
+  map<string, string> ext_info = 18;        // 扩展字段
+}
+
+// 频道摘要（用户前台列表用，完整定义见 channel.proto）
+message Channel {
+  string name = 1;                       // 频道名（唯一键，如 travel / game）
+  string display_name = 2;               // 展示名
+  string description = 3;                // 描述
+  string ip_name = 4;                    // 绑定 IP
+  bool enabled = 5;                      // 是否启用
+  map<string, string> ext_info = 6;      // 扩展字段
+}
+
+// 频道列表查询请求（用户前台订阅）
+message ListChannelsRequest {
+  bool enabled_only = 1;                 // 仅返回启用频道（用户前台传 true）
+}
+
+// 频道列表查询响应
+message ListChannelsResponse {
+  repeated Channel channels = 1;         // 频道列表
+  int32 total = 2;                       // 总数
+}
+
+// 行为事件（单条，与前端 reco.ts RecoEventItem 对齐）
+message RecoEvent {
+  string rec_request_id = 1;             // 关联推荐请求ID
+  string user_id = 2;                    // 用户ID
+  string session_id = 3;                 // 会话ID
+  string surface = 4;                    // 展示场景
+  string article_id = 5;                 // 文章ID
+  int32 rank = 6;                        // 排名位次
+  EventType event_type = 7;              // 事件类型
+  map<string, string> metadata = 8;      // 元数据
+  map<string, string> ext_info = 9;      // 扩展字段
+}
+
+// 事件上报请求
+message ReportEventsRequest {
+  repeated RecoEvent events = 1;         // 事件列表（批量上报）
+  map<string, string> ext_info = 2;      // 扩展字段
+}
+
+// 事件上报响应
+message ReportEventsResponse {
+  int32 accepted = 1;                    // 接收条数
+  string err_msg = 2;                    // 错误信息
+  map<string, string> ext_info = 3;      // 扩展字段
+}
+
+// 推荐核心服务定义
+service RecoService {
+  rpc Recommend(RecommendRequest) returns (RecommendResponse);
+  rpc RecommendStream(RecommendRequest) returns (stream RecommendResponse); // AG-UI 流式
+  rpc ListChannels(ListChannelsRequest) returns (ListChannelsResponse);     // 频道列表（用户前台）
+  rpc ReportEvents(ReportEventsRequest) returns (ReportEventsResponse);     // 行为事件上报
+}

@@ -1,0 +1,102 @@
+syntax = "v1"
+
+type (
+	// IP 绑定规则（type_tag + secondary_tags 组合绑定 IP 主题）
+	IPBindingRule {
+		TypeTag       string            `json:"type_tag,optional"`
+		SecondaryTags []string          `json:"secondary_tags,optional"`
+		IpName        string            `json:"ip_name,optional"`
+		Exclusive     bool              `json:"exclusive,optional"`
+		ExtInfo       map[string]string `json:"ext_info,optional"`
+	}
+
+	// 频道配置（独立池 + 质量阈值 + filterKey + rerank 版本 + IP 绑定）
+	ChannelConfig {
+		PoolMinSize        int32            `json:"pool_min_size,optional"`
+		PoolMaxSize        int32            `json:"pool_max_size,optional"`
+		QualityThreshold   float64          `json:"quality_threshold,optional"`
+		FilterKey          string           `json:"filter_key,optional"`
+		RerankModelVersion string           `json:"rerank_model_version,optional"`
+		RerankModelType    string           `json:"rerank_model_type,optional"`
+		IpBinding          *IPBindingRule   `json:"ip_binding,optional"`
+		ExtInfo            map[string]string `json:"ext_info,optional"`
+	}
+
+	// 频道（IP 主题频道）
+	Channel {
+		Name            string            `json:"name"`
+		DisplayName     string            `json:"display_name"`
+		Description     string            `json:"description,optional"`
+		IpName          string            `json:"ip_name,optional"`
+		Config          *ChannelConfig    `json:"config,optional"`
+		PoolCurrentSize int32             `json:"pool_current_size,optional"`
+		Enabled         bool              `json:"enabled"`
+		CreateTime      int64             `json:"create_time,optional"`
+		UpdateTime      int64             `json:"update_time,optional"`
+		ExtInfo         map[string]string `json:"ext_info,optional"`
+	}
+
+	// 注册频道请求（二开点：业务方注册自定义 IP 频道）
+	RegisterChannelReq {
+		Name        string            `json:"name"`
+		DisplayName string            `json:"display_name"`
+		Description string            `json:"description,optional"`
+		IpName      string            `json:"ip_name,optional"`
+		Config      *ChannelConfig    `json:"config,optional"`
+		IpBinding   *IPBindingRule    `json:"ip_binding,optional"`
+		Enabled     bool              `json:"enabled,optional"`
+		ExtInfo     map[string]string `json:"ext_info,optional"`
+	}
+
+	RegisterChannelResp {
+		Name    string `json:"name"`
+		Success bool   `json:"success"`
+	}
+
+	ListChannelsReq {
+		EnabledOnly bool `form:"enabled_only,optional"`
+	}
+
+	ListChannelsResp {
+		Channels []Channel `json:"channels"`
+		Total    int32     `json:"total"`
+	}
+
+	GetChannelReq {
+		Name string `path:"id"`
+	}
+
+	UpdateChannelReq {
+		Name        string         `path:"id"`
+		DisplayName string         `json:"display_name,optional"`
+		Description string         `json:"description,optional"`
+		Config      *ChannelConfig `json:"config,optional"`
+		Enabled     bool           `json:"enabled,optional"`
+	}
+
+	DeleteChannelReq {
+		Name string `path:"id"`
+	}
+)
+
+@server (
+	prefix: /api/v1/v2
+	group:  channel-admin
+	jwt:    Auth
+)
+service channel-api {
+	@handler RegisterChannel
+	post /admin/channels (RegisterChannelReq) returns (RegisterChannelResp)
+
+	@handler ListChannels
+	get /admin/channels (ListChannelsReq) returns (ListChannelsResp)
+
+	@handler GetChannel
+	get /admin/channels/:id (GetChannelReq) returns (Channel)
+
+	@handler UpdateChannel
+	put /admin/channels/:id (UpdateChannelReq) returns (RegisterChannelResp)
+
+	@handler DeleteChannel
+	delete /admin/channels/:id (DeleteChannelReq) returns (RegisterChannelResp)
+}

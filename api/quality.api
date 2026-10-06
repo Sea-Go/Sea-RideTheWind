@@ -1,0 +1,114 @@
+syntax = "v1"
+
+type (
+	// 文章质量 6 维评分（LLM Verifier + Best-of-N）
+	ArticleQuality {
+		ArticleId         string             `json:"article_id"`
+		Authority         float64            `json:"authority"`
+		Depth             float64            `json:"depth"`
+		Freshness         float64            `json:"freshness"`
+		Completeness      float64            `json:"completeness"`
+		Readability       float64            `json:"readability"`
+		Citation          float64            `json:"citation"`
+		Overall           float64            `json:"overall"`
+		Grade             string             `json:"grade"`
+		GradeDistribution map[string]float64 `json:"grade_distribution"`
+		JudgeModel        string             `json:"judge_model"`
+		JudgedAt          int64              `json:"judged_at"`
+		ExtInfo           map[string]string  `json:"ext_info"`
+	}
+
+	// Rubric 维度（accuracy/authority/depth/freshness/completeness/readability/citation）
+	RubricDimension {
+		Name      string            `json:"name"`
+		Score     float64           `json:"score"`
+		Rationale string            `json:"rationale"`
+		Evidence  string            `json:"evidence"`
+		ExtInfo   map[string]string `json:"ext_info"`
+	}
+
+	// 质量报告（含 Rubrics 维度 + 评语）
+	ArticleQualityReport {
+		ArticleId       string             `json:"article_id"`
+		Quality         ArticleQuality     `json:"quality"`
+		Rubrics         []RubricDimension  `json:"rubrics"`
+		Summary         string             `json:"summary"`
+		GroundingResult string             `json:"grounding_result"`
+		CreateTime      int64              `json:"create_time"`
+		ExtInfo         map[string]string  `json:"ext_info"`
+	}
+
+	// 质量评估请求
+	QualityEvaluateReq {
+		ArticleId  string            `json:"article_id"`
+		UseBestOfN bool              `json:"use_best_of_n"`
+		N          int32             `json:"n"`
+		JudgeModel string            `json:"judge_model,optional"`
+		Logprobs   bool              `json:"logprobs"`
+		ExtInfo    map[string]string `json:"ext_info,optional"`
+	}
+
+	// 质量评估响应
+	QualityEvaluateResp {
+		Report  ArticleQualityReport `json:"report"`
+		Success bool                 `json:"success"`
+		ErrMsg  string               `json:"err_msg"`
+	}
+
+	// 批量质量评估请求
+	BatchEvaluateQualityReq {
+		ArticleIds []string          `json:"article_ids"`
+		UseBestOfN bool              `json:"use_best_of_n"`
+		N          int32             `json:"n"`
+		JudgeModel string            `json:"judge_model,optional"`
+		Logprobs   bool              `json:"logprobs"`
+		ExtInfo    map[string]string `json:"ext_info,optional"`
+	}
+
+	// 批量质量评估响应
+	BatchEvaluateQualityResp {
+		Reports []ArticleQualityReport `json:"reports"`
+		Success bool                    `json:"success"`
+		ErrMsg  string                  `json:"err_msg"`
+	}
+
+	// 质量反馈（反馈闭环）
+	QualityFeedback {
+		ArticleId    string            `json:"article_id"`
+		FeedbackType string            `json:"feedback_type"`
+		Reason       string            `json:"reason,optional"`
+		AnnotatorId  string            `json:"annotator_id"`
+		CreateTime   int64             `json:"create_time"`
+		ExtInfo      map[string]string `json:"ext_info,optional"`
+	}
+
+	// 质量反馈响应
+	QualityFeedbackResp {
+		Success bool   `json:"success"`
+		ErrMsg  string `json:"err_msg"`
+	}
+
+	// 获取质量报告请求
+	GetQualityReportReq {
+		ArticleId string `path:"article_id"`
+	}
+)
+
+@server (
+	prefix: api/v1/v2
+	group:  quality-admin
+	jwt:    Auth
+)
+service quality-api {
+	@handler EvaluateQuality
+	post /admin/quality/evaluate (QualityEvaluateReq) returns (QualityEvaluateResp)
+
+	@handler BatchEvaluateQuality
+	post /admin/quality/batch_evaluate (BatchEvaluateQualityReq) returns (BatchEvaluateQualityResp)
+
+	@handler SubmitQualityFeedback
+	post /admin/quality/feedback (QualityFeedback) returns (QualityFeedbackResp)
+
+	@handler GetQualityReport
+	get /admin/quality/report/:article_id (GetQualityReportReq) returns (ArticleQualityReport)
+)
