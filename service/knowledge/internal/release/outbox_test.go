@@ -59,6 +59,30 @@ func TestMemoryStorePendingKeepsInsertOrder(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreDefensiveCopies(t *testing.T) {
+	st := NewMemoryStore()
+	e := eventN(1)
+	if err := st.Append(e); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	want := e.Docs[0].DocKey
+	// Append 之后调用方继续改自己的 Docs 底层数组，不能穿透到已存事件。
+	e.Docs[0].DocKey = "source:00000000-0000-4000-8000-000000000000@drift"
+	pending, err := st.Pending()
+	if err != nil {
+		t.Fatalf("Pending: %v", err)
+	}
+	if got := pending[0].Docs[0].DocKey; got != want {
+		t.Fatalf("调用方切片改动穿透进存储: %q", got)
+	}
+	// Pending 的返回值同样与存储解耦：改动返回事件不影响后续读取/投递。
+	pending[0].Docs[0].RevisionID = "drift"
+	again, _ := st.Pending()
+	if got := again[0].Docs[0].RevisionID; got == "drift" {
+		t.Fatal("Pending 返回值的改动穿透进了存储")
+	}
+}
+
 func TestDispatchAllSuccess(t *testing.T) {
 	st := NewMemoryStore()
 	for i := 1; i <= 3; i++ {

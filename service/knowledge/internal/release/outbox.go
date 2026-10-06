@@ -23,6 +23,15 @@ type MemoryStore struct {
 	sent   map[string]bool
 }
 
+// cloneEvent 深拷贝事件的 Docs 切片:事件是不可变事实,存储与返回都不与
+// 调用方共享底层数组,外部改动无法穿透到已存事件。
+func cloneEvent(e Event) Event {
+	if e.Docs != nil {
+		e.Docs = append([]EventDoc(nil), e.Docs...)
+	}
+	return e
+}
+
 // NewMemoryStore 返回空内存 Outbox。
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
@@ -38,7 +47,7 @@ func (s *MemoryStore) Append(e Event) error {
 	if _, ok := s.events[e.EventID]; ok {
 		return nil
 	}
-	s.events[e.EventID] = e
+	s.events[e.EventID] = cloneEvent(e)
 	s.order = append(s.order, e.EventID)
 	return nil
 }
@@ -50,7 +59,7 @@ func (s *MemoryStore) Pending() ([]Event, error) {
 	pending := make([]Event, 0, len(s.order))
 	for _, id := range s.order {
 		if !s.sent[id] {
-			pending = append(pending, s.events[id])
+			pending = append(pending, cloneEvent(s.events[id]))
 		}
 	}
 	return pending, nil
