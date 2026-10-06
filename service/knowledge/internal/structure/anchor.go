@@ -68,18 +68,25 @@ func Anchor(t *Tree, source []byte, loc Locator) (AnchoredQuote, error) {
 
 // resolveSection walks the heading chain and returns the section's covering
 // span: from the first matched heading's start to just before the next
-// heading with a level no deeper than the last matched one (or +∞).
+// heading with a level no deeper than the last matched one (or +∞). Each
+// step searches only within the span of the previously matched heading, so
+// a deeper heading nested under a sibling section can never satisfy the
+// chain.
 func resolveSection(t *Tree, path []string) (int, int, error) {
 	if len(path) == 0 {
 		return 0, 1 << 62, nil
 	}
 	start, level := 0, 0
+	limit := 1 << 62
 	for wantIdx, want := range path {
 		found := -1
 		for i := range t.Nodes {
 			n := &t.Nodes[i]
 			if n.Level == LevelParagraph || n.CharStart < start {
 				continue
+			}
+			if n.CharStart >= limit {
+				break
 			}
 			if n.Title != want || n.Level <= level {
 				continue
@@ -93,9 +100,9 @@ func resolveSection(t *Tree, path []string) (int, int, error) {
 		matched := t.Nodes[found]
 		start = matched.CharStart
 		level = matched.Level
-		_ = wantIdx
+		limit = sectionEnd(t, start, level)
 	}
-	return start, sectionEnd(t, start, level), nil
+	return start, limit, nil
 }
 
 // sectionEnd returns the start of the next heading with level <= level after

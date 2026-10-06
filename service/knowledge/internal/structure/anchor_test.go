@@ -70,6 +70,36 @@ func TestAnchorSectionPathResolution(t *testing.T) {
 	}
 }
 
+func TestAnchorSectionPathBoundedToParentSection(t *testing.T) {
+	src := []byte("# A\n\npara under A.\n\n## B\n\npara under B.\n\n## C\n\n### D\n\npara under D.\n")
+	tree, err := Derive("rev-sibling", src)
+	if err != nil {
+		t.Fatalf("Derive: %v", err)
+	}
+	// "para under D" is global para 2, nested under ## C > ### D. The chain
+	// B > D must fail even though both titles exist: D lives in a sibling
+	// subtree, not inside B's span.
+	if _, err := Anchor(tree, src, Locator{
+		SectionPath: []string{"B", "D"},
+		ParaIndex:   2,
+		Quote:       "para under D",
+	}); err == nil {
+		t.Fatal("expected error: D is nested under C, not under B")
+	}
+	// The honest chain resolves the same paragraph.
+	aq, err := Anchor(tree, src, Locator{
+		SectionPath: []string{"C", "D"},
+		ParaIndex:   2,
+		Quote:       "para under D",
+	})
+	if err != nil {
+		t.Fatalf("Anchor: %v", err)
+	}
+	if got := string(src[aq.CharStart:aq.CharEnd]); got != "para under D" {
+		t.Fatalf("anchored text = %q", got)
+	}
+}
+
 func TestAnchorRejectsQuoteOutsideParagraph(t *testing.T) {
 	tree, src := anchorFixture(t)
 	// "导言" is para 0's text; anchoring it as para 1 must fail.
