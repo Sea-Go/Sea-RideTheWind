@@ -137,15 +137,13 @@ func (s *Service) Freeze(ctx context.Context, fr FrozenRevision) (string, error)
 }
 
 // ensureRevision closes the crash window where a tree was stored but the
-// revision was not: replays re-Save the revision, which is idempotent.
+// revision was not: replays re-Save the revision, which is idempotent for
+// identical records and reports ErrConflict when the envelope (ModuleID or
+// DocKey) drifted — the tree alone cannot detect that, because Derive only
+// reads RevisionID and Source.
 func (s *Service) ensureRevision(ctx context.Context, fr FrozenRevision) error {
-	if _, err := s.revisions.Load(ctx, fr.RevisionID); errors.Is(err, ErrNotFound) {
-		if err := s.revisions.Save(ctx, fr); err != nil {
-			return fmt.Errorf("freeze: save revision %s: %w", fr.RevisionID, err)
-		}
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("freeze: load revision %s: %w", fr.RevisionID, err)
+	if err := s.revisions.Save(ctx, fr); err != nil {
+		return fmt.Errorf("freeze: save revision %s: %w", fr.RevisionID, err)
 	}
 	return nil
 }
@@ -211,8 +209,9 @@ func (s *Service) Release(ctx context.Context, moduleID, releaseID string, docs 
 
 // Accept verifies a citation request against the frozen revision revID:
 // the canonical tree is loaded and re-parsed, the source bytes are loaded
-// from the revision store and re-hashed, and citation.Accept does the C-4
-// quote-hit validation. The receipt's TreeSHA is checked against the stored
+// from the revision store and re-hashed, each citation's DocKey is checked
+// against the frozen revision's own DocKey, and citation.Accept does the
+// C-4 quote-hit validation. The receipt's TreeSHA is checked against the stored
 // treeSHA — the two canonical encoders must agree forever, and a drift is a
 // hard error, not a warning.
 func (s *Service) Accept(ctx context.Context, req citation.AcceptRequest, revID string) (citation.Receipt, error) {
@@ -236,6 +235,15 @@ func (s *Service) Accept(ctx context.Context, req citation.AcceptRequest, revID 
 	}
 	if sha256Hex(fr.Source) != fr.ContentSHA256 {
 		return citation.Receipt{}, fmt.Errorf("freeze: source bytes of revision %s no longer match their content sha", revID)
+	}
+
+	for i, c := range req.Citations {
+		if c.DocKey != fr.DocKey {
+			return citation.Receipt{}, fmt.Errorf(
+				"freeze: citation %d doc key %q does not match frozen document %q",
+				i+1, c.DocKey, fr.DocKey,
+			)
+		}
 	}
 
 	receipt, err := citation.Accept(tree, fr.Source, req)
