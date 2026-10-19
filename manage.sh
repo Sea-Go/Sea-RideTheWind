@@ -37,7 +37,8 @@ export CONTAINER_PREFIX
 NODE_ROLE="${NODE_ROLE:-app}"
 
 # 服务器公网 IP（用于对外访问；单机部署时容器内部依赖建议走 DOCKER_NETWORK）
-INFRA_HOST="${INFRA_HOST:-141.11.46.61}"
+# 不再内置默认地址：export INFRA_HOST=... 后执行，app 命令会校验非空
+INFRA_HOST="${INFRA_HOST:-}"
 
 # 如果你想手工覆盖下面这些地址，可以直接修改这里，或 export 后再执行脚本
 ETCD_ADDR="${ETCD_ADDR:-${INFRA_HOST}:32379}"
