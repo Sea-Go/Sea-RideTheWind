@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "path": "service/knowledge/api/internal/handler/product_v2",
+      "package": "product_v2",
+      "reason": "SubjectRef v2 受控双通道签发（v1/v2 并行，默认流量仍 v1）",
+      "converge_event": "默认读版本切换至 v2 且 v1 通道下线后，并入 product/ 并删除本条"
+    },
+    {
+      "path": "service/knowledge/api/internal/logic/product_v2",
+      "package": "product_v2",
+      "reason": "SubjectRef v2 受控双通道签发（v1/v2 并行，默认流量仍 v1）",
+      "converge_event": "默认读版本切换至 v2 且 v1 通道下线后，并入 product/ 并删除本条"
+    }
+  ]
+}
