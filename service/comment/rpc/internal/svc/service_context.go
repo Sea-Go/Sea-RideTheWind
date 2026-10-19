@@ -1,12 +1,12 @@
 package svc
 
 import (
-	cache2 "sea-try-go/service/comment/rpc/internal/cache"
-	"sea-try-go/service/comment/rpc/internal/config"
-	model2 "sea-try-go/service/comment/rpc/internal/model"
-	"sea-try-go/service/comment/rpc/internal/utils"
-	"sea-try-go/service/article/rpc/articleservice"
-	"sea-try-go/service/message/rpc/messageservice"
+	cache2 "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/cache"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/config"
+	model2 "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/utils"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/messageservice"
 
 	"github.com/zeromicro/go-queue/kq"
 	"github.com/zeromicro/go-zero/zrpc"

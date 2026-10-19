@@ -8,14 +8,14 @@ import (
 	"sync"
 	"time"
 
-	"sea-try-go/service/article/rpc/articleservice"
-	articlepb "sea-try-go/service/article/rpc/pb"
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/hot/api/internal/metrics"
-	"sea-try-go/service/hot/api/internal/svc"
-	"sea-try-go/service/hot/api/internal/types"
-	hotcommon "sea-try-go/service/hot/common"
-	hotpb "sea-try-go/service/hot/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
+	articlepb "github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/api/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/api/internal/types"
+	hotcommon "github.com/Sea-Go/Sea-RideTheWind/service/hot/common"
+	hotpb "github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

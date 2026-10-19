@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"sea-try-go/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"

@@ -3,8 +3,8 @@ package sink
 import (
 	"context"
 	"encoding/json"
-	"sea-try-go/service/common/observability"
-	"sea-try-go/service/task/rpc/internal/reward"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/reward"
 	"strconv"
 	"sync"
 	"time"

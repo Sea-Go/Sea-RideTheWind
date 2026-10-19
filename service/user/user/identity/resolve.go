@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

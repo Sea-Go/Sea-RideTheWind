@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"sea-try-go/service/hot/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/internal/config"
 )
 
 func InitMetrics(cfg *config.Config) {

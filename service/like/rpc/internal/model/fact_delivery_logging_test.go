@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"sea-try-go/service/common/communityfact"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/communityfact"
 )
 
 type likeLogSender struct{}

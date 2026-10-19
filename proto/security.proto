@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package security;
 
-option go_package = "sea-try-go/service/security/rpc/pb";
+option go_package = "github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/pb";
 
 // 可观测性上下文 - 用于端到端链路追踪
 message ObservabilityContext {

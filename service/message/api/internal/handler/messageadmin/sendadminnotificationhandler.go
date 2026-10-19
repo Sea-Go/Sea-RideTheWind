@@ -7,9 +7,9 @@ import (
 	"net/http"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
-	"sea-try-go/service/message/api/internal/logic/messageadmin"
-	"sea-try-go/service/message/api/internal/svc"
-	"sea-try-go/service/message/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/logic/messageadmin"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/types"
 )
 
 func SendAdminNotificationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

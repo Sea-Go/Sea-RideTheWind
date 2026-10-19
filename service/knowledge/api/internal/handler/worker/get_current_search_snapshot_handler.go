@@ -6,12 +6,12 @@ package worker
 import (
 	"fmt"
 	"net/http"
-	"sea-try-go/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
-	"sea-try-go/service/knowledge/api/internal/logic/worker"
-	"sea-try-go/service/knowledge/api/internal/svc"
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/logic/worker"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 )
 
 func GetCurrentSearchSnapshotHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

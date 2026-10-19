@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 
-	"sea-try-go/service/article/common/errmsg"
-	"sea-try-go/service/article/rpc/internal/model"
-	"sea-try-go/service/article/rpc/internal/svc"
-	"sea-try-go/service/article/rpc/metrics"
-	"sea-try-go/service/article/rpc/pb"
-	"sea-try-go/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/prometheus/client_golang/prometheus"

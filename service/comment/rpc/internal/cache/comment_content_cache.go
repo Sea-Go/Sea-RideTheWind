@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sea-try-go/service/comment/rpc/internal/metrics"
-	model2 "sea-try-go/service/comment/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/metrics"
+	model2 "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/model"
 	"time"
 )
 

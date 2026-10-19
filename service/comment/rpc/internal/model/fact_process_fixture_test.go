@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	kqtypes "sea-try-go/service/comment/rpc/common/types"
-	"sea-try-go/service/common/communityfact"
+	kqtypes "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/common/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/communityfact"
 )
 
 // TestCommentFactProcessFixture holds a real RTW database open while the

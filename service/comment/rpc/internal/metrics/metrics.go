@@ -3,7 +3,7 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"sea-try-go/service/comment/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/config"
 )
 
 var (

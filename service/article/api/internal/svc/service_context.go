@@ -5,10 +5,10 @@ package svc
 
 import (
 	"github.com/zeromicro/go-zero/zrpc"
-	"sea-try-go/service/article/api/internal/config"
-	"sea-try-go/service/article/rpc/articleservice"
-	"sea-try-go/service/security/rpc/client/imagesecurityservice"
-	"sea-try-go/service/user/user/rpc/userservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/client/imagesecurityservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/userservice"
 )
 
 type ServiceContext struct {

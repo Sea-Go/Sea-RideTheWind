@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	imagesecurityservicelogic "sea-try-go/service/security/rpc/internal/logic/imagesecurityservice"
-	"sea-try-go/service/security/rpc/internal/svc"
-	"sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
+	imagesecurityservicelogic "github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/logic/imagesecurityservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/pb"
 )
 
 type ImageSecurityServiceServer struct {

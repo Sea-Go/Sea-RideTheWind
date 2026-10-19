@@ -2,14 +2,14 @@ package main
 
 import (
 	"flag"
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/common/observability"
-	"sea-try-go/service/points/rpc/internal/config"
-	"sea-try-go/service/points/rpc/internal/metrics"
-	"sea-try-go/service/points/rpc/internal/mqs"
-	"sea-try-go/service/points/rpc/internal/server"
-	"sea-try-go/service/points/rpc/internal/svc"
-	__ "sea-try-go/service/points/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/mqs"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/server"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/svc"
+	__ "github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/pb"
 
 	"github.com/zeromicro/go-queue/kq"
 	"github.com/zeromicro/go-zero/core/conf"

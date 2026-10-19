@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"sea-try-go/service/common/snowflake"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
 	"strings"
 	"testing"
 	"time"
@@ -146,7 +146,7 @@ func TestGetFuncName(t *testing.T) {
 		t.Fatal("runtime.Caller failed")
 	}
 	funcName := getFuncName(pc)
-	expected := "sea-try-go/service/common/logger.TestGetFuncName"
+	expected := "github.com/Sea-Go/Sea-RideTheWind/service/common/logger.TestGetFuncName"
 	if funcName != expected {
 		t.Errorf("getFuncName failed, expected '%s', got '%s'", expected, funcName)
 	}

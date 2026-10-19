@@ -7,7 +7,7 @@ import (
 	"mime"
 	"net/http"
 
-	"sea-try-go/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
 )
 
 func decodeToolJSON(w http.ResponseWriter, r *http.Request, body any) error {

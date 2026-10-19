@@ -1,7 +1,7 @@
 package config
 
 import (
-	"sea-try-go/service/hot/heavykeeper"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/heavykeeper"
 
 	"github.com/zeromicro/go-queue/kq"
 	"github.com/zeromicro/go-zero/zrpc"

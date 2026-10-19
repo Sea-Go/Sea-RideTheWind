@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"sea-try-go/service/article/api/internal/svc"
-	"sea-try-go/service/article/api/internal/types"
-	"sea-try-go/service/article/common/errmsg"
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/user/user/rpc/userservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/userservice"
 )
 
 func extractCurrentUserID(ctx context.Context) (string, int) {

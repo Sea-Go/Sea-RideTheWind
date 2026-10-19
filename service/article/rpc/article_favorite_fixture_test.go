@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"sea-try-go/service/article/rpc/internal/model"
-	"sea-try-go/service/article/rpc/internal/server"
-	"sea-try-go/service/article/rpc/internal/svc"
-	articlepb "sea-try-go/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/server"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/svc"
+	articlepb "github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

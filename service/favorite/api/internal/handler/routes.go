@@ -6,8 +6,8 @@ package handler
 import (
 	"net/http"
 
-	favorite "sea-try-go/service/favorite/api/internal/handler/favorite"
-	"sea-try-go/service/favorite/api/internal/svc"
+	favorite "github.com/Sea-Go/Sea-RideTheWind/service/favorite/api/internal/handler/favorite"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
 )

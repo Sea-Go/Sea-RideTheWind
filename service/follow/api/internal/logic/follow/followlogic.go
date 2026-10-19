@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/follow/api/internal/metrics"
-	"sea-try-go/service/follow/api/internal/svc"
-	"sea-try-go/service/follow/api/internal/types"
-	followcommon "sea-try-go/service/follow/common"
-	"sea-try-go/service/follow/rpc/followservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/api/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/api/internal/types"
+	followcommon "github.com/Sea-Go/Sea-RideTheWind/service/follow/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/rpc/followservice"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

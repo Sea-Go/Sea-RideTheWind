@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"sea-try-go/service/article/rpc/internal/model"
-	pb "sea-try-go/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/model"
+	pb "github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
 )
 
 const (

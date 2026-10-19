@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	article "sea-try-go/service/article/api/internal/handler/article"
-	"sea-try-go/service/article/api/internal/svc"
+	article "github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/handler/article"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
 )

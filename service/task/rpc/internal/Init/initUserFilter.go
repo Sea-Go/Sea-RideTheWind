@@ -3,8 +3,8 @@ package Init
 import (
 	"context"
 	"log"
-	"sea-try-go/service/task/rpc/internal/sink"
-	"sea-try-go/service/task/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/sink"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/svc"
 
 	"github.com/zeromicro/go-queue/kq"
 	"github.com/zeromicro/go-zero/core/proc"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 )
 
 // DetectSearchScopeVersions checks the active relation catalog against a

@@ -4,8 +4,8 @@
 package svc
 
 import (
-	"sea-try-go/service/like/api/internal/config"
-	"sea-try-go/service/like/rpc/likeservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/api/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/likeservice"
 
 	"github.com/zeromicro/go-zero/zrpc"
 )

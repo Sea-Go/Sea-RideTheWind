@@ -3,9 +3,9 @@ package logic
 import (
 	"context"
 
-	"sea-try-go/service/article/rpc/internal/model"
-	"sea-try-go/service/article/rpc/internal/svc"
-	"sea-try-go/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel"

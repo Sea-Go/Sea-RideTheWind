@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	workerhandler "sea-try-go/service/knowledge/api/internal/handler/worker"
-	"sea-try-go/service/knowledge/api/internal/middleware"
-	"sea-try-go/service/knowledge/api/internal/model"
-	"sea-try-go/service/knowledge/api/internal/object"
-	"sea-try-go/service/knowledge/api/internal/svc"
-	"sea-try-go/service/knowledge/api/internal/types"
+	workerhandler "github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/handler/worker"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/middleware"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 
 	jsoncanonicalizer "github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 )

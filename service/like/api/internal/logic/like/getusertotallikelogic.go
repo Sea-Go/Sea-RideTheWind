@@ -8,12 +8,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/like/api/internal/metrics"
-	"sea-try-go/service/like/api/internal/svc"
-	"sea-try-go/service/like/api/internal/types"
-	"sea-try-go/service/like/common/errmsg"
-	"sea-try-go/service/like/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/api/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/status"

@@ -7,11 +7,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sea-try-go/service/common/cryptx"
-	"sea-try-go/service/common/snowflake"
-	"sea-try-go/service/user/rpc/internal/config"
-	"sea-try-go/service/user/rpc/internal/model"
-	"sea-try-go/service/user/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/cryptx"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/internal/svc"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -36,12 +36,12 @@ func (TestUser) TableName() string {
 	return "users"
 }
 
-// 测试数据库配置
+// 测试数据库配置（密码从环境读取，见 .env.example / docker-compose）
 const (
 	testDBHost     = "127.0.0.1"
 	testDBPort     = "35432"
 	testDBUser     = "admin"
-	testDBPassword = "Sea-TryGo"
+	testDBPassword = "change-me"
 	testDBName     = "test_db"
 )
 

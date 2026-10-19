@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"time"
 
-	"sea-try-go/service/knowledge/api/internal/telemetry"
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/telemetry"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

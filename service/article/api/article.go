@@ -7,12 +7,12 @@ import (
 	"flag"
 	"fmt"
 	"github.com/zeromicro/go-zero/core/logx"
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/common/observability"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
 
-	"sea-try-go/service/article/api/internal/config"
-	"sea-try-go/service/article/api/internal/handler"
-	"sea-try-go/service/article/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/handler"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"

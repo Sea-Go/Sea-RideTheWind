@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
-	"sea-try-go/service/favorite/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/config"
 )
 
 var (

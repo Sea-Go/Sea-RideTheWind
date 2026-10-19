@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"sea-try-go/service/knowledge/internal/structure"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/structure"
 )
 
 // docKeyPattern matches source:<uuid>@<rev>, page:<uuid>@<rev> and

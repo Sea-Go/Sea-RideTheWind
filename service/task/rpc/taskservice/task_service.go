@@ -7,7 +7,7 @@ package taskservice
 import (
 	"context"
 
-	"sea-try-go/service/task/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

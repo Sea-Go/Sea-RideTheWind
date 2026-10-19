@@ -5,12 +5,12 @@ import (
 	"flag"
 	"time"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/like/common/errmsg"
-	"sea-try-go/service/like/rpc/internal/model"
-	"sea-try-go/service/like/rpc/internal/mq/internal/config"
-	"sea-try-go/service/like/rpc/internal/mq/internal/mqs"
-	"sea-try-go/service/like/rpc/internal/mq/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/mq/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/mq/internal/mqs"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/mq/internal/svc"
 
 	"github.com/zeromicro/go-queue/kq"
 	"github.com/zeromicro/go-zero/core/conf"

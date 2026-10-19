@@ -7,7 +7,7 @@ package adminservice
 import (
 	"context"
 
-	"sea-try-go/service/user/admin/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

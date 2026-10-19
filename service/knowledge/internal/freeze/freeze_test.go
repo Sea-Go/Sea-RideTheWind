@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"sea-try-go/service/knowledge/internal/citation"
-	"sea-try-go/service/knowledge/internal/release"
-	"sea-try-go/service/knowledge/internal/structure"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/citation"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/release"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/structure"
 )
 
 func mkFrozen(module, revID, docKey, source string) FrozenRevision {

@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	contentsecurityservicelogic "sea-try-go/service/security/rpc/internal/logic/contentsecurityservice"
-	"sea-try-go/service/security/rpc/internal/svc"
-	"sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
+	contentsecurityservicelogic "github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/logic/contentsecurityservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/pb"
 )
 
 type ContentSecurityServiceServer struct {

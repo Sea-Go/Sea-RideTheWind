@@ -5,10 +5,10 @@ package user
 
 import (
 	"net/http"
-	"sea-try-go/service/common/response"
-	"sea-try-go/service/user/common/errmsg"
-	"sea-try-go/service/user/user/api/internal/logic/user"
-	"sea-try-go/service/user/user/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/response"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/logic/user"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 )

@@ -3,11 +3,11 @@ package favorite
 import (
 	"net/http"
 
-	"sea-try-go/service/common/response"
-	"sea-try-go/service/favorite/api/internal/logic/favorite"
-	"sea-try-go/service/favorite/api/internal/svc"
-	"sea-try-go/service/favorite/api/internal/types"
-	favoritecommon "sea-try-go/service/favorite/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/response"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/api/internal/logic/favorite"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/api/internal/types"
+	favoritecommon "github.com/Sea-Go/Sea-RideTheWind/service/favorite/common"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 )

@@ -7,12 +7,12 @@ import (
 	"context"
 	"encoding/json"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/user/admin/api/internal/metrics"
-	"sea-try-go/service/user/admin/api/internal/svc"
-	"sea-try-go/service/user/admin/api/internal/types"
-	"sea-try-go/service/user/admin/rpc/pb"
-	"sea-try-go/service/user/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/api/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/common/errmsg"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"

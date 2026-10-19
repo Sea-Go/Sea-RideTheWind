@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"sea-try-go/service/points/rpc/internal/metrics"
-	"sea-try-go/service/points/rpc/internal/svc"
-	pb "sea-try-go/service/points/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/svc"
+	pb "github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

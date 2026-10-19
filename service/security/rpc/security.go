@@ -4,12 +4,12 @@ import (
 	"context"
 	"flag"
 
-	"sea-try-go/service/common/observability"
-	"sea-try-go/service/security/rpc/internal/config"
-	contentsecurityserviceServer "sea-try-go/service/security/rpc/internal/server/contentsecurityservice"
-	imagesecurityserviceServer "sea-try-go/service/security/rpc/internal/server/imagesecurityservice"
-	"sea-try-go/service/security/rpc/internal/svc"
-	"sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/config"
+	contentsecurityserviceServer "github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/server/contentsecurityservice"
+	imagesecurityserviceServer "github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/server/imagesecurityservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"sea-try-go/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 )
 
 var configFile = flag.String("f", "etc/security.yaml", "the config file")

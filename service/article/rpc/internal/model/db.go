@@ -8,7 +8,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
-	"sea-try-go/service/article/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/config"
 )
 
 type ArticleRepo struct {

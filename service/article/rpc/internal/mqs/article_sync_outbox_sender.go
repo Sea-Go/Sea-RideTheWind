@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"sea-try-go/service/article/common/errmsg"
-	"sea-try-go/service/article/rpc/internal/svc"
-	"sea-try-go/service/article/rpc/metrics"
-	"sea-try-go/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 )
 
 type ArticleSyncOutboxSender struct {

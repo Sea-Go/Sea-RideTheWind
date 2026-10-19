@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"sea-try-go/service/knowledge/internal/structure"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/structure"
 )
 
 // canonicalTreeJSON renders t in the canonical tree form: one compact JSON

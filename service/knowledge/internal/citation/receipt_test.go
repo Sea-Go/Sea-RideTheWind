@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"sea-try-go/service/knowledge/internal/structure"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/structure"
 )
 
 const fixtureRev = "rev-citation-0001"

@@ -3,9 +3,9 @@ package user
 import (
 	"context"
 
-	"sea-try-go/service/user/user/api/internal/identity"
-	"sea-try-go/service/user/user/api/internal/types"
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/identity"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 )
 
 func currentUserID(ctx context.Context) (int64, error) {

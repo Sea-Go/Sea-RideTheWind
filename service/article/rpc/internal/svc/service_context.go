@@ -2,12 +2,12 @@ package svc
 
 import (
 	"context"
-	"sea-try-go/service/article/rpc/internal/config"
-	"sea-try-go/service/article/rpc/internal/model"
-	"sea-try-go/service/common/snowflake"
-	"sea-try-go/service/message/rpc/messageservice"
-	"sea-try-go/service/security/rpc/client/contentsecurityservice"
-	"sea-try-go/service/security/rpc/client/imagesecurityservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/messageservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/client/contentsecurityservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/client/imagesecurityservice"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"

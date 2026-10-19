@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"sea-try-go/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"

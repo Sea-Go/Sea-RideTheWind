@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	rtwjwt "sea-try-go/service/user/common/jwt"
-	shared "sea-try-go/service/user/user/identity"
-	"sea-try-go/service/user/user/rpc/pb"
+	rtwjwt "github.com/Sea-Go/Sea-RideTheWind/service/user/common/jwt"
+	shared "github.com/Sea-Go/Sea-RideTheWind/service/user/user/identity"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 
 	"github.com/zeromicro/go-zero/rest/handler"
 	"google.golang.org/grpc"

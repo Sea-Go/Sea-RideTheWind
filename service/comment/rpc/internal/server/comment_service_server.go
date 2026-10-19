@@ -6,9 +6,9 @@ package server
 
 import (
 	"context"
-	logic2 "sea-try-go/service/comment/rpc/internal/logic"
-	"sea-try-go/service/comment/rpc/internal/svc"
-	pb2 "sea-try-go/service/comment/rpc/pb"
+	logic2 "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/svc"
+	pb2 "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/pb"
 )
 
 type CommentServiceServer struct {

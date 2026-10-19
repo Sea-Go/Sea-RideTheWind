@@ -1,11 +1,11 @@
 package svc
 
 import (
-	//pointspb "sea-try-go/service/points/rpc/pb"
-	"sea-try-go/service/task/rpc/internal/Model"
-	"sea-try-go/service/task/rpc/internal/config"
+	//pointspb "github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/Model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/config"
 	//"github.com/zeromicro/go-zero/zrpc"
-	//userpb "sea-try-go/service/user/rpc/pb"
+	//userpb "github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/pb"
 	"time"
 
 	"github.com/redis/go-redis/v9"

@@ -11,8 +11,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	kqtypes "sea-try-go/service/comment/rpc/common/types"
-	"sea-try-go/service/comment/rpc/internal/metrics"
+	kqtypes "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/common/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/metrics"
 )
 
 type CommentModel struct {

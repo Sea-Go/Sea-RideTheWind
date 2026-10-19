@@ -5,8 +5,8 @@ package svc
 
 import (
 	"github.com/zeromicro/go-zero/zrpc"
-	"sea-try-go/service/task/api/internal/config"
-	taskpb "sea-try-go/service/task/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/api/internal/config"
+	taskpb "github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/pb"
 )
 
 /*type ServiceContext struct {

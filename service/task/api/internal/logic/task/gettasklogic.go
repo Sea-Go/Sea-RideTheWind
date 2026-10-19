@@ -5,10 +5,10 @@ package task
 
 import (
 	"context"
-	taskpb "sea-try-go/service/task/rpc/pb"
+	taskpb "github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/pb"
 
-	"sea-try-go/service/task/api/internal/svc"
-	"sea-try-go/service/task/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/api/internal/types"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

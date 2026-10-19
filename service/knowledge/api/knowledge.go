@@ -15,11 +15,11 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/proc"
 
-	"sea-try-go/service/knowledge/api/internal/config"
-	"sea-try-go/service/knowledge/api/internal/handler"
-	"sea-try-go/service/knowledge/api/internal/mqs"
-	"sea-try-go/service/knowledge/api/internal/svc"
-	"sea-try-go/service/knowledge/api/internal/telemetry"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/handler"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/mqs"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/telemetry"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"

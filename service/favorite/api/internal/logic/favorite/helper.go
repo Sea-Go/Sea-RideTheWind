@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sea-try-go/service/common/logger"
-	favoritecommon "sea-try-go/service/favorite/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	favoritecommon "github.com/Sea-Go/Sea-RideTheWind/service/favorite/common"
 )
 
 func extractUserID(ctx context.Context) (int64, error) {

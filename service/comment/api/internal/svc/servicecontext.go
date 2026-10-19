@@ -4,8 +4,8 @@
 package svc
 
 import (
-	"sea-try-go/service/comment/api/internal/config"
-	commentpb "sea-try-go/service/comment/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/config"
+	commentpb "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 )

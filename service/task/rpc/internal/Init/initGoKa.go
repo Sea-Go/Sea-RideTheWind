@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"sea-try-go/service/task/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/svc"
 
 	"github.com/IBM/sarama"
 	"github.com/lovoo/goka"

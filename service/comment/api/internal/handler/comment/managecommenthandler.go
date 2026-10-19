@@ -6,9 +6,9 @@ package comment
 import (
 	"net/http"
 
-	"sea-try-go/service/comment/api/internal/logic/comment"
-	"sea-try-go/service/comment/api/internal/svc"
-	"sea-try-go/service/comment/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/logic/comment"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/types"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
