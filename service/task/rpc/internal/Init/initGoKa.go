@@ -3,8 +3,8 @@ package Init
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/svc"
+	"log"
 
 	"github.com/IBM/sarama"
 	"github.com/lovoo/goka"

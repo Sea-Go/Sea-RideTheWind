@@ -6,10 +6,10 @@ package like
 import (
 	"net/http"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/Sea-Go/Sea-RideTheWind/service/like/api/internal/logic/like"
 	"github.com/Sea-Go/Sea-RideTheWind/service/like/api/internal/svc"
 	"github.com/Sea-Go/Sea-RideTheWind/service/like/api/internal/types"
+	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 func LikeActionHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

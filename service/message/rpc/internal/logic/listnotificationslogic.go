@@ -52,10 +52,10 @@ func (l *ListNotificationsLogic) ListNotifications(in *pb.NotificationListReq) (
 	}
 
 	return &pb.NotificationListResp{
-		Code:       int32(messagecommon.Success),
-		Msg:        messagecommon.GetErrMsg(messagecommon.Success),
-		Items:      respItems,
-		Total:      total,
+		Code:        int32(messagecommon.Success),
+		Msg:         messagecommon.GetErrMsg(messagecommon.Success),
+		Items:       respItems,
+		Total:       total,
 		UnreadCount: unread,
 	}, nil
 }

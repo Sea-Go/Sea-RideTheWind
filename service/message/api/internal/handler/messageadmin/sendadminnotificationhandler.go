@@ -6,10 +6,10 @@ package messageadmin
 import (
 	"net/http"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/logic/messageadmin"
 	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/svc"
 	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/types"
+	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 func SendAdminNotificationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

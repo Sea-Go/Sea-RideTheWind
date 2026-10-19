@@ -6,9 +6,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/config"
 	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/handler"

@@ -6,12 +6,12 @@ package logic
 import (
 	"context"
 	"fmt"
-	"log"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/cryptx"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
 	"github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/internal/config"
 	"github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/internal/model"
 	"github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/internal/svc"
+	"log"
 	"time"
 
 	"gorm.io/driver/postgres"

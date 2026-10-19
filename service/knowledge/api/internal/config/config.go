@@ -1,9 +1,9 @@
 package config
 
 import (
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/telemetry"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
-	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/telemetry"
 )
 
 type Config struct {

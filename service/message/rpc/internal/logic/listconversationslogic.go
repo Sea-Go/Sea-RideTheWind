@@ -63,10 +63,10 @@ func (l *ListConversationsLogic) ListConversations(in *pb.ConversationListReq) (
 	}
 
 	return &pb.ConversationListResp{
-		Code:       int32(messagecommon.Success),
-		Msg:        messagecommon.GetErrMsg(messagecommon.Success),
-		Items:      respItems,
-		Total:      total,
+		Code:        int32(messagecommon.Success),
+		Msg:         messagecommon.GetErrMsg(messagecommon.Success),
+		Items:       respItems,
+		Total:       total,
 		UnreadCount: unreadTotal,
 	}, nil
 }

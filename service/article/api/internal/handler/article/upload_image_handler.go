@@ -6,9 +6,9 @@ package article
 import (
 	"net/http"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/logic/article"
 	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/svc"
+	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 func UploadImageHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

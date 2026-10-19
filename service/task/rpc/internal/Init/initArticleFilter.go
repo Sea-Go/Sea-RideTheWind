@@ -2,9 +2,9 @@ package Init
 
 import (
 	"context"
-	"log"
 	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/sink"
 	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/svc"
+	"log"
 
 	"github.com/zeromicro/go-queue/kq"
 	"github.com/zeromicro/go-zero/core/proc"

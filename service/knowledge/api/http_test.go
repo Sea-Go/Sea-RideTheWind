@@ -28,14 +28,14 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/zeromicro/go-zero/core/conf"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/testenv"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 	rtwjwt "github.com/Sea-Go/Sea-RideTheWind/service/user/common/jwt"
 	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type productUserRPC struct {

@@ -3,9 +3,9 @@ package logger
 import (
 	"context"
 	"fmt"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
 	"os"
 	"runtime"
-	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
 	"strings"
 	"testing"
 	"time"

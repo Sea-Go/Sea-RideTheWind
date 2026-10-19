@@ -8,7 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net/http"
 	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/config"
 	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/handler"
 	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/svc"
@@ -16,6 +15,7 @@ import (
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/response"
+	"net/http"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"

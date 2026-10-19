@@ -171,17 +171,17 @@ func buildConversationItem(ctx context.Context, svcCtx *svc.ServiceContext, conv
 
 	name, email := loadProfile(ctx, svcCtx, peerRole, peerID)
 	return &pb.ConversationItem{
-		ConversationId: conv.ID,
-		PeerId:         peerID,
-		PeerRole:       peerRole,
-		PeerName:       name,
-		PeerEmail:      email,
-		Status:         pb.ConversationStatus(conv.Status),
-		UnreadCount:    unread,
-		LatestMessage:  conv.LastMessagePreview,
+		ConversationId:  conv.ID,
+		PeerId:          peerID,
+		PeerRole:        peerRole,
+		PeerName:        name,
+		PeerEmail:       email,
+		Status:          pb.ConversationStatus(conv.Status),
+		UnreadCount:     unread,
+		LatestMessage:   conv.LastMessagePreview,
 		LatestMessageAt: conv.LastMessageAt.Unix(),
-		UpdatedAt:      conv.UpdatedAt.Unix(),
-		CanSend:        canSend(&conv, operatorRole, operatorID),
+		UpdatedAt:       conv.UpdatedAt.Unix(),
+		CanSend:         canSend(&conv, operatorRole, operatorID),
 	}, nil
 }
 

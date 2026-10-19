@@ -40,8 +40,8 @@ func (l *DeleteArticleLogic) DeleteArticle(req *types.DeleteArticleReq) (resp *t
 	}
 
 	articleResp, err := l.svcCtx.ArticleRpc.GetArticle(l.ctx, &articleservice.GetArticleRequest{
-		ArticleId: req.ArticleId,
-		IncrView:  false,
+		ArticleId:   req.ArticleId,
+		IncrView:    false,
 		RequesterId: operatorID,
 	})
 	if err != nil {

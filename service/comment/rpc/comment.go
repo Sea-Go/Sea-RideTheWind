@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/http"
 	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/config"
 	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/metrics"
 	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/mqs"
@@ -13,6 +12,7 @@ import (
 	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/pb"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zeromicro/go-queue/kq"

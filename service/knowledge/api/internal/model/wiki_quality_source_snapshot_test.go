@@ -83,7 +83,7 @@ func TestWikiQualitySourceSnapshotPinsHistoricalCatalogAndCurrentRequiredHeads(t
 	manual, err := ordinary.CreateWiki(ctx, "test-admin", types.CreateWikiReq{
 		ModuleId: module.Id, PageId: wiki.EntityId, BaseRevisionId: wiki.RevisionId,
 		Title: "new manual Wiki target", Content: "later human edition of both facts",
-		SourceRefs: []types.SourceRef{{RevisionId: sources[0].RevisionId, Locator: "paragraph:2"}},
+		SourceRefs:     []types.SourceRef{{RevisionId: sources[0].RevisionId, Locator: "paragraph:2"}},
 		IdempotencyKey: "snapshot-later-manual-wiki"})
 	manual = must(t, manual, err)
 	manualReq := req

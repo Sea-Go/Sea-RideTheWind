@@ -6,10 +6,10 @@ package follow
 import (
 	"net/http"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/Sea-Go/Sea-RideTheWind/service/follow/api/internal/logic/follow"
 	"github.com/Sea-Go/Sea-RideTheWind/service/follow/api/internal/svc"
 	"github.com/Sea-Go/Sea-RideTheWind/service/follow/api/internal/types"
+	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 func GetBlockListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

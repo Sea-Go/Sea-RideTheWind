@@ -41,8 +41,8 @@ func (l *UpdateArticleLogic) UpdateArticle(req *types.UpdateArticleReq) (resp *t
 	}
 
 	articleResp, err := l.svcCtx.ArticleRpc.GetArticle(l.ctx, &articleservice.GetArticleRequest{
-		ArticleId: req.ArticleId,
-		IncrView:  false,
+		ArticleId:   req.ArticleId,
+		IncrView:    false,
 		RequesterId: currentUserID,
 	})
 	if err != nil {

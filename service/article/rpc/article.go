@@ -5,8 +5,6 @@ import (
 	"flag"
 	"time"
 
-	"github.com/zeromicro/go-queue/kq"
-	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/config"
 	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/model"
 	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/mqs"
@@ -15,6 +13,8 @@ import (
 	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/zeromicro/go-queue/kq"
+	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"

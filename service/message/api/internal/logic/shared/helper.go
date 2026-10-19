@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	messagecommon "github.com/Sea-Go/Sea-RideTheWind/service/message/common"
 	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/types"
+	messagecommon "github.com/Sea-Go/Sea-RideTheWind/service/message/common"
 	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/pb"
 
 	"google.golang.org/grpc/status"

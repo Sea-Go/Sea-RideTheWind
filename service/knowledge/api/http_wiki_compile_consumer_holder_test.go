@@ -15,13 +15,13 @@ import (
 	"testing"
 	"time"
 
-	jsoncanonicalizer "github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
-	"github.com/google/uuid"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/mqs"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
 	knowledgeTelemetry "github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/telemetry"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
+	jsoncanonicalizer "github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
+	"github.com/google/uuid"
 )
 
 type wikiExternalConsumerRuntime struct {

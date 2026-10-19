@@ -1,11 +1,11 @@
 package svc
 
 import (
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
 	cache2 "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/cache"
 	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/config"
 	model2 "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/model"
 	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/utils"
-	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
 	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/messageservice"
 
 	"github.com/zeromicro/go-queue/kq"

@@ -4,12 +4,12 @@
 package user
 
 import (
-	"net/http"
 	"github.com/Sea-Go/Sea-RideTheWind/service/common/response"
 	"github.com/Sea-Go/Sea-RideTheWind/service/user/common/errmsg"
 	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/logic/user"
 	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/svc"
 	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/types"
+	"net/http"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 )

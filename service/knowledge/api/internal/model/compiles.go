@@ -3,8 +3,8 @@ package model
 import (
 	"context"
 	"errors"
-	"reflect"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/telemetry"
+	"reflect"
 	"sort"
 	"strings"
 	"time"

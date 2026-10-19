@@ -6,10 +6,10 @@ package product_v2
 import (
 	"net/http"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/logic/product_v2"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/svc"
 	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
+	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 func GetProductAnswerCitationStatesV2Handler(svcCtx *svc.ServiceContext) http.HandlerFunc {

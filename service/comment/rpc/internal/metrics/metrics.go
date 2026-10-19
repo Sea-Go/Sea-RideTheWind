@@ -1,9 +1,9 @@
 package metrics
 
 import (
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/config"
 )
 
 var (
