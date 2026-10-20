@@ -12,6 +12,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # sea-guards 为仓内 replace 依赖（go.mod => ./sea-guards），CI 双 checkout
+      - uses: actions/checkout@v4
+        with:
+          repository: Sea-Go/sea-guards
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod

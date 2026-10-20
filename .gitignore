@@ -15,3 +15,4 @@ bin/
 # IDE 与日志（治理基线 G2/G3 补齐）
 .idea/
 *.log
+sea-guards/
