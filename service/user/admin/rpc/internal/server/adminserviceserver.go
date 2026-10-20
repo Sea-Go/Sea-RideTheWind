@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"sea-try-go/service/user/admin/rpc/internal/logic"
-	"sea-try-go/service/user/admin/rpc/internal/svc"
-	"sea-try-go/service/user/admin/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/rpc/pb"
 )
 
 type AdminServiceServer struct {

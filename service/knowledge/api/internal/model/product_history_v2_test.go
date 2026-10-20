@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"sea-try-go/service/knowledge/api/internal/logic/product_v2"
-	"sea-try-go/service/knowledge/api/internal/model"
-	"sea-try-go/service/knowledge/api/internal/object"
-	"sea-try-go/service/knowledge/api/internal/svc"
-	"sea-try-go/service/knowledge/api/internal/testenv"
-	"sea-try-go/service/knowledge/api/internal/types"
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/logic/product_v2"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/testenv"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 
 	"google.golang.org/grpc"
 )

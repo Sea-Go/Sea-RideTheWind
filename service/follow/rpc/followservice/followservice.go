@@ -7,7 +7,7 @@ package followservice
 import (
 	"context"
 
-	"sea-try-go/service/follow/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

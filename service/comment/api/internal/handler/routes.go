@@ -6,8 +6,8 @@ package handler
 import (
 	"net/http"
 
-	comment "sea-try-go/service/comment/api/internal/handler/comment"
-	"sea-try-go/service/comment/api/internal/svc"
+	comment "github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/handler/comment"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
 )

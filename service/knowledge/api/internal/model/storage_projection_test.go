@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"sea-try-go/service/knowledge/api/internal/testenv"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/testenv"
 
 	"github.com/jackc/pgx/v5"
 )

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/like/common/errmsg"
-	"sea-try-go/service/like/rpc/internal/mq/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/mq/internal/svc"
 )
 
 type LikeOutboxSender struct {

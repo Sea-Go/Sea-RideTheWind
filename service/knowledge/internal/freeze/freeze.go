@@ -25,9 +25,9 @@ import (
 	"fmt"
 	"time"
 
-	"sea-try-go/service/knowledge/internal/citation"
-	"sea-try-go/service/knowledge/internal/release"
-	"sea-try-go/service/knowledge/internal/structure"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/citation"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/release"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/structure"
 )
 
 // Sentinel errors carried through the store seams. Production (PG)

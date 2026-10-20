@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sea-try-go/service/article/rpc/articleservice"
-	"sea-try-go/service/comment/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/model"
 )
 
 func resolveSubjectFallback(ctx context.Context, articleRPC articleservice.ArticleService, targetType, targetID string) (model.Subject, error) {

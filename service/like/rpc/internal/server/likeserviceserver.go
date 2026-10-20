@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"sea-try-go/service/like/rpc/internal/logic"
-	"sea-try-go/service/like/rpc/internal/svc"
-	"sea-try-go/service/like/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/pb"
 )
 
 type LikeServiceServer struct {

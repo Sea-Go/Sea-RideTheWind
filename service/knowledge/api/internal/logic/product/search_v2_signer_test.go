@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"sea-try-go/service/knowledge/api/internal/model"
-	"sea-try-go/service/knowledge/api/internal/types"
-	"sea-try-go/service/user/user/identity"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/identity"
 )
 
 const signerTestKey = "test-only-v2-scope-key-more-than-32-bytes"

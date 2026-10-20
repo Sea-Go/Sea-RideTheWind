@@ -3,12 +3,12 @@ package logic
 import (
 	"context"
 	"fmt"
-	"sea-try-go/service/comment/common/errmsg"
-	"sea-try-go/service/comment/rpc/internal/metrics"
-	"sea-try-go/service/comment/rpc/internal/model"
-	"sea-try-go/service/comment/rpc/internal/svc"
-	"sea-try-go/service/comment/rpc/pb"
-	"sea-try-go/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"

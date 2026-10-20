@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"sea-try-go/service/common/observability"
-	"sea-try-go/service/hot/rpc/internal/config"
-	"sea-try-go/service/hot/rpc/internal/mqs"
-	"sea-try-go/service/hot/rpc/internal/server"
-	"sea-try-go/service/hot/rpc/internal/svc"
-	"sea-try-go/service/hot/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/internal/mqs"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/internal/server"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/pb"
 
 	"github.com/IBM/sarama"
 	"github.com/zeromicro/go-zero/core/conf"

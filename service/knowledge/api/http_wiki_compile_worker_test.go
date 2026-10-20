@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"sea-try-go/service/knowledge/api/internal/config"
-	"sea-try-go/service/knowledge/api/internal/object"
-	"sea-try-go/service/knowledge/api/internal/testenv"
-	"sea-try-go/service/knowledge/api/internal/types"
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/testenv"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"google.golang.org/grpc"

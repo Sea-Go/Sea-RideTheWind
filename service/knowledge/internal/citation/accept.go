@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"sea-try-go/service/knowledge/internal/structure"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/structure"
 )
 
 // MaxCitations is the hard cap of citations one acceptance may carry.

@@ -1,7 +1,7 @@
 package svc
 
 import (
-	"sea-try-go/service/hot/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/internal/config"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-queue/kq"

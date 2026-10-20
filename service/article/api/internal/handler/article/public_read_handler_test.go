@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"sea-try-go/service/article/api/internal/svc"
-	"sea-try-go/service/article/rpc/articleservice"
-	pb "sea-try-go/service/article/rpc/pb"
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/user/user/rpc/userservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
+	pb "github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/userservice"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/rest/handler"

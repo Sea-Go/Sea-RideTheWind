@@ -6,8 +6,8 @@ package handler
 import (
 	"net/http"
 
-	admin "sea-try-go/service/user/admin/api/internal/handler/admin"
-	"sea-try-go/service/user/admin/api/internal/svc"
+	admin "github.com/Sea-Go/Sea-RideTheWind/service/user/admin/api/internal/handler/admin"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
 )

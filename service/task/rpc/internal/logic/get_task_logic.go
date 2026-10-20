@@ -6,13 +6,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"sea-try-go/service/task/rpc/internal/Model"
-	__ "sea-try-go/service/task/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/Model"
+	__ "github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/pb"
 	"strconv"
 	"strings"
 	"time"
 
-	"sea-try-go/service/task/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

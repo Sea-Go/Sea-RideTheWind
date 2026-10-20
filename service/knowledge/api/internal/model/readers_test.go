@@ -7,10 +7,10 @@ import (
 	"sync"
 	"testing"
 
-	"sea-try-go/service/knowledge/api/internal/model"
-	"sea-try-go/service/knowledge/api/internal/object"
-	"sea-try-go/service/knowledge/api/internal/testenv"
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/testenv"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 )
 
 func compile(t *testing.T, s *model.Store, m types.Module, a types.Revision, key string) types.Compile {

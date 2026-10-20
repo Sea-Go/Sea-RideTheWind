@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"sea-try-go/service/article/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/model"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

@@ -4,8 +4,8 @@
 package svc
 
 import (
-	"sea-try-go/service/message/api/internal/config"
-	"sea-try-go/service/message/rpc/messageservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/messageservice"
 
 	"github.com/zeromicro/go-zero/zrpc"
 )

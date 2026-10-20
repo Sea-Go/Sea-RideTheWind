@@ -1,9 +1,9 @@
 package svc
 
 import (
-	"sea-try-go/service/favorite/api/internal/config"
-	"sea-try-go/service/favorite/api/internal/middleware"
-	"sea-try-go/service/favorite/rpc/favoriteservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/api/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/api/internal/middleware"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/favoriteservice"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/rest"

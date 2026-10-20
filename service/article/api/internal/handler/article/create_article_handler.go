@@ -4,14 +4,14 @@
 package article
 
 import (
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/response"
 	"net/http"
-	"sea-try-go/service/article/common/errmsg"
-	"sea-try-go/service/common/response"
 
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/logic/article"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
-	"sea-try-go/service/article/api/internal/logic/article"
-	"sea-try-go/service/article/api/internal/svc"
-	"sea-try-go/service/article/api/internal/types"
 )
 
 func CreateArticleHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

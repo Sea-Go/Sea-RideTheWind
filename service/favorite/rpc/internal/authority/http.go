@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"sea-try-go/service/favorite/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/model"
 )
 
 type Reader interface {

@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/logic/worker"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
-	"sea-try-go/service/knowledge/api/internal/logic/worker"
-	"sea-try-go/service/knowledge/api/internal/model"
-	"sea-try-go/service/knowledge/api/internal/svc"
-	"sea-try-go/service/knowledge/api/internal/types"
 )
 
 func GetAcceptedAnswerHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

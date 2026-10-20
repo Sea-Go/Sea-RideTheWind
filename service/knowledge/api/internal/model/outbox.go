@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sea-try-go/service/knowledge/api/internal/telemetry"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/telemetry"
 
 	"github.com/jackc/pgx/v5"
 )

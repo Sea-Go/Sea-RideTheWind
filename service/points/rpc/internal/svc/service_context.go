@@ -1,8 +1,8 @@
 package svc
 
 import (
-	"sea-try-go/service/points/rpc/internal/config"
-	"sea-try-go/service/points/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/model"
 
 	"github.com/zeromicro/go-queue/dq"
 	"github.com/zeromicro/go-queue/kq"

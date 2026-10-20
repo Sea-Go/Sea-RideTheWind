@@ -6,14 +6,14 @@ package article
 import (
 	"context"
 	"fmt"
-	"sea-try-go/service/article/rpc/articleservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
 	"strings"
 	"time"
 
-	"sea-try-go/service/article/api/internal/svc"
-	"sea-try-go/service/article/api/internal/types"
-	"sea-try-go/service/article/common/errmsg"
-	"sea-try-go/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/zrpc"

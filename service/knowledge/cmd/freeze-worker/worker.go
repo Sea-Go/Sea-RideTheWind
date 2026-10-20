@@ -15,9 +15,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"sea-try-go/service/knowledge/internal/citation"
-	"sea-try-go/service/knowledge/internal/freeze"
-	"sea-try-go/service/knowledge/internal/structure"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/citation"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/freeze"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/structure"
 )
 
 type workerOptions struct {

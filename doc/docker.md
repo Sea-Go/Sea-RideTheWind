@@ -1,4 +1,4 @@
-**# Sea-TryGo Docker Compose 组件说明（含可视化面板与账号密码）
+**# Sea-RideTheWind Docker Compose 组件说明（含可视化面板与账号密码）
 
 ## 可视化面板（Web UI）入口（建议收藏）
 > 下面均为 **宿主机访问地址**（即你运行 docker-compose 的机器上访问）。
@@ -293,7 +293,7 @@
 
 ## 网络与数据卷（简要）
 - **网络**
-  - 默认网络命名：`Sea-TryGo`（所有服务加入同一 Docker 网络，容器间可用服务名互通）
+  - 默认网络命名：`sea-ridethewind`（所有服务加入同一 Docker 网络，容器间可用服务名互通）
 - **数据卷（named volumes）**
   - `prometheus_data`：Prometheus 时序数据
   - `grafana_data`：Grafana 数据（数据源/仪表盘/用户等）

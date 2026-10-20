@@ -3,8 +3,8 @@ package logic
 import (
 	"context"
 
-	"sea-try-go/service/hot/rpc/internal/svc"
-	"sea-try-go/service/hot/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

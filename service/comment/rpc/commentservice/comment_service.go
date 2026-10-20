@@ -6,7 +6,7 @@ package commentservice
 
 import (
 	"context"
-	pb2 "sea-try-go/service/comment/rpc/pb"
+	pb2 "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

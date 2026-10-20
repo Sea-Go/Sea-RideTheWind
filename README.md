@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./logo.png" alt="Sea-TryGo" width="180" />
+  <img src="./logo.png" alt="Sea-RideTheWind" width="180" />
 
 # Sea-RideTheWind
 

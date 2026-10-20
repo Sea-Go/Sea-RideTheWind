@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"sea-try-go/service/favorite/rpc/internal/logic"
-	"sea-try-go/service/favorite/rpc/internal/svc"
-	"sea-try-go/service/favorite/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/pb"
 )
 
 type FavoriteServiceServer struct {

@@ -3,14 +3,14 @@ package logic
 import (
 	"context"
 	"fmt"
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/user/common/cryptx"
-	"sea-try-go/service/user/common/errmsg"
-	"sea-try-go/service/user/user/rpc/internal/metrics"
-	"sea-try-go/service/user/user/rpc/internal/model"
-	"sea-try-go/service/user/user/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/common/cryptx"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/svc"
 
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel"

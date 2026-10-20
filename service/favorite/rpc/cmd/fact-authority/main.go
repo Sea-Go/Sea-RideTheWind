@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"sea-try-go/service/favorite/rpc/internal/authority"
-	"sea-try-go/service/favorite/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/authority"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/model"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

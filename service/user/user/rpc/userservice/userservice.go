@@ -6,33 +6,33 @@ package userservice
 
 import (
 	"context"
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
 )
 
 type (
-	CreateUserReq  = pb.CreateUserReq
-	CreateUserResp = pb.CreateUserResp
-	DeleteUserReq  = pb.DeleteUserReq
-	DeleteUserResp = pb.DeleteUserResp
-	GetAvatarHistoryReq = pb.GetAvatarHistoryReq
+	CreateUserReq        = pb.CreateUserReq
+	CreateUserResp       = pb.CreateUserResp
+	DeleteUserReq        = pb.DeleteUserReq
+	DeleteUserResp       = pb.DeleteUserResp
+	GetAvatarHistoryReq  = pb.GetAvatarHistoryReq
 	GetAvatarHistoryResp = pb.GetAvatarHistoryResp
-	GetUserReq     = pb.GetUserReq
-	GetUserResp    = pb.GetUserResp
-	LoginReq       = pb.LoginReq
-	LoginResp      = pb.LoginResp
-	LogoutReq      = pb.LogoutReq
-	LogoutResp     = pb.LogoutResp
-	SelectAvatarReq = pb.SelectAvatarReq
-	SelectAvatarResp = pb.SelectAvatarResp
-	UploadAvatarReq = pb.UploadAvatarReq
-	UploadAvatarResp = pb.UploadAvatarResp
-	UpdateUserReq  = pb.UpdateUserReq
-	UpdateUserResp = pb.UpdateUserResp
-	UserInfo       = pb.UserInfo
-	AvatarHistoryItem = pb.AvatarHistoryItem
+	GetUserReq           = pb.GetUserReq
+	GetUserResp          = pb.GetUserResp
+	LoginReq             = pb.LoginReq
+	LoginResp            = pb.LoginResp
+	LogoutReq            = pb.LogoutReq
+	LogoutResp           = pb.LogoutResp
+	SelectAvatarReq      = pb.SelectAvatarReq
+	SelectAvatarResp     = pb.SelectAvatarResp
+	UploadAvatarReq      = pb.UploadAvatarReq
+	UploadAvatarResp     = pb.UploadAvatarResp
+	UpdateUserReq        = pb.UpdateUserReq
+	UpdateUserResp       = pb.UpdateUserResp
+	UserInfo             = pb.UserInfo
+	AvatarHistoryItem    = pb.AvatarHistoryItem
 
 	UserService interface {
 		GetAvatarHistory(ctx context.Context, in *GetAvatarHistoryReq, opts ...grpc.CallOption) (*GetAvatarHistoryResp, error)

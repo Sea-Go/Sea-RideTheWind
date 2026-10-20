@@ -16,17 +16,17 @@ load_root_env() {
 }
 
 load_root_env
-DOCKERFILE="$ROOT_DIR/dockerfile"
+DOCKERFILE="$ROOT_DIR/Dockerfile"
 ENTRYPOINT_FILE="$ROOT_DIR/docker-entrypoint.sh"
 DOCKERIGNORE_FILE="$ROOT_DIR/.dockerignore"
-IMAGE_PREFIX="sea-trygo"
+IMAGE_PREFIX="sea-ridethewind"
 CONTAINER_PREFIX="${CONTAINER_PREFIX:-Sea}"
 LOG_ROOT_DIR="$ROOT_DIR/.manage-logs"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 LOG_DIR="$LOG_ROOT_DIR/$RUN_ID"
-DOCKER_NETWORK="${DOCKER_NETWORK:-Sea-TryGo}"
+DOCKER_NETWORK="${DOCKER_NETWORK:-sea-ridethewind}"
 HOST_BUILD_DIR="$ROOT_DIR/.dist"
-LOCAL_IMAGE_BASE="${LOCAL_IMAGE_BASE:-sea-trygo-article:latest}"
+LOCAL_IMAGE_BASE="${LOCAL_IMAGE_BASE:-sea-ridethewind-article:latest}"
 GO_BIN="${GO_BIN:-/home/ubuntu/go/bin/go}"
 export DOCKER_NETWORK
 export CONTAINER_PREFIX

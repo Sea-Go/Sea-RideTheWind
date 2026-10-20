@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net/http"
 
-	"sea-try-go/service/common/response"
-	"sea-try-go/service/knowledge/api/internal/model"
-	"sea-try-go/service/knowledge/api/internal/telemetry"
-	"sea-try-go/service/user/user/identity"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/response"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/telemetry"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/identity"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 	"google.golang.org/grpc/codes"

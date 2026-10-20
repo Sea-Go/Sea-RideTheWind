@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"sea-try-go/service/comment/rpc/internal/metrics"
-	"sea-try-go/service/comment/rpc/internal/model"
-	"sea-try-go/service/comment/rpc/internal/svc"
-	"sea-try-go/service/comment/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel"

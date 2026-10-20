@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/common/observability"
-	"sea-try-go/service/points/rpc/internal/metrics"
-	"sea-try-go/service/points/rpc/internal/model"
-	"sea-try-go/service/points/rpc/internal/svc"
-	"sea-try-go/service/user/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/common/errmsg"
 )
 
 type RetryHandler struct {

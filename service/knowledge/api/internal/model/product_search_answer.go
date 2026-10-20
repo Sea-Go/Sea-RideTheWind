@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"reflect"
 
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 )
 
 // VerifiedProductSearch projects only an RTW-accepted root turn bound to the

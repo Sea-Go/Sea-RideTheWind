@@ -9,14 +9,14 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/common/observability"
-	"sea-try-go/service/common/snowflake"
-	"sea-try-go/service/like/common/errmsg"
-	"sea-try-go/service/like/rpc/internal/model"
-	"sea-try-go/service/like/rpc/internal/mq/internal/metrics"
-	"sea-try-go/service/like/rpc/internal/mq/internal/svc"
-	"sea-try-go/service/like/rpc/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/mq/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/mq/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/types"
 )
 
 type LikeUpdateService struct {

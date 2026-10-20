@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"sea-try-go/service/security/rpc/internal/svc"
-	pb "sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/svc"
+	pb "github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/pb"
 )
 
 type DetectImageAdBatchLogic struct {

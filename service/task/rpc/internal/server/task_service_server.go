@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"sea-try-go/service/task/rpc/internal/logic"
-	"sea-try-go/service/task/rpc/internal/svc"
-	"sea-try-go/service/task/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/pb"
 )
 
 type TaskServiceServer struct {

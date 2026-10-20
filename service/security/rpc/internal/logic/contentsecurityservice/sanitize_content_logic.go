@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/security/rpc/internal/svc"
-	pb "sea-try-go/service/security/rpc/pb/sea-try-go/service/security/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/svc"
+	pb "github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/pb"
 
 	"github.com/microcosm-cc/bluemonday"
 	"golang.org/x/text/unicode/norm"

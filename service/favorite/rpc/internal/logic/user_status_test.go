@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"sea-try-go/service/favorite/rpc/internal/svc"
-	"sea-try-go/service/user/user/rpc/userservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/userservice"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

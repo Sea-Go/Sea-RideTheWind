@@ -3,7 +3,7 @@ package model
 import (
 	"context"
 
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 )
 
 // GetProductAnswerCitationStates reads only the references actually cited by

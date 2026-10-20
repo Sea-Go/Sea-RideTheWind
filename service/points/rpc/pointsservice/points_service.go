@@ -7,7 +7,7 @@ package pointsservice
 import (
 	"context"
 
-	"sea-try-go/service/points/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

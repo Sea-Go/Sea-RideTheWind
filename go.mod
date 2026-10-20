@@ -1,4 +1,4 @@
-module sea-try-go
+module github.com/Sea-Go/Sea-RideTheWind
 
 go 1.25.11
 

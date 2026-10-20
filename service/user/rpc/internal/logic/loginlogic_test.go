@@ -6,7 +6,7 @@ package logic
 import (
 	"testing"
 
-	pb "sea-try-go/service/user/rpc/pb"
+	pb "github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/pb"
 )
 
 func TestLogin_Success(t *testing.T) {

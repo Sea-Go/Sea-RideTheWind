@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"sea-try-go/service/article/rpc/articleservice"
-	"sea-try-go/service/favorite/rpc/internal/model"
-	"sea-try-go/service/favorite/rpc/internal/server"
-	"sea-try-go/service/favorite/rpc/internal/svc"
-	favoritepb "sea-try-go/service/favorite/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/server"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/svc"
+	favoritepb "github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

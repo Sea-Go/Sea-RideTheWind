@@ -6,9 +6,9 @@ package server
 
 import (
 	"context"
-	"sea-try-go/service/user/user/rpc/internal/logic"
-	"sea-try-go/service/user/user/rpc/internal/svc"
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 )
 
 type UserServiceServer struct {

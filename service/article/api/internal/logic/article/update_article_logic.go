@@ -7,12 +7,12 @@ import (
 	"context"
 	"fmt"
 
-	"sea-try-go/service/article/api/internal/svc"
-	"sea-try-go/service/article/api/internal/types"
-	"sea-try-go/service/article/common/errmsg"
-	"sea-try-go/service/article/rpc/articleservice"
-	"sea-try-go/service/article/rpc/pb"
-	"sea-try-go/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"
@@ -41,8 +41,8 @@ func (l *UpdateArticleLogic) UpdateArticle(req *types.UpdateArticleReq) (resp *t
 	}
 
 	articleResp, err := l.svcCtx.ArticleRpc.GetArticle(l.ctx, &articleservice.GetArticleRequest{
-		ArticleId: req.ArticleId,
-		IncrView:  false,
+		ArticleId:   req.ArticleId,
+		IncrView:    false,
 		RequesterId: currentUserID,
 	})
 	if err != nil {

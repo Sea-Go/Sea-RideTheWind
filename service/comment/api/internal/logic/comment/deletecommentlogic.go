@@ -7,11 +7,11 @@ import (
 	"context"
 	"fmt"
 
-	"sea-try-go/service/comment/api/internal/svc"
-	"sea-try-go/service/comment/api/internal/types"
-	"sea-try-go/service/comment/common/errmsg"
-	"sea-try-go/service/comment/rpc/pb"
-	"sea-try-go/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/status"

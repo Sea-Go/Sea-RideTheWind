@@ -7,7 +7,7 @@ package articleservice
 import (
 	"context"
 
-	"sea-try-go/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"sea-try-go/service/article/rpc/internal/logic"
-	"sea-try-go/service/article/rpc/internal/svc"
-	"sea-try-go/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
 )
 
 type ArticleServiceServer struct {

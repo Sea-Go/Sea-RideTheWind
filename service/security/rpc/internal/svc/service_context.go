@@ -1,6 +1,6 @@
 package svc
 
-import "sea-try-go/service/security/rpc/internal/config"
+import "github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/internal/config"
 
 type ServiceContext struct {
 	Config config.Config

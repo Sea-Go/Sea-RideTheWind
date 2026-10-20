@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"sea-try-go/service/message/rpc/internal/logic"
-	"sea-try-go/service/message/rpc/internal/svc"
-	"sea-try-go/service/message/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/pb"
 )
 
 type MessageServiceServer struct {

@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sea-try-go/service/common/observability"
-	"sea-try-go/service/hot/heavykeeper"
-	"sea-try-go/service/hot/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/heavykeeper"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/internal/svc"
 
 	"github.com/IBM/sarama"
 	"github.com/redis/go-redis/v9"

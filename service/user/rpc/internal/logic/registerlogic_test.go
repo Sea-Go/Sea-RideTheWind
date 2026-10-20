@@ -6,8 +6,8 @@ package logic
 import (
 	"testing"
 
-	"sea-try-go/service/user/rpc/internal/model"
-	pb "sea-try-go/service/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/internal/model"
+	pb "github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/pb"
 )
 
 func TestRegister_Success(t *testing.T) {

@@ -6,9 +6,9 @@ package product
 import (
 	"context"
 
-	"sea-try-go/service/knowledge/api/internal/svc"
-	"sea-try-go/service/knowledge/api/internal/types"
-	"sea-try-go/service/user/user/identity"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/identity"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

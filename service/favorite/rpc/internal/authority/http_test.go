@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"sea-try-go/service/favorite/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/model"
 )
 
 type stubReader struct{ calls int }

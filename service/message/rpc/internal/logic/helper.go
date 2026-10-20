@@ -7,14 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"sea-try-go/service/common/snowflake"
-	messagecommon "sea-try-go/service/message/common"
-	"sea-try-go/service/message/rpc/internal/metrics"
-	"sea-try-go/service/message/rpc/internal/model"
-	"sea-try-go/service/message/rpc/internal/svc"
-	"sea-try-go/service/message/rpc/pb"
-	adminpb "sea-try-go/service/user/admin/rpc/pb"
-	userpb "sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
+	messagecommon "github.com/Sea-Go/Sea-RideTheWind/service/message/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/pb"
+	adminpb "github.com/Sea-Go/Sea-RideTheWind/service/user/admin/rpc/pb"
+	userpb "github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -171,17 +171,17 @@ func buildConversationItem(ctx context.Context, svcCtx *svc.ServiceContext, conv
 
 	name, email := loadProfile(ctx, svcCtx, peerRole, peerID)
 	return &pb.ConversationItem{
-		ConversationId: conv.ID,
-		PeerId:         peerID,
-		PeerRole:       peerRole,
-		PeerName:       name,
-		PeerEmail:      email,
-		Status:         pb.ConversationStatus(conv.Status),
-		UnreadCount:    unread,
-		LatestMessage:  conv.LastMessagePreview,
+		ConversationId:  conv.ID,
+		PeerId:          peerID,
+		PeerRole:        peerRole,
+		PeerName:        name,
+		PeerEmail:       email,
+		Status:          pb.ConversationStatus(conv.Status),
+		UnreadCount:     unread,
+		LatestMessage:   conv.LastMessagePreview,
 		LatestMessageAt: conv.LastMessageAt.Unix(),
-		UpdatedAt:      conv.UpdatedAt.Unix(),
-		CanSend:        canSend(&conv, operatorRole, operatorID),
+		UpdatedAt:       conv.UpdatedAt.Unix(),
+		CanSend:         canSend(&conv, operatorRole, operatorID),
 	}, nil
 }
 

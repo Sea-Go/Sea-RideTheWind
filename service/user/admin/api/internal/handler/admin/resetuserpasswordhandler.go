@@ -4,12 +4,12 @@
 package admin
 
 import (
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/response"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/api/internal/logic/admin"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/common/errmsg"
 	"net/http"
-	"sea-try-go/service/common/response"
-	"sea-try-go/service/user/admin/api/internal/logic/admin"
-	"sea-try-go/service/user/admin/api/internal/svc"
-	"sea-try-go/service/user/admin/api/internal/types"
-	"sea-try-go/service/user/common/errmsg"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 )

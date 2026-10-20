@@ -7,7 +7,7 @@ package likeservice
 import (
 	"context"
 
-	"sea-try-go/service/like/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

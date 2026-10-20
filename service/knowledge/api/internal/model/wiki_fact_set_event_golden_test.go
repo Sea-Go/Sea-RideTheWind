@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"testing"
 
-	"sea-try-go/service/knowledge/api/internal/object"
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 )
 
 // This fixed two-source EventSpec gives downstream owners the separate
@@ -35,22 +35,22 @@ func TestWikiFactSetEventSpecStaticGolden(t *testing.T) {
 			SourceRevisionId: sourceAID, SourceContentSha256: sources[0].ContentSha256,
 			Locator: "paragraph:2", SourceByteStart: strconv.Itoa(bytes.Index(sourceA, []byte(quoteA))),
 			SourceByteEnd: strconv.Itoa(bytes.Index(sourceA, []byte(quoteA)) + len(quoteA)),
-			SourceQuote: quoteA, SourceQuoteSha256: object.Hash([]byte(quoteA)),
+			SourceQuote:   quoteA, SourceQuoteSha256: object.Hash([]byte(quoteA)),
 			Required: true, ConflictGroup: "conflict_1"},
 		{FactId: wikiQualityFactID(sourceBID, "paragraph:2", object.Hash([]byte(quoteB))),
 			SourceRevisionId: sourceBID, SourceContentSha256: sources[1].ContentSha256,
 			Locator: "paragraph:2", SourceByteStart: strconv.Itoa(bytes.Index(sourceB, []byte(quoteB))),
 			SourceByteEnd: strconv.Itoa(bytes.Index(sourceB, []byte(quoteB)) + len(quoteB)),
-			SourceQuote: quoteB, SourceQuoteSha256: object.Hash([]byte(quoteB)),
+			SourceQuote:   quoteB, SourceQuoteSha256: object.Hash([]byte(quoteB)),
 			Required: true, ConflictGroup: "conflict_1"},
 	}
 	sortWikiFactSetFacts(facts)
 	r := wikiFactSetRevision{SchemaVersion: wikiFactSetRevisionSchema,
-		FactSetID: "fact_set_55555555-5555-4555-8555-555555555555",
+		FactSetID:         "fact_set_55555555-5555-4555-8555-555555555555",
 		FactSetRevisionID: "fact_set_revision_66666666-6666-4666-8666-666666666666",
-		FactSetRevision: "1", ModuleID: moduleID, PageID: pageID,
+		FactSetRevision:   "1", ModuleID: moduleID, PageID: pageID,
 		WikiRevisionID: wikiID, WikiOriginKind: "manual_revision",
-		WikiContentSHA256: object.Hash([]byte("Two frozen Source facts.")),
+		WikiContentSHA256:   object.Hash([]byte("Two frozen Source facts.")),
 		SourceScopeRevision: scope, SourceRevisions: sources, Facts: facts,
 		FactsComplete: true, DeclarationSource: wikiFactSetDeclarationSource,
 		ActorID: "test-admin", Reason: "human declares this approved scope complete",
@@ -65,8 +65,8 @@ func TestWikiFactSetEventSpecStaticGolden(t *testing.T) {
 	}
 	event := Event{AggregateVersion: 1,
 		OperationID: "command:" + object.Hash([]byte("wiki-fact-set/"+wikiID+"/test-admin/fact-set-golden")),
-		EventID: "evt_77777777-7777-4777-8777-777777777777",
-		EventType: wikiFactSetEventType, SchemaVersion: 1,
+		EventID:     "evt_77777777-7777-4777-8777-777777777777",
+		EventType:   wikiFactSetEventType, SchemaVersion: 1,
 		Producer: "ridethewind.knowledge", AggregateID: moduleID,
 		OccurredAt: "2026-09-16T00:00:00Z", Payload: payload}
 	raw, err := json.Marshal(event)

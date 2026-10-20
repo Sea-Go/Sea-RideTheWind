@@ -7,7 +7,7 @@ package favoriteservice
 import (
 	"context"
 
-	"sea-try-go/service/favorite/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

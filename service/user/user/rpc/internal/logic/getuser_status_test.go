@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/user/user/rpc/internal/model"
-	"sea-try-go/service/user/user/rpc/internal/svc"
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
