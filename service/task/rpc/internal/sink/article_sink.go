@@ -100,7 +100,7 @@ func (c *ArticleLikeSinkConsumer) Consume(ctx context.Context, key string, value
 			return err
 		}
 		userID, d, ok := parseVal(value)
-		if !ok || userID == 0 || d == 0 {
+		if !ok || userID == 0 {
 			return nil
 		}
 		c.mu.Lock()
@@ -129,11 +129,14 @@ func parseVal(val string) (int64, int64, bool) {
 	}
 	var v articleVal
 	if err := json.Unmarshal([]byte(val), &v); err == nil {
-		if v.Cur == 0 {
-			v.Cur = 1
+		// UserID 解析失败按脏数据跳过并留痕，不再静默归零。
+		userID, err := strconv.ParseInt(v.UserID, 10, 64)
+		if err != nil {
+			logx.Errorf("article_sink: 脏 UserID %q 进入计数聚合，跳过该条", v.UserID)
+			return 0, v.Cur, false
 		}
-		UserID, _ := strconv.ParseInt(v.UserID, 10, 64)
-		return UserID, v.Cur, UserID != 0
+		// Cur 为当前真实计数：合法的 0（点赞全部撤销）不再伪造为 1。
+		return userID, v.Cur, userID != 0
 	}
 	return 0, 0, false
 }
@@ -444,7 +447,7 @@ func (c *ArticleLikeSinkConsumer) completeArticleLike(ctx context.Context, userI
 		"updateAt", nowUnix,
 	).Result()
 
-	ev := reward.NewEvent(strconv.Itoa(int(userID)), strconv.Itoa(articleTaskID), 5)
+	ev := reward.NewEventFromInts(userID, articleTaskID, 5)
 	if err := c.rewardProduct.Enqueue(ctx, ev); err != nil {
 		//需要补充如果失败后的异常处理
 		return err

@@ -305,15 +305,22 @@ func getFuncName(pc uintptr) string {
 		return "unknown"
 	}
 	fullName := fn.Name()
-	parts := strings.Split(fullName, ".")
-	if len(parts) >= 2 {
-		// 处理匿名函数/闭包场景
-		if strings.Contains(parts[len(parts)-2], "func") {
-			return parts[len(parts)-1]
-		}
-		return strings.Join(parts[len(parts)-2:], ".")
+	// 函数名以最后一个 '.' 与包路径分隔；包路径本身可含 '.'（如
+	// github.com/Sea-Go/...）。旧实现按任意 '.' 切分在无点旧模块名下恰好
+	// 成立，模块正名后会把包路径劈碎（截出 "com/Sea-Go/..."）。
+	idx := strings.LastIndex(fullName, ".")
+	if idx <= 0 {
+		return filepath.Base(fullName)
 	}
-	return filepath.Base(fullName)
+	if strings.Contains(fullName[:idx], "func") {
+		// 匿名函数/闭包场景：只返回函数段
+		return fullName[idx+1:]
+	}
+	pkgPath := fullName[:idx]
+	if base := strings.LastIndex(pkgPath, "/"); base >= 0 {
+		pkgPath = pkgPath[base+1:]
+	}
+	return pkgPath + fullName[idx:]
 }
 
 // getCallChain 采集并格式化完整调用链路（过滤无关栈帧）

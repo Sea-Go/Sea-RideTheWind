@@ -146,7 +146,7 @@ func TestGetFuncName(t *testing.T) {
 		t.Fatal("runtime.Caller failed")
 	}
 	funcName := getFuncName(pc)
-	expected := "github.com/Sea-Go/Sea-RideTheWind/service/common/logger.TestGetFuncName"
+	expected := "logger.TestGetFuncName"
 	if funcName != expected {
 		t.Errorf("getFuncName failed, expected '%s', got '%s'", expected, funcName)
 	}

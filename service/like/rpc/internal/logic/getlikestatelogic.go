@@ -59,7 +59,12 @@ func (l *GetLikeStateLogic) GetLikeState(in *pb.GetLikeStateReq) (*pb.GetLikeSta
 			missingIds = append(missingIds, id)
 			continue
 		}
-		state, _ := strconv.ParseInt(stateStr, 10, 32)
+		state, parseErr := strconv.ParseInt(stateStr, 10, 32)
+		if parseErr != nil {
+			// 缓存值损坏按未命中回源修复，不展示伪造的 0 状态。
+			missingIds = append(missingIds, id)
+			continue
+		}
 		resp.States[id] = int32(state)
 	}
 
