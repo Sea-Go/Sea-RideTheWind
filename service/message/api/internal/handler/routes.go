@@ -6,9 +6,9 @@ package handler
 import (
 	"net/http"
 
-	message "sea-try-go/service/message/api/internal/handler/message"
-	messageadmin "sea-try-go/service/message/api/internal/handler/messageadmin"
-	"sea-try-go/service/message/api/internal/svc"
+	message "github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/handler/message"
+	messageadmin "github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/handler/messageadmin"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
 )

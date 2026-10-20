@@ -3,8 +3,8 @@ package logic
 import (
 	"context"
 
-	"sea-try-go/service/hot/rpc/internal/svc"
-	"sea-try-go/service/hot/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"
@@ -27,9 +27,9 @@ func NewLikeArticleLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LikeA
 
 // LikeArticle 点赞文章（预留接口）
 // 实现时需要：
-// 1. 更新 PostgreSQL article.like_count
-// 2. 发布 ArticleHotEvent 到 Kafka topic "article-hot-events"
-//    业务侧只需发送 article_id + type，权重由热点系统配置决定
+//  1. 更新 PostgreSQL article.like_count
+//  2. 发布 ArticleHotEvent 到 Kafka topic "article-hot-events"
+//     业务侧只需发送 article_id + type，权重由热点系统配置决定
 //
 // 示例发布逻辑：
 //

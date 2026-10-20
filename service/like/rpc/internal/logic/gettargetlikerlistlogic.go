@@ -6,11 +6,11 @@ import (
 	"math"
 	"strconv"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/like/common/errmsg"
-	"sea-try-go/service/like/rpc/internal/metrics"
-	"sea-try-go/service/like/rpc/internal/svc"
-	"sea-try-go/service/like/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel/attribute"

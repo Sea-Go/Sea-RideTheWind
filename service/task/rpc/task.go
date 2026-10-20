@@ -3,13 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"sea-try-go/service/common/observability"
-	"sea-try-go/service/task/rpc/internal/Init"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/Init"
 
-	"sea-try-go/service/task/rpc/internal/config"
-	"sea-try-go/service/task/rpc/internal/server"
-	"sea-try-go/service/task/rpc/internal/svc"
-	"sea-try-go/service/task/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/server"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"

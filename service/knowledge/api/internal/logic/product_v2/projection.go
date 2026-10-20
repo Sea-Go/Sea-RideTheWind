@@ -1,8 +1,8 @@
 package product_v2
 
 import (
-	"sea-try-go/service/knowledge/api/internal/types"
-	"sea-try-go/service/user/user/identity"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/identity"
 )
 
 // The authenticated RTW source retains its frozen legacy storage slot. The

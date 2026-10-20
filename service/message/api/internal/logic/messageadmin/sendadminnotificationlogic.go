@@ -7,12 +7,12 @@ import (
 	"context"
 	"time"
 
-	"sea-try-go/service/message/api/internal/logic/shared"
-	"sea-try-go/service/message/api/internal/metrics"
-	"sea-try-go/service/message/api/internal/svc"
-	"sea-try-go/service/message/api/internal/types"
-	messagecommon "sea-try-go/service/message/common"
-	"sea-try-go/service/message/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/logic/shared"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/api/internal/types"
+	messagecommon "github.com/Sea-Go/Sea-RideTheWind/service/message/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 )
 
 func TestMaxSimAggregationIsExplicitAndPreserved(t *testing.T) {

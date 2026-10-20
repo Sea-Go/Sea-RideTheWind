@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"sea-try-go/service/common/logger"
-	followcommon "sea-try-go/service/follow/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	followcommon "github.com/Sea-Go/Sea-RideTheWind/service/follow/common"
 )
 
 func extractUserID(ctx context.Context) (int64, error) {

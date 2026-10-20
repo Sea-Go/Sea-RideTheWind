@@ -33,7 +33,7 @@ KqPusherConf:
 MinIO:
   Endpoint: "minio:9000"
   # 部署环境建议填写对外可访问的静态资源基址；留空时回退到 Endpoint。
-  PublicBaseURL: "http://sea-ridethewindbreakthewaves.xyz:39000"
+  PublicBaseURL: ""
   AccessKeyID: "minioadmin"
   SecretAccessKey: "minioadmin"
   BucketName: "articles"

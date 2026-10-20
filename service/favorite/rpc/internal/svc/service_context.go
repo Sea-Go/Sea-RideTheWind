@@ -1,10 +1,10 @@
 package svc
 
 import (
-	"sea-try-go/service/article/rpc/articleservice"
-	"sea-try-go/service/favorite/rpc/internal/config"
-	"sea-try-go/service/favorite/rpc/internal/model"
-	"sea-try-go/service/user/user/rpc/userservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/userservice"
 
 	"github.com/zeromicro/go-zero/zrpc"
 )

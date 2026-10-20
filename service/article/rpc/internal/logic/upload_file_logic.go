@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"sea-try-go/service/article/common/errmsg"
-	"sea-try-go/service/article/rpc/internal/svc"
-	"sea-try-go/service/article/rpc/metrics"
-	__ "sea-try-go/service/article/rpc/pb"
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/common/snowflake"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/metrics"
+	__ "github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/zeromicro/go-zero/core/logx"

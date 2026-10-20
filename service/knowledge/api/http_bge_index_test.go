@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 )
 
 // The live DC acceptance owns this disposable gateway and the pinned provider.

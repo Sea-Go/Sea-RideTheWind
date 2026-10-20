@@ -6,10 +6,10 @@ package hot
 import (
 	"net/http"
 
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/api/internal/logic/hot"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/api/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
-	"sea-try-go/service/hot/api/internal/logic/hot"
-	"sea-try-go/service/hot/api/internal/svc"
-	"sea-try-go/service/hot/api/internal/types"
 )
 
 func GetHotArticlesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

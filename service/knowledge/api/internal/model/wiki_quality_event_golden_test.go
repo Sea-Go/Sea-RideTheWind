@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"sea-try-go/service/knowledge/api/internal/object"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
 )
 
 // This one fixed synthetic EventSpec is shared with downstream warehouse and

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"sea-try-go/service/common/communityfact"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/communityfact"
 )
 
 func deliveredCommentAuthority(row CommentDomainFactOutbox) (communityfact.AuthorityFact, commentFact, bool) {

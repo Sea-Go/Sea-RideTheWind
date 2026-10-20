@@ -5,11 +5,11 @@ package comment
 
 import (
 	"context"
-	"sea-try-go/service/comment/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/pb"
 	"strings"
 
-	"sea-try-go/service/comment/api/internal/svc"
-	"sea-try-go/service/comment/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/api/internal/types"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"

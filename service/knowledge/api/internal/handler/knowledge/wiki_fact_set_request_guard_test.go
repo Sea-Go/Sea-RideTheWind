@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 	"github.com/zeromicro/go-zero/rest/pathvar"
-	"sea-try-go/service/knowledge/api/internal/types"
 )
 
 func TestFreezeWikiFactSetJSONRejectsCorruptNestedCommands(t *testing.T) {

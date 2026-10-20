@@ -5,12 +5,12 @@ package knowledge
 
 import (
 	"fmt"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
 	"net/http"
-	"sea-try-go/service/knowledge/api/internal/model"
 
-	"sea-try-go/service/knowledge/api/internal/logic/knowledge"
-	"sea-try-go/service/knowledge/api/internal/svc"
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/logic/knowledge"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 )

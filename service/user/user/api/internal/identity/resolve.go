@@ -5,8 +5,8 @@ package identity
 import (
 	"context"
 
-	shared "sea-try-go/service/user/user/identity"
-	"sea-try-go/service/user/user/rpc/pb"
+	shared "github.com/Sea-Go/Sea-RideTheWind/service/user/user/identity"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 )
 
 var (

@@ -5,11 +5,11 @@ import (
 	"sort"
 	"strconv"
 
-	"sea-try-go/service/common/logger"
-	followcommon "sea-try-go/service/follow/common"
-	"sea-try-go/service/follow/rpc/internal/svc"
-	"sea-try-go/service/follow/rpc/pb"
-	"sea-try-go/service/user/user/rpc/userservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	followcommon "github.com/Sea-Go/Sea-RideTheWind/service/follow/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/userservice"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

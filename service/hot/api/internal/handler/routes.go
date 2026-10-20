@@ -6,8 +6,8 @@ package handler
 import (
 	"net/http"
 
-	hot "sea-try-go/service/hot/api/internal/handler/hot"
-	"sea-try-go/service/hot/api/internal/svc"
+	hot "github.com/Sea-Go/Sea-RideTheWind/service/hot/api/internal/handler/hot"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
 )

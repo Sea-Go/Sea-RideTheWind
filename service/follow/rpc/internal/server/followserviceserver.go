@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"sea-try-go/service/follow/rpc/internal/logic"
-	"sea-try-go/service/follow/rpc/internal/svc"
-	"sea-try-go/service/follow/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/follow/rpc/pb"
 )
 
 type FollowServiceServer struct {

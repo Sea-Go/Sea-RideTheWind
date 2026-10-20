@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 )
 
 const toolFixtureScopeKey = "test-only-tools-scope-key-32-bytes-minimum"

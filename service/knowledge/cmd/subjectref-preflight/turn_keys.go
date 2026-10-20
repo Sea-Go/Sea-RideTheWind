@@ -1,6 +1,6 @@
 package main
 
-import "sea-try-go/service/knowledge/internal/subjectrefturn"
+import "github.com/Sea-Go/Sea-RideTheWind/service/knowledge/internal/subjectrefturn"
 
 const maxTurnKeyScanDepth = subjectrefturn.MaxTurnKeyScanDepth
 

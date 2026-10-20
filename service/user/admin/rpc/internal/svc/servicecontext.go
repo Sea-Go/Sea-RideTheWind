@@ -3,11 +3,11 @@ package svc
 import (
 	"context"
 
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/common/snowflake"
-	"sea-try-go/service/user/admin/rpc/internal/config"
-	"sea-try-go/service/user/admin/rpc/internal/model"
-	"sea-try-go/service/user/common/cryptx"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/common/cryptx"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"

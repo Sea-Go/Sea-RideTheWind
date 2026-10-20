@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"sea-try-go/service/common/logger"
-	favoritecommon "sea-try-go/service/favorite/common"
-	"sea-try-go/service/favorite/rpc/internal/metrics"
-	"sea-try-go/service/favorite/rpc/internal/model"
-	"sea-try-go/service/favorite/rpc/internal/svc"
-	favoritepb "sea-try-go/service/favorite/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	favoritecommon "github.com/Sea-Go/Sea-RideTheWind/service/favorite/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/svc"
+	favoritepb "github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel"

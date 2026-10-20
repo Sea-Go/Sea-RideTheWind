@@ -1,8 +1,8 @@
 package svc
 
 import (
-	"sea-try-go/service/user/user/rpc/internal/config"
-	"sea-try-go/service/user/user/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/model"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )

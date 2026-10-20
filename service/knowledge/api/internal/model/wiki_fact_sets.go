@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"sea-try-go/service/knowledge/api/internal/object"
-	"sea-try-go/service/knowledge/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
 
 	"github.com/jackc/pgx/v5"
 )

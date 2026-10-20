@@ -1,9 +1,9 @@
 package svc
 
 import (
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/mq/internal/config"
 	"log"
-	"sea-try-go/service/like/rpc/internal/model"
-	"sea-try-go/service/like/rpc/internal/mq/internal/config"
 
 	"github.com/zeromicro/go-queue/kq"
 	"gorm.io/driver/postgres"

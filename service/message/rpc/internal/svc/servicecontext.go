@@ -1,11 +1,11 @@
 package svc
 
 import (
-	"sea-try-go/service/common/snowflake"
-	"sea-try-go/service/message/rpc/internal/config"
-	"sea-try-go/service/message/rpc/internal/model"
-	"sea-try-go/service/user/admin/rpc/adminservice"
-	"sea-try-go/service/user/user/rpc/userservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/admin/rpc/adminservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/userservice"
 
 	"github.com/zeromicro/go-zero/zrpc"
 )

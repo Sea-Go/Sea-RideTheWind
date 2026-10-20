@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"sea-try-go/service/points/rpc/internal/logic"
-	"sea-try-go/service/points/rpc/internal/svc"
-	"sea-try-go/service/points/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/logic"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/pb"
 )
 
 type PointsServiceServer struct {

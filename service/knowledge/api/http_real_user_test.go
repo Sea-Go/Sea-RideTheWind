@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"sea-try-go/service/knowledge/api/internal/model"
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"

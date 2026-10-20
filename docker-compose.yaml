@@ -14,7 +14,7 @@ services:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd
     command: >
       etcd
-      -advertise-client-urls=http://etcd:2379,http://141.11.46.61:32379
+      -advertise-client-urls=http://etcd:2379,http://${PUBLIC_HOST:-localhost}:32379
       -listen-client-urls http://0.0.0.0:2379
       --data-dir /etcd
     ports:
@@ -71,7 +71,7 @@ services:
       - "37687:7687"   # Bolt
       - "32004:2004"   # Prometheus metrics（需要启用配置，见下方 volumes/conf）
     environment:
-      - NEO4J_AUTH=neo4j/Sea-TryGo
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:?set NEO4J_PASSWORD}
       - NEO4J_dbms_logs_debug_level=INFO
     volumes:
       - ./data/neo4j/data:/data
@@ -108,8 +108,8 @@ services:
     container_name: "${CONTAINER_PREFIX:-Sea}-minio"
     image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_PROMETHEUS_AUTH_TYPE: public
     ports:
       - "39000:9000"
@@ -187,8 +187,8 @@ services:
     image: grafana/grafana:latest
     container_name: "${CONTAINER_PREFIX:-Sea}-grafana"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_AUTH_ANONYMOUS_ENABLED=false
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
@@ -287,4 +287,4 @@ volumes:
   redisinsight_data:
 networks:
   default:
-    name: "${DOCKER_NETWORK:-Sea-TryGo}"
+    name: "${DOCKER_NETWORK:-sea-ridethewind}"

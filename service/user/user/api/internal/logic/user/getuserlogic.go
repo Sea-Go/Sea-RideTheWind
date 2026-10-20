@@ -6,11 +6,11 @@ package user
 import (
 	"context"
 	"errors"
-	"sea-try-go/service/common/logger"
-	"sea-try-go/service/user/common/errmsg"
-	"sea-try-go/service/user/user/api/internal/identity"
-	"sea-try-go/service/user/user/api/internal/svc"
-	"sea-try-go/service/user/user/api/internal/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/logger"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/common/errmsg"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/identity"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/types"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"

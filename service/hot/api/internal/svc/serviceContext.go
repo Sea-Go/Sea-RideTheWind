@@ -6,9 +6,9 @@ package svc
 import (
 	"context"
 
-	"sea-try-go/service/article/rpc/articleservice"
-	"sea-try-go/service/hot/api/internal/config"
-	hotpb "sea-try-go/service/hot/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/article/rpc/articleservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/hot/api/internal/config"
+	hotpb "github.com/Sea-Go/Sea-RideTheWind/service/hot/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 )

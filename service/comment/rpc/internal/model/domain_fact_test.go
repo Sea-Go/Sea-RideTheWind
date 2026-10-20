@@ -12,7 +12,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	kqtypes "sea-try-go/service/comment/rpc/common/types"
+	kqtypes "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/common/types"
 )
 
 func factTestDB(t *testing.T) *gorm.DB {

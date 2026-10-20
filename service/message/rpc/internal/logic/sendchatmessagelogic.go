@@ -5,12 +5,12 @@ import (
 	"errors"
 	"time"
 
-	"sea-try-go/service/common/snowflake"
-	messagecommon "sea-try-go/service/message/common"
-	"sea-try-go/service/message/rpc/internal/metrics"
-	"sea-try-go/service/message/rpc/internal/model"
-	"sea-try-go/service/message/rpc/internal/svc"
-	"sea-try-go/service/message/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/snowflake"
+	messagecommon "github.com/Sea-Go/Sea-RideTheWind/service/message/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"

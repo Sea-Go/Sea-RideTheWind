@@ -1,19 +1,19 @@
-**# Sea-TryGo Docker Compose 组件说明（含可视化面板与账号密码）
+**# Sea-RideTheWind Docker Compose 组件说明（含可视化面板与账号密码）
 
 ## 可视化面板（Web UI）入口（建议收藏）
 > 下面均为 **宿主机访问地址**（即你运行 docker-compose 的机器上访问）。
 
 | 面板/系统 | 入口（宿主机访问） | 默认账号/密码 | 用途 |
 |---|---|---|---|
-| **Grafana** | http://localhost:33000 | `admin / admin` | 指标可视化大盘（数据源通常接 Prometheus） |
+| **Grafana** | http://localhost:33000 | `admin / ${GRAFANA_ADMIN_PASSWORD:-admin}（默认值，生产必改）` | 指标可视化大盘（数据源通常接 Prometheus） |
 | **Prometheus** | http://localhost:39090 | 无（默认不启用登录） | 指标查询、Targets 状态、规则与告警排查 |
 | **Jaeger UI** | http://localhost:16686 | 无（默认不启用登录） | 分布式链路追踪查询与依赖分析 |
 | **Kibana** | http://localhost:35601 | 无（本配置 `xpack.security.enabled=false`） | Elasticsearch 日志检索与可视化 |
 | **Kafka UI** | http://localhost:38080 | 无（默认不启用登录） | Kafka 集群管理/Topic/Consumer/消息查看 |
 | **RedisInsight** | http://localhost:35540 | 无（首次可能引导创建本地账号） | Redis 可视化管理、键浏览、慢查询等 |
-| **Neo4j Browser** | http://localhost:37474 | `neo4j / Sea-TryGo` | Neo4j 图数据库 Web 管理与查询 |
+| **Neo4j Browser** | http://localhost:37474 | `neo4j / ${NEO4J_PASSWORD}（部署时经 .env 注入）` | Neo4j 图数据库 Web 管理与查询 |
 | **NeoDash** | http://localhost:35005 | 无（面板内配置 Neo4j 连接） | Neo4j 仪表盘（图/表/查询面板） |
-| **MinIO Console** | http://localhost:39001 | `minioadmin / minioadmin` | 对象存储管理台（Bucket/对象/策略/AccessKey） |
+| **MinIO Console** | http://localhost:39001 | `${MINIO_ACCESS_KEY:-minioadmin} / ${MINIO_SECRET_KEY:-minioadmin}（默认值，生产必改）` | 对象存储管理台（Bucket/对象/策略/AccessKey） |
 | **Flink Web UI** | http://localhost:38081 | 无（默认不启用登录） | Flink 作业管理、任务/算子监控、日志查看 |
 | **cAdvisor UI** | http://localhost:38082 | 无（默认不启用登录） | 容器资源监控 UI（也常被 Prometheus 抓取 metrics） |
 
@@ -37,7 +37,7 @@
   - `35432 -> 5432`：PostgreSQL 连接端口（psql/JDBC/ORM）
 - **账号密码**
   - 用户：`admin`
-  - 密码：`Sea-TryGo`
+  - 密码：`${POSTGRES_PASSWORD}`（部署时经 .env 注入，compose 已强制非空）
   - 数据库：`first_db`
 
 ---
@@ -69,7 +69,7 @@
   - `37687 -> 7687`：Bolt 协议（应用驱动连接端口）
   - `32004 -> 2004`：Prometheus Metrics（需要 Neo4j 配置启用并暴露 metrics）
 - **账号密码**
-  - `neo4j / Sea-TryGo`
+  - `neo4j / ${NEO4J_PASSWORD}（部署时经 .env 注入）`
 
 ---
 
@@ -80,7 +80,7 @@
   - `35005 -> 5005`：NeoDash Web UI
 - **账号密码**
   - 默认：**无**
-  - 连接 Neo4j 时使用：`neo4j / Sea-TryGo`
+  - 连接 Neo4j 时使用：`neo4j / ${NEO4J_PASSWORD}（部署时经 .env 注入）`
 
 ---
 
@@ -113,7 +113,7 @@
   - `39000 -> 9000`：S3 API（SDK/应用访问）
   - `39001 -> 9001`：MinIO Console（Web 管理台）
 - **账号密码**
-  - `minioadmin / minioadmin`
+  - `${MINIO_ACCESS_KEY:-minioadmin} / ${MINIO_SECRET_KEY:-minioadmin}（默认值，生产必改）`
 
 ---
 
@@ -185,7 +185,7 @@
 - **端口**
   - `33000 -> 3000`：Grafana Web UI
 - **账号密码**
-  - `admin / admin`
+  - `admin / ${GRAFANA_ADMIN_PASSWORD:-admin}（默认值，生产必改）`
 
 ---
 
@@ -293,7 +293,7 @@
 
 ## 网络与数据卷（简要）
 - **网络**
-  - 默认网络命名：`Sea-TryGo`（所有服务加入同一 Docker 网络，容器间可用服务名互通）
+  - 默认网络命名：`sea-ridethewind`（所有服务加入同一 Docker 网络，容器间可用服务名互通）
 - **数据卷（named volumes）**
   - `prometheus_data`：Prometheus 时序数据
   - `grafana_data`：Grafana 数据（数据源/仪表盘/用户等）

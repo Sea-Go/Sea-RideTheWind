@@ -4,9 +4,9 @@
 package svc
 
 import (
-	"sea-try-go/service/user/user/api/internal/config"
-	"sea-try-go/service/user/user/api/internal/middleware"
-	"sea-try-go/service/user/user/rpc/userservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/api/internal/middleware"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/userservice"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/rest"

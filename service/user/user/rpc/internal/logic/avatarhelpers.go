@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"sea-try-go/service/user/user/rpc/internal/model"
-	"sea-try-go/service/user/user/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 )
 
 func avatarHistoryItemFromModel(item *model.UserAvatarHistory) *pb.AvatarHistoryItem {

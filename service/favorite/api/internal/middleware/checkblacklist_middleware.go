@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	favoritecommon "sea-try-go/service/favorite/common"
+	favoritecommon "github.com/Sea-Go/Sea-RideTheWind/service/favorite/common"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )

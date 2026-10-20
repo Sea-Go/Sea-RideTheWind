@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"sea-try-go/service/favorite/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/favorite/rpc/internal/model"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

@@ -1,9 +1,9 @@
 package svc
 
 import (
-	"sea-try-go/service/like/rpc/internal/config"
-	"sea-try-go/service/like/rpc/internal/model"
-	"sea-try-go/service/message/rpc/messageservice"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/like/rpc/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/messageservice"
 
 	"github.com/zeromicro/go-queue/kq"
 	"github.com/zeromicro/go-zero/core/stores/redis"

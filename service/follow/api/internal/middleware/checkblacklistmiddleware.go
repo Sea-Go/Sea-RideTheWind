@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	followcommon "sea-try-go/service/follow/common"
+	followcommon "github.com/Sea-Go/Sea-RideTheWind/service/follow/common"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	kqtypes "sea-try-go/service/comment/rpc/common/types"
-	"sea-try-go/service/comment/rpc/internal/svc"
-	"sea-try-go/service/common/observability"
-	messagepb "sea-try-go/service/message/rpc/pb"
+	kqtypes "github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/common/types"
+	"github.com/Sea-Go/Sea-RideTheWind/service/comment/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/observability"
+	messagepb "github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.opentelemetry.io/otel/attribute"

@@ -3,9 +3,9 @@ package reward
 /*import (
 	"context"
 	"log"
-	pointspb "sea-try-go/service/points/rpc/pb"
-	"sea-try-go/service/task/rpc/internal/svc"
-	//userpb "sea-try-go/service/user/rpc/pb"
+	pointspb "github.com/Sea-Go/Sea-RideTheWind/service/points/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/rpc/internal/svc"
+	//userpb "github.com/Sea-Go/Sea-RideTheWind/service/user/rpc/pb"
 	"strconv"
 	"strings"
 	"time"

@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/api/internal/logic/task"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/api/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/task/api/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
-	"sea-try-go/service/task/api/internal/logic/task"
-	"sea-try-go/service/task/api/internal/svc"
-	"sea-try-go/service/task/api/internal/types"
 )
 
 func GetTaskHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

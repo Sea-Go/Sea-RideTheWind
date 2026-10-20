@@ -6,11 +6,11 @@ package handler
 import (
 	"net/http"
 
-	knowledge "sea-try-go/service/knowledge/api/internal/handler/knowledge"
-	product "sea-try-go/service/knowledge/api/internal/handler/product"
-	product_v2 "sea-try-go/service/knowledge/api/internal/handler/product_v2"
-	worker "sea-try-go/service/knowledge/api/internal/handler/worker"
-	"sea-try-go/service/knowledge/api/internal/svc"
+	knowledge "github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/handler/knowledge"
+	product "github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/handler/product"
+	product_v2 "github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/handler/product_v2"
+	worker "github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/handler/worker"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
 )

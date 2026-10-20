@@ -20,22 +20,22 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"sea-try-go/service/knowledge/api/internal/config"
-	"sea-try-go/service/knowledge/api/internal/model"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/config"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/model"
 
 	jsoncanonicalizer "github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/zeromicro/go-zero/core/conf"
 
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/object"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/testenv"
+	"github.com/Sea-Go/Sea-RideTheWind/service/knowledge/api/internal/types"
+	rtwjwt "github.com/Sea-Go/Sea-RideTheWind/service/user/common/jwt"
+	"github.com/Sea-Go/Sea-RideTheWind/service/user/user/rpc/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"sea-try-go/service/knowledge/api/internal/object"
-	"sea-try-go/service/knowledge/api/internal/testenv"
-	"sea-try-go/service/knowledge/api/internal/types"
-	rtwjwt "sea-try-go/service/user/common/jwt"
-	"sea-try-go/service/user/user/rpc/pb"
 )
 
 type productUserRPC struct {

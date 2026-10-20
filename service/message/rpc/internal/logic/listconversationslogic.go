@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	messagecommon "sea-try-go/service/message/common"
-	"sea-try-go/service/message/rpc/internal/metrics"
-	"sea-try-go/service/message/rpc/internal/svc"
-	"sea-try-go/service/message/rpc/pb"
+	messagecommon "github.com/Sea-Go/Sea-RideTheWind/service/message/common"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/metrics"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/internal/svc"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"
@@ -63,10 +63,10 @@ func (l *ListConversationsLogic) ListConversations(in *pb.ConversationListReq) (
 	}
 
 	return &pb.ConversationListResp{
-		Code:       int32(messagecommon.Success),
-		Msg:        messagecommon.GetErrMsg(messagecommon.Success),
-		Items:      respItems,
-		Total:      total,
+		Code:        int32(messagecommon.Success),
+		Msg:         messagecommon.GetErrMsg(messagecommon.Success),
+		Items:       respItems,
+		Total:       total,
 		UnreadCount: unreadTotal,
 	}, nil
 }

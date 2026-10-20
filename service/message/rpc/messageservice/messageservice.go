@@ -7,7 +7,7 @@ package messageservice
 import (
 	"context"
 
-	"sea-try-go/service/message/rpc/pb"
+	"github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

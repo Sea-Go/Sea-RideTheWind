@@ -1480,7 +1480,7 @@ const file_proto_security_proto_rawDesc = "" +
 	"\x0fSanitizeContent\x12 .security.SanitizeContentRequest\x1a!.security.SanitizeContentResponse2\xc9\x01\n" +
 	"\x14ImageSecurityService\x12P\n" +
 	"\rDetectImageAd\x12\x1e.security.DetectImageAdRequest\x1a\x1f.security.DetectImageAdResponse\x12_\n" +
-	"\x12DetectImageAdBatch\x12#.security.DetectImageAdBatchRequest\x1a$.security.DetectImageAdBatchResponseB$Z\"sea-try-go/service/security/rpc/pbb\x06proto3"
+	"\x12DetectImageAdBatch\x12#.security.DetectImageAdBatchRequest\x1a$.security.DetectImageAdBatchResponseB$Z\"github.com/Sea-Go/Sea-RideTheWind/service/security/rpc/pbb\x06proto3"
 
 var (
 	file_proto_security_proto_rawDescOnce sync.Once
