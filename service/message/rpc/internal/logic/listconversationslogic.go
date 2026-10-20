@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/paging"
 	"time"
 
 	messagecommon "github.com/Sea-Go/Sea-RideTheWind/service/message/common"
@@ -39,7 +40,7 @@ func (l *ListConversationsLogic) ListConversations(in *pb.ConversationListReq) (
 		return nil, err
 	}
 
-	limit := normalizeLimit(in.Limit, l.svcCtx.Config.List.DefaultLimit, l.svcCtx.Config.List.MaxLimit)
+	limit := paging.Normalize(in.Limit, l.svcCtx.Config.List.DefaultLimit, l.svcCtx.Config.List.MaxLimit)
 	items, total, err := l.svcCtx.MessageModel.ListConversations(l.ctx, int32(in.OperatorRole), in.OperatorId, in.Offset, limit)
 	if err != nil {
 		metrics.ObserveDBError("conversation", "list")

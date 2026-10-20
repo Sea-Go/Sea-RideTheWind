@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"fmt"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/paging"
 	"math"
 	"strconv"
 
@@ -41,10 +42,7 @@ func (l *GetTargetLikerListLogic) GetTargetLikerList(in *pb.GetTargetLikerListRe
 		attribute.Int64("query.page_size", int64(in.PageSize)),
 	)
 
-	limit := int(in.PageSize)
-	if limit <= 0 || limit > 100 {
-		limit = 10
-	}
+	limit := paging.Normalize(int(in.PageSize), 10, 100)
 	fetchLimit := limit + 1
 	redisKey := fmt.Sprintf("target_liker_list:%s:%s", in.TargetType, in.TargetId)
 	var maxScore int64

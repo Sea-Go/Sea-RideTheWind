@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/paging"
 	"testing"
 
 	pb "github.com/Sea-Go/Sea-RideTheWind/service/message/rpc/pb"
@@ -18,16 +19,16 @@ func TestMessageValidRole(t *testing.T) {
 }
 
 func TestMessageNormalizeLimit(t *testing.T) {
-	if got := normalizeLimit(0, 20, 100); got != 20 {
+	if got := paging.Normalize(int32(0), 20, 100); got != 20 {
 		t.Errorf("limit<=0 应回退默认，实际 %d", got)
 	}
-	if got := normalizeLimit(500, 20, 100); got != 100 {
+	if got := paging.Normalize(int32(500), 20, 100); got != 100 {
 		t.Errorf("超上限应截断，实际 %d", got)
 	}
-	if got := normalizeLimit(50, 20, 100); got != 50 {
+	if got := paging.Normalize(int32(50), 20, 100); got != 50 {
 		t.Errorf("合法值应保留，实际 %d", got)
 	}
-	if got := normalizeLimit(50, 20, 0); got != 50 {
+	if got := paging.Normalize(int32(50), 20, 0); got != 50 {
 		t.Errorf("maxLimit<=0 时不应截断，实际 %d", got)
 	}
 }
