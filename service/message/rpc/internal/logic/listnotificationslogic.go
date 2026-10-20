@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/paging"
 	"time"
 
 	messagecommon "github.com/Sea-Go/Sea-RideTheWind/service/message/common"
@@ -39,7 +40,7 @@ func (l *ListNotificationsLogic) ListNotifications(in *pb.NotificationListReq) (
 		return nil, err
 	}
 
-	limit := normalizeLimit(in.Limit, l.svcCtx.Config.List.DefaultLimit, l.svcCtx.Config.List.MaxLimit)
+	limit := paging.Normalize(in.Limit, l.svcCtx.Config.List.DefaultLimit, l.svcCtx.Config.List.MaxLimit)
 	items, total, unread, err := l.svcCtx.MessageModel.ListNotifications(l.ctx, in.UserId, in.Offset, limit, in.UnreadOnly)
 	if err != nil {
 		metrics.ObserveDBError("notification", "list")

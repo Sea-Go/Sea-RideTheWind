@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/paging"
 	"sort"
 	"strconv"
 
@@ -44,13 +45,7 @@ func normalizeListReq(defaultLimit, maxLimit int32, in *pb.ListReq) (int64, int3
 		offset = 0
 	}
 
-	limit := in.GetLimit()
-	if limit <= 0 {
-		limit = defaultLimit
-	}
-	if maxLimit > 0 && limit > maxLimit {
-		limit = maxLimit
-	}
+	limit := paging.Normalize(in.GetLimit(), defaultLimit, maxLimit)
 
 	return in.GetUserId(), offset, limit, nil
 }

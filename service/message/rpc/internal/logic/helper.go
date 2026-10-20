@@ -31,16 +31,6 @@ func validRole(role pb.SenderRole) bool {
 	return role == pb.SenderRole_USER || role == pb.SenderRole_ADMIN
 }
 
-func normalizeLimit(limit, defaultLimit, maxLimit int32) int32 {
-	if limit <= 0 {
-		limit = defaultLimit
-	}
-	if maxLimit > 0 && limit > maxLimit {
-		limit = maxLimit
-	}
-	return limit
-}
-
 func trimContent(content string) string {
 	return strings.TrimSpace(content)
 }

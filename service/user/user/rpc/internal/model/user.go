@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"github.com/Sea-Go/Sea-RideTheWind/service/common/paging"
 	"strings"
 
 	"gorm.io/gorm"
@@ -112,9 +113,7 @@ func (m *UserModel) CreateAvatarHistory(
 }
 
 func (m *UserModel) ListAvatarHistory(ctx context.Context, uid int64, limit int) ([]UserAvatarHistory, error) {
-	if limit <= 0 || limit > 30 {
-		limit = 30
-	}
+	limit = paging.Normalize(limit, 30, 30)
 
 	var histories []UserAvatarHistory
 	err := m.conn.WithContext(ctx).
