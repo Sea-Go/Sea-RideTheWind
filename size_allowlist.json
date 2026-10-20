@@ -1,0 +1,9 @@
+{
+  "limit": 800,
+  "files": {
+    "service/favorite/rpc/internal/model/favorite_delivery_test.go": 853,
+    "service/knowledge/api/http_test.go": 2065,
+    "service/knowledge/api/internal/types/types.go": 1228
+  },
+  "note": "G6 存量建档：只减不增，拆分后请收紧记录值"
+}
