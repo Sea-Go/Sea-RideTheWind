@@ -49,17 +49,23 @@ func (l *GetUserTotalLikeLogic) GetUserTotalLike(in *pb.GetUserTotalLikeReq) (*p
 		metrics.LikeQueryCacheCount.WithLabelValues("user_total", "redis_error").Inc()
 		logger.LogBusinessErr(l.ctx, errmsg.ErrorRedisSelect, err)
 	} else if val != "" {
-		span.SetAttributes(attribute.String("cache.status", "hit"))
-		metrics.LikeQueryCacheCount.WithLabelValues("user_total", "hit").Inc()
-		count, _ := strconv.ParseInt(val, 10, 64)
+		count, parseErr := strconv.ParseInt(val, 10, 64)
+		if parseErr != nil {
+			// 缓存值损坏：不返回伪造的 0，也不给损坏值续期，走 DB 回源重建。
+			metrics.LikeQueryCacheCount.WithLabelValues("user_total", "corrupt").Inc()
+			logger.LogBusinessErr(l.ctx, errmsg.ErrorRedisSelect, fmt.Errorf("user_total_like 缓存值损坏: %q", val))
+		} else {
+			span.SetAttributes(attribute.String("cache.status", "hit"))
+			metrics.LikeQueryCacheCount.WithLabelValues("user_total", "hit").Inc()
 
-		ttl := l.svcCtx.Config.Storage.Redis.CacheTTL
-		_ = l.svcCtx.BizRedis.ExpireCtx(l.ctx, redisKey, int(ttl))
+			ttl := l.svcCtx.Config.Storage.Redis.CacheTTL
+			_ = l.svcCtx.BizRedis.ExpireCtx(l.ctx, redisKey, int(ttl))
 
-		logger.LogInfo(l.ctx, "get user total like count success (from cache)")
-		return &pb.GetUserTotalLikeResp{
-			TotalLikeCount: count,
-		}, nil
+			logger.LogInfo(l.ctx, "get user total like count success (from cache)")
+			return &pb.GetUserTotalLikeResp{
+				TotalLikeCount: count,
+			}, nil
+		}
 	}
 	span.SetAttributes(attribute.String("cache.status", "miss"))
 	metrics.LikeQueryCacheCount.WithLabelValues("user_total", "miss").Inc()

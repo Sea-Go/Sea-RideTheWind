@@ -69,15 +69,14 @@ func (l *GetLikeCountLogic) GetLikeCount(in *pb.GetLikeCountReq) (*pb.GetLikeCou
 		if len(dislikeVals) > i {
 			dislikeStr = dislikeVals[i]
 		}
-		if likeStr == "" {
+		likeCount, likeErr := strconv.ParseInt(likeStr, 10, 64)
+		dislikeCount, dislikeErr := strconv.ParseInt(dislikeStr, 10, 64)
+		// like/dislike 任一缺失或缓存值损坏（非数字）都按未命中回源：
+		// DB 回源同时取两者并回写，损坏值随之被修复；不再静默按 0 展示。
+		if likeErr != nil || dislikeErr != nil || likeStr == "" || dislikeStr == "" {
 			missingIds = append(missingIds, id)
 			continue
 		}
-		if dislikeStr == "" {
-			dislikeStr = "0"
-		}
-		likeCount, _ := strconv.ParseInt(likeStr, 10, 64)
-		dislikeCount, _ := strconv.ParseInt(dislikeStr, 10, 64)
 		resp.Counts[id] = &pb.LikeCountItem{
 			LikeCount:    likeCount,
 			DislikeCount: dislikeCount,

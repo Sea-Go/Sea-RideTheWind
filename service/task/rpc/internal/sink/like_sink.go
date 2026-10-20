@@ -352,7 +352,10 @@ func (c *LikeSinkConsumer) completeLikeGT5(ctx context.Context, _uid, total int6
 	if err != nil {
 		return err
 	}
-	ev := reward.NewEvent(uid, strconv.FormatInt(taskID, 10), 5)
+	ev, err := reward.NewEvent(uid, strconv.FormatInt(taskID, 10), 5)
+	if err != nil {
+		return err
+	}
 	if err := c.rewardProduct.Enqueue(ctx, ev); err != nil {
 		return err
 	}
