@@ -67,6 +67,7 @@ func run(once bool, logger *slog.Logger) error {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
+		waitForTick := false
 		for i := 0; i < 16; i++ {
 			attempt, cancel := context.WithTimeout(ctx, 10*time.Second)
 			sent, dispatchErr := store.DispatchFavoriteFactOnce(attempt, sender)
@@ -74,12 +75,19 @@ func run(once bool, logger *slog.Logger) error {
 			if dispatchErr != nil {
 				logger.Warn("favorite delivery retry scheduled", "event", "favorite.delivery.retry",
 					"outcome", "retryable", "error_code", "DELIVERY_ATTEMPT_FAILED")
+				waitForTick = true
 				break
 			}
 			if !sent {
+				waitForTick = true
 				break
 			}
 			logger.Info("favorite fact delivered", "event", "favorite.delivery.accepted", "outcome", "succeeded")
+		}
+		// A full batch means more backlog may be pending: drain immediately
+		// instead of paying one tick per 16 events.
+		if !waitForTick {
+			continue
 		}
 		select {
 		case <-ctx.Done():
